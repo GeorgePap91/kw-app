@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="KW App">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="robots" content="noindex, nofollow">
+  <title>KW App</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div class="env" id="env" hidden>ΔΟΚΙΜΑΣΤΙΚΟ</div>
+
+<div id="boot" class="boot">
+  <div class="boot-mark">KW</div>
+  <p id="boot-msg">Φόρτωση…</p>
+  <button class="btn primary" id="boot-retry" hidden>Δοκίμασε ξανά</button>
+</div>
+
+<div id="app" hidden>
+
+  <!-- ΚΛΗΣΕΙΣ -->
+  <section class="view" id="view-calls">
+    <header class="head">
+      <div class="head-row">
+        <h1>Κλήσεις</h1>
+        <div class="head-actions">
+          <button class="icon-btn" id="refresh" aria-label="Ανανέωση" title="Ανανέωση">↻</button>
+          <button class="icon-btn" id="btn-settings" aria-label="Ρυθμίσεις" title="Τα στοιχεία μου">⚙</button>
+        </div>
+      </div>
+      <div class="segmented" role="tablist">
+        <button class="seg is-on" data-filter="pending">Αναπάντητες <span class="pill" id="c-pending">0</span></button>
+        <button class="seg" data-filter="answered">Απαντημένες <span class="pill" id="c-answered">0</span></button>
+        <button class="seg" data-filter="all">Όλες</button>
+      </div>
+    </header>
+    <div class="filter-bar" id="filter-bar" hidden>
+      <span id="filter-label"></span>
+      <button class="link" id="filter-clear">Όλες οι κλήσεις</button>
+    </div>
+    <div class="list" id="call-list"></div>
+  </section>
+
+  <!-- ΑΚΙΝΗΤΑ -->
+  <section class="view" id="view-props" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Ακίνητα</h1></div>
+      <p class="head-note">Διαθέσιμα ακίνητα της ομάδας. Τα δικά σου πρώτα.</p>
+    </header>
+    <div class="list" id="prop-list"></div>
+  </section>
+
+  <!-- ΦΟΡΜΕΣ -->
+  <section class="view" id="view-forms" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Φόρμες</h1></div>
+      <p class="head-note">Ανοίγουν σε νέα καρτέλα.</p>
+    </header>
+    <div class="list" id="form-list"></div>
+  </section>
+
+  <!-- ΑΙΘΟΥΣΕΣ -->
+  <section class="view" id="view-rooms" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Αίθουσες</h1></div>
+      <p class="head-note">Διάλεξε ώρα για να κλείσεις αίθουσα συνεδριάσεων.</p>
+    </header>
+    <div class="pad">
+      <a class="btn primary wide link-btn" id="book-link" href="#" target="_blank" rel="noopener">Άνοιγμα ημερολογίου κρατήσεων</a>
+      <p class="note">Ανοίγει σε νέα καρτέλα.</p>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    <button class="tab is-on" data-view="calls">
+      <span class="tab-ico">☎</span>Κλήσεις
+      <span class="badge" id="tab-badge" hidden>0</span>
+    </button>
+    <button class="tab" data-view="props"><span class="tab-ico">⌂</span>Ακίνητα</button>
+    <button class="tab" data-view="forms"><span class="tab-ico">✎</span>Φόρμες</button>
+    <button class="tab" data-view="rooms"><span class="tab-ico">▤</span>Αίθουσες</button>
+  </nav>
+</div>
+
+<!-- ΛΕΠΤΟΜΕΡΕΙΑ ΚΛΗΣΗΣ -->
+<div class="sheet" id="detail" hidden>
+  <div class="sheet-head">
+    <button class="back" id="detail-back">‹ Πίσω</button>
+    <span class="sheet-title" id="d-status"></span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="d-name"></h2>
+    <p class="d-sub" id="d-prop"></p>
+    <p class="d-sub small" id="d-deal"></p>
+
+    <div class="contact">
+      <a class="contact-btn" id="d-tel">Κλήση</a>
+      <a class="contact-btn ghost" id="d-mail">Email</a>
+    </div>
+
+    <div class="sms-block">
+      <a class="btn primary wide" id="sms-link">Άνοιγμα SMS με έτοιμο μήνυμα</a>
+      <details class="sms-preview">
+        <summary>Δες ή άλλαξε το μήνυμα <span id="sms-count"></span></summary>
+        <textarea id="sms-text" rows="4"></textarea>
+        <div class="actions">
+          <button class="btn" id="btn-copy">Αντιγραφή</button>
+          <button class="btn" id="btn-lang">In English</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="message" id="d-message-wrap" hidden>
+      <span>Μήνυμα πελάτη</span>
+      <p id="d-message"></p>
+    </div>
+
+    <dl class="facts">
+      <div><dt>Τηλέφωνο</dt><dd id="d-phone"></dd></div>
+      <div><dt>Email</dt><dd id="d-email"></dd></div>
+      <div><dt>Ήρθε</dt><dd id="d-date"></dd></div>
+      <div><dt>Πηγή</dt><dd id="d-source"></dd></div>
+      <div id="d-repeat-wrap" hidden><dt>Επανάληψη</dt><dd id="d-repeat"></dd></div>
+      <div id="d-called-wrap" hidden><dt>Κάλεσε</dt><dd id="d-called"></dd></div>
+      <div id="d-followup-wrap" hidden><dt>Follow-up</dt><dd id="d-followup"></dd></div>
+      <div id="d-showing-wrap" hidden><dt>Υπόδειξη</dt><dd id="d-showing"></dd></div>
+      <div id="d-sms-wrap" hidden><dt>SMS</dt><dd id="d-sms"></dd></div>
+    </dl>
+
+    <label class="field">
+      <span>Κατάσταση</span>
+      <select id="d-status-select"></select>
+    </label>
+
+    <label class="field">
+      <span>Σημειώσεις</span>
+      <textarea id="d-notes" rows="5" placeholder="Τι είπε ο πελάτης, τι ψάχνει, budget…"></textarea>
+    </label>
+    <p class="save-hint" id="save-hint"></p>
+
+    <div class="actions">
+      <button class="btn" id="btn-noanswer">Δεν απάντησε</button>
+      <button class="btn primary" id="btn-showing">Υπόδειξη</button>
+    </div>
+  </div>
+</div>
+
+<!-- ΥΠΟΔΕΙΞΗ (νέα ή αλλαγή) -->
+<div class="sheet" id="showing" hidden>
+  <div class="sheet-head">
+    <button class="back" id="showing-back">‹ Πίσω</button>
+    <span class="sheet-title" id="s-title">Νέα υπόδειξη</span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="s-name"></h2>
+    <p class="d-sub" id="s-prop"></p>
+
+    <label class="field"><span>Ημερομηνία</span><input type="date" id="s-date"></label>
+    <label class="field"><span>Ώρα</span><input type="time" id="s-time" step="900"></label>
+    <label class="field"><span>Διεύθυνση</span>
+      <input type="text" id="s-addr" placeholder="Οδός, αριθμός, περιοχή"></label>
+    <p class="field-hint" id="s-addr-note"></p>
+
+    <p class="note" id="s-note"></p>
+
+    <button class="btn primary wide" id="btn-save-showing">Καταχώρηση υπόδειξης</button>
+    <p class="save-hint" id="s-hint"></p>
+  </div>
+</div>
+
+<!-- ΛΕΠΤΟΜΕΡΕΙΑ ΑΚΙΝΗΤΟΥ -->
+<div class="sheet" id="propdetail" hidden>
+  <div class="sheet-head">
+    <button class="back" id="propdetail-back">‹ Πίσω</button>
+    <span class="sheet-title">Ακίνητο</span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="pd-name"></h2>
+    <p class="d-sub" id="pd-sub"></p>
+    <div class="stats" id="pd-stats"></div>
+    <button class="btn primary wide gap" id="pd-leads">Οι κλήσεις μου για αυτό</button>
+    <dl class="facts" id="pd-facts"></dl>
+  </div>
+</div>
+
+<!-- ΤΑ ΣΤΟΙΧΕΙΑ ΜΟΥ -->
+<div class="sheet" id="settings" hidden>
+  <div class="sheet-head">
+    <button class="back" id="settings-back">‹ Πίσω</button>
+    <span class="sheet-title">Τα στοιχεία μου</span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="p-title">Τα στοιχεία μου</h2>
+    <p class="d-sub">Μπαίνουν αυτούσια στο SMS που διαβάζει ο πελάτης.</p>
+
+    <label class="field"><span>Όνομα στο SMS</span><input type="text" id="p-name"></label>
+    <label class="field"><span>Κινητό</span>
+      <input type="tel" id="p-phone" inputmode="tel" placeholder="69XXXXXXXX"></label>
+    <label class="field"><span>Σύνδεσμος ή vCard (προαιρετικά)</span>
+      <input type="url" id="p-link" placeholder="https://…"></label>
+
+    <button class="btn primary wide" id="btn-save-settings">Αποθήκευση</button>
+    <p class="save-hint" id="p-hint"></p>
+
+    <h3 class="sub-head">Ημερολόγιο</h3>
+    <p class="cal-status" id="cal-status"></p>
+    <div class="note" id="cal-howto" hidden>
+      <p>Για να μπαίνουν οι υποδείξεις και τα follow-up κατευθείαν στο ημερολόγιό σου:</p>
+      <ol>
+        <li>Άνοιξε το Google Calendar στον υπολογιστή.</li>
+        <li>Ρυθμίσεις του ημερολογίου σου → «Κοινή χρήση με συγκεκριμένα άτομα».</li>
+        <li>Πρόσθεσε <b id="cal-account"></b> με δικαίωμα «Αλλαγές σε συμβάντα».</li>
+      </ol>
+      <p>Μέχρι τότε σου έρχονται ως προσκλήσεις.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
