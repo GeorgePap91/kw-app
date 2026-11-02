@@ -240,3 +240,85 @@ body.has-env .sheet-head{padding-top:12px}
 .cal-status.warn{color:var(--amber)}
 .note ol{margin:8px 0;padding-left:20px}
 .note p{margin:0}
+
+/* ── Ειδοποιήσεις, τύποι SMS, ακύρωση ──── */
+.push-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;
+  background:#eef3fb;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--ink-2)}
+.push-banner span{flex:1}
+.btn.small{flex:0 0 auto;padding:8px 14px;font-size:13.5px}
+
+.chips{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--paper);border-radius:20px;
+  padding:6px 13px;font-size:13.5px;font-weight:500;color:var(--ink-2);cursor:pointer}
+.chip.is-on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.btn.danger{color:var(--red);border-color:#f2c4cc;margin-top:28px}
+.btn.danger.confirming{background:var(--red);border-color:var(--red);color:#fff}
+
+.version{margin:32px 0 0;font-size:12px;color:var(--ink-3);text-align:center}
+.version.warn{color:var(--amber);font-weight:600}
+
+/* ── 1.2: Εργασίες ───────────────────── */
+.tabs .tab{font-size:10.5px}
+.section.late{color:var(--red)}
+.task-row{display:flex;align-items:stretch;background:var(--paper);border-bottom:1px solid var(--line)}
+.task-row.late{box-shadow:inset 3px 0 0 var(--red)}
+.check{flex:0 0 auto;width:26px;height:26px;margin:14px 0 0 16px;border-radius:50%;
+  border:2px solid var(--ink-3);background:none;cursor:pointer;color:#fff;font-size:14px;
+  font-weight:700;display:grid;place-items:center;padding:0}
+.task-row.done .check{background:var(--green);border-color:var(--green)}
+.task-main{flex:1;text-align:left;background:none;border:0;padding:14px 16px 14px 12px;cursor:pointer;color:inherit}
+.task-title{display:block;font-weight:600;font-size:15.5px}
+.task-row.done .task-title{text-decoration:line-through;color:var(--ink-3);font-weight:500}
+.task-meta{display:block;font-size:12.5px;color:var(--ink-3);margin-top:3px}
+.task-row.late .task-meta{color:var(--red)}
+.done-group summary{padding:18px 16px 10px;font-size:13px;font-weight:600;color:var(--ink-3);cursor:pointer}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 16px}
+.linked{margin:-8px 0 16px;font-size:13.5px;color:var(--ink-2)}
+.gap-top{margin-top:12px}
+
+/* ── 1.2: Έγγραφα ακινήτου ────────────── */
+.docs{margin:22px 0 0}
+.docs-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.docs-head h3{margin:0;font-size:17px}
+.docs-count{font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums}
+.docs-count.ok{color:var(--green)}
+.doc-slot{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--paper)}
+.doc-slot.ok{border-color:#cfe3d7;background:#f6fbf8}
+.doc-head{display:flex;align-items:center;gap:10px}
+.doc-head b{flex:1;font-size:15px}
+.doc-ico{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;
+  background:#fdf1e3;color:var(--amber)}
+.doc-slot.ok .doc-ico{background:var(--green);color:#fff}
+.doc-file{display:flex;align-items:center;gap:10px;font-size:13.5px;margin-top:8px;padding-left:32px}
+.doc-file a{flex:1;color:var(--blue);text-decoration:none;word-break:break-all}
+.doc-file span{color:var(--ink-3);font-size:12px;white-space:nowrap}
+.doc-file.muted{color:var(--ink-3)}
+.x{background:none;border:0;color:var(--ink-3);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px}
+.x.confirming{background:var(--red);color:#fff;font-size:12px;font-weight:600}
+.link-out{display:inline-block;margin:6px 0 4px;color:var(--blue);font-size:14px;font-weight:500;text-decoration:none}
+
+/* ── 1.2: Μηνύματα & χρώματα ──────────── */
+.cal-status.muted{color:var(--ink-2);font-size:13.5px}
+.tpl-card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+.tpl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.mini-seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.mini-seg button{border:0;background:var(--paper);padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--ink-3);cursor:pointer}
+.mini-seg button.is-on{background:var(--ink);color:#fff}
+.tpl-text{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14.5px;line-height:1.5;resize:vertical}
+.chips.tight{margin:8px 0}
+.chip.small{padding:4px 9px;font-size:12px;color:var(--blue)}
+.tpl-preview{background:var(--wash);border-radius:8px;padding:10px 12px;margin:4px 0 8px}
+.tpl-preview span{display:block;font-size:11.5px;color:var(--ink-3);margin-bottom:3px}
+.tpl-preview p{margin:0;font-size:14px}
+.tpl-preview small{display:block;margin-top:6px;font-size:12px;color:var(--ink-3)}
+.tpl-preview small.over{color:var(--amber);font-weight:600}
+.color-row{margin-bottom:14px}
+.color-label{font-size:14px;font-weight:600;margin-bottom:6px}
+.color-label span{font-weight:400;color:var(--ink-3);font-size:13px;margin-left:4px}
+.swatches{display:flex;flex-wrap:wrap;gap:6px}
+.swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;
+  box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.swatch.is-on{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ink)}
+
+.diag{font-size:11.5px;color:var(--ink-3);margin:-8px 0 8px;word-break:break-word}

@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. Πρέπει να ταιριάζει με το VERSION του Code.gs. */
-var APP_VERSION = '1.3';
+var APP_VERSION = '1.3.1';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -213,16 +213,21 @@ function renderPush() {
 
   $('btn-push-enable').hidden = !server.ready || on || (st !== 'default' && st !== 'granted');
   $('btn-push-test').hidden = !on;
+  $('push-diag').textContent = Push.diag();
 }
 
 function onEnablePush(e) {
   var btn = e.currentTarget;
+  var label = btn.textContent;
   var hint = $('push-hint');
   btn.disabled = true;
   hint.className = 'save-hint';
   hint.textContent = '';
 
-  Push.enable(sendToken).then(function () {
+  // Το βήμα φαίνεται πάνω στο ίδιο το κουμπί (και στο banner και στις ρυθμίσεις).
+  var step = function (t) { btn.textContent = t; hint.textContent = t; };
+
+  Push.enable(sendToken, step).then(function () {
     toast('Οι ειδοποιήσεις ενεργοποιήθηκαν');
   }).catch(function (err) {
     hint.className = 'save-hint err';
@@ -230,6 +235,7 @@ function onEnablePush(e) {
     toast(err.message, true);
   }).then(function () {
     btn.disabled = false;
+    btn.textContent = label;
     renderPush();
   });
 }
