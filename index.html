@@ -101,24 +101,40 @@
     <div class="list" id="prop-list"></div>
   </section>
 
-  <!-- ΦΟΡΜΕΣ -->
+  <!-- ΜΕΤΡΗΣΙΜΟΤΗΤΑ (1.5) -->
+  <section class="view" id="view-metrics" hidden>
+    <header class="head">
+      <div class="head-row">
+        <h1>Μετρησιμότητα</h1>
+        <div class="head-actions">
+          <div class="mini-seg" id="mx-mode">
+            <button class="is-on" data-mode="month">Μήνας</button><button data-mode="year">Έτος</button>
+          </div>
+          <button class="icon-btn" id="mx-refresh" aria-label="Ανανέωση" title="Ανανέωση">↻</button>
+        </div>
+      </div>
+      <div class="mx-nav" id="mx-nav" hidden>
+        <button class="icon-btn" id="mx-prev" aria-label="Προηγούμενος">‹</button>
+        <b id="mx-title"></b>
+        <button class="icon-btn" id="mx-next" aria-label="Επόμενος">›</button>
+      </div>
+    </header>
+    <div id="mx-body"><div class="empty">Φόρτωση…</div></div>
+  </section>
+
+  <!-- ΦΟΡΜΕΣ & ΑΙΘΟΥΣΕΣ (από 1.5 στην ίδια καρτέλα) -->
   <section class="view" id="view-forms" hidden>
     <header class="head">
       <div class="head-row"><h1>Φόρμες</h1></div>
       <p class="head-note">Ανοίγουν σε νέα καρτέλα.</p>
     </header>
     <div class="list" id="form-list"></div>
-  </section>
-
-  <!-- ΑΙΘΟΥΣΕΣ -->
-  <section class="view" id="view-rooms" hidden>
-    <header class="head">
-      <div class="head-row"><h1>Αίθουσες</h1></div>
-      <p class="head-note">Διάλεξε ώρα για να κλείσεις αίθουσα συνεδριάσεων.</p>
-    </header>
-    <div class="pad">
-      <a class="btn primary wide link-btn" id="book-link" href="#" target="_blank" rel="noopener">Άνοιγμα ημερολογίου κρατήσεων</a>
-      <p class="note">Ανοίγει σε νέα καρτέλα.</p>
+    <div class="section">Αίθουσες συνεδριάσεων</div>
+    <div class="list">
+      <a class="row" id="book-link" href="#" target="_blank" rel="noopener">
+        <div class="row-top"><span class="row-name">Κράτηση αίθουσας</span><span class="row-time">Άνοιγμα ↗</span></div>
+        <div class="row-prop">Διάλεξε ώρα στο ημερολόγιο κρατήσεων.</div>
+      </a>
     </div>
   </section>
 
@@ -132,8 +148,8 @@
       <span class="badge" id="task-badge" hidden>0</span>
     </button>
     <button class="tab" data-view="props"><span class="tab-ico">⌂</span>Ακίνητα</button>
+    <button class="tab" data-view="metrics"><span class="tab-ico">▥</span>Μετρησιμότητα</button>
     <button class="tab" data-view="forms"><span class="tab-ico">✎</span>Φόρμες</button>
-    <button class="tab" data-view="rooms"><span class="tab-ico">▤</span>Αίθουσες</button>
   </nav>
 </div>
 

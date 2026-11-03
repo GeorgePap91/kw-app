@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. Πρέπει να ταιριάζει με το VERSION του Code.gs. */
-var APP_VERSION = '1.4';
+var APP_VERSION = '1.5';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -64,7 +64,8 @@ var S = {
   filter: 'pending', propFilter: null, view: 'calls',
   noteTimer: null, smsLang: 'el', smsKind: 'intro', cancelled: null, wired: false,
   tasks: [], task: null, docs: {}, prop: null, uploading: {}, tplDraft: null, tplLang: {},
-  docsFilter: false
+  docsFilter: false,
+  mx: null, mxMode: 'month', mxMonth: '', mxYear: '', mxOpen: '', mxLoading: false
 };
 
 var $ = function (id) { return document.getElementById(id); };
@@ -239,6 +240,7 @@ function verifyPairCode() {
 function authLost() {
   forgetDevice();
   S.boot = null;
+  S.mx = null;
   ['detail', 'showing', 'task', 'settings', 'templates', 'propdetail'].forEach(function (id) { $(id).hidden = true; });
   needPairing(true);
 }
@@ -260,6 +262,7 @@ function onBoot(b) {
   fillSelect($('d-status-select'), b.statuses);
   renderForms(b.forms || []);
   $('book-link').href = b.bookingUrl || '#';
+  $('book-link').hidden = !b.bookingUrl;
   fillSettings();
 
   $('boot').hidden = true;
@@ -396,6 +399,17 @@ function wire() {
   });
 
   $('refresh').onclick = refreshNow;
+  $('mx-refresh').onclick = function () { loadMetrics(true); };
+  $('mx-prev').onclick = function () { stepMetrics(1); };     // η λίστα είναι από τον νεότερο μήνα
+  $('mx-next').onclick = function () { stepMetrics(-1); };
+  $$('#mx-mode button').forEach(function (b) {
+    b.onclick = function () {
+      S.mxMode = b.dataset.mode;
+      $$('#mx-mode button').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      S.mxOpen = '';
+      renderMetrics();
+    };
+  });
   $('filter-clear').onclick = function () { S.propFilter = null; renderCalls(); };
   $('btn-settings').onclick = openSettings;
 
@@ -458,13 +472,14 @@ function wire() {
 
 function goto(view) {
   $$('.tab').forEach(function (x) { x.classList.toggle('is-on', x.dataset.view === view); });
-  ['calls', 'tasks', 'props', 'forms', 'rooms'].forEach(function (v) {
+  ['calls', 'tasks', 'props', 'metrics', 'forms'].forEach(function (v) {
     $('view-' + v).hidden = (v !== view);
   });
   S.view = view;
   window.scrollTo(0, 0);
   if (view === 'props') renderProps();
   if (view === 'tasks') renderTasks();
+  if (view === 'metrics') loadMetrics(false);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1830,6 +1845,213 @@ function fmtPrice(v) {
   var n = Number(String(v).replace(/[^\d.]/g, ''));
   if (!n) return String(v);
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ΜΕΤΡΗΣΙΜΟΤΗΤΑ (1.5)
+//  Τα νούμερα έρχονται έτοιμα ανά μήνα από τον server (action 'metrics').
+//  Εδώ γίνεται μόνο η εμφάνιση: μήνας ή έτος, σύγκριση με τον προηγούμενο.
+// ─────────────────────────────────────────────────────────────
+
+function loadMetrics(force) {
+  if (S.mxLoading || (S.mx && !force)) { if (S.mx) renderMetrics(); return; }
+  S.mxLoading = true;
+  if (!S.mx) $('mx-body').innerHTML = '<div class="empty">Φόρτωση…</div>';
+  $('mx-refresh').disabled = true;
+  api('metrics', force ? { refresh: 1 } : {}).then(function (d) {
+    S.mx = d;
+    var withData = (d.months || []).filter(function (m) { return m.weeks.length; });
+    if (!S.mxMonth || !monthOf(S.mxMonth)) S.mxMonth = withData.length ? withData[0].ym : '';
+    if (!S.mxYear) S.mxYear = S.mxMonth.slice(0, 4);
+    renderMetrics();
+    if (force) toast('Ενημερώθηκε');
+  }).catch(function (e) {
+    if (!S.mx) $('mx-body').innerHTML = '<div class="empty"><b>Δεν φορτώθηκε</b>' + esc(e.message) + '</div>';
+    else toast(e.message, true);
+  }).then(function () { S.mxLoading = false; $('mx-refresh').disabled = false; });
+}
+
+function monthOf(ym) {
+  return ((S.mx && S.mx.months) || []).filter(function (m) { return m.ym === ym; })[0] || null;
+}
+
+function prevYm(ym) {
+  var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1;
+  if (m === 0) { y--; m = 12; }
+  return y + '-' + (m < 10 ? '0' : '') + m;
+}
+
+function mxYears() {
+  var seen = {};
+  (S.mx.months || []).forEach(function (m) { seen[m.ym.slice(0, 4)] = true; });
+  return Object.keys(seen).sort().reverse();
+}
+
+/** dir = +1 → παλαιότερο, -1 → νεότερο. */
+function stepMetrics(dir) {
+  if (!S.mx) return;
+  if (S.mxMode === 'year') {
+    var ys = mxYears(), i = ys.indexOf(S.mxYear) + dir;
+    if (i >= 0 && i < ys.length) S.mxYear = ys[i];
+  } else {
+    var ms = S.mx.months, j = ms.indexOf(monthOf(S.mxMonth)) + dir;
+    if (j >= 0 && j < ms.length) S.mxMonth = ms[j].ym;
+  }
+  S.mxOpen = '';
+  renderMetrics();
+}
+
+function deltaHtml(now, before, neutral) {
+  if (before == null) return '<span class="delta"></span>';
+  var d = now - before;
+  if (!d) return '<span class="delta" title="Ίδιο με τον προηγούμενο μήνα">=</span>';
+  return '<span class="delta ' + (neutral ? '' : d > 0 ? 'up' : 'down') + '" title="Σε σχέση με τον προηγούμενο μήνα">' +
+         (d > 0 ? '▲ ' : '▼ ') + Math.abs(d) + '</span>';
+}
+
+function fmtNum(n) { return String(Math.round(n * 10) / 10).replace('.', ','); }
+
+function sumGroup(values, group) {
+  return S.mx.metrics.filter(function (m) { return m.group === group; })
+    .reduce(function (a, m) { return a + (values[m.key] || 0); }, 0);
+}
+
+function renderMetrics() {
+  var d = S.mx, body = $('mx-body');
+  if (!d) return;
+  $('mx-nav').hidden = true;
+
+  if (!d.configured) {
+    body.innerHTML = '<div class="empty"><b>Δεν έχει ρυθμιστεί ακόμα</b>' +
+      'Το γραφείο πρέπει να συνδέσει το φύλλο της φόρμας με την εφαρμογή.</div>';
+    return;
+  }
+  if (!d.months.length) {
+    body.innerHTML = '<div class="empty"><b>Δεν βρέθηκαν υποβολές</b>' +
+      'Ψάξαμε για: ' + esc(d.emails.join(', ')) + '.<br>Αν συμπληρώνεις τη φόρμα με άλλο email, ' +
+      'ζήτα να μπει στη στήλη «Email φόρμας» του φύλλου Agents.</div>' + formLink(d);
+    return;
+  }
+
+  $('mx-nav').hidden = false;
+  if (S.mxMode === 'year') return renderMetricsYear(d, body);
+
+  var ms = d.months, m = monthOf(S.mxMonth) || ms[0];
+  S.mxMonth = m.ym;
+  var i = ms.indexOf(m);
+  $('mx-title').textContent = m.label;
+  $('mx-prev').disabled = i >= ms.length - 1;
+  $('mx-next').disabled = i <= 0;
+  var prev = monthOf(prevYm(m.ym));
+  var pv = prev ? prev.values : null;
+  // Ο τρέχων μήνας δεν έχει τελειώσει: η διαφορά φαίνεται, αλλά χωρίς κόκκινο/πράσινο.
+  var now = new Date(), live = m.ym === now.getFullYear() + '-' + (now.getMonth() < 9 ? '0' : '') + (now.getMonth() + 1);
+
+  var html = '';
+  var weeks = m.weeks.length + (m.weeks.length === 1 ? ' εβδομάδα' : ' εβδομάδες');
+  var done = m.weeks.length === 1 ? ' συμπληρωμένη' : ' συμπληρωμένες';
+  if (m.missing.length) {
+    html += '<div class="mx-status warn"><span>' + weeks + ' · <b>δεν βρέθηκε υποβολή για ' +
+      esc(m.missing.join(', ')) + '</b></span>' +
+      (d.formUrl ? '<a class="link" href="' + esc(d.formUrl) + '" target="_blank" rel="noopener">Φόρμα ↗</a>' : '') + '</div>';
+  } else {
+    html += '<div class="mx-status"><span>' + (m.weeks.length ? weeks + done + ' ✓' : 'Καμία υποβολή ακόμα') + (live ? ' · ο μήνας είναι σε εξέλιξη' : '') + '</span></div>';
+  }
+
+  // Τρία σύνολα με μια ματιά
+  var tiles = [
+    { label: 'Ραντεβού', v: sumGroup(m.values, 'owners') + sumGroup(m.values, 'clients') - (m.values.ilist || 0),
+      p: pv ? sumGroup(pv, 'owners') + sumGroup(pv, 'clients') - (pv.ilist || 0) : null },
+    { label: 'Υποδείξεις', v: sumGroup(m.values, 'showings'), p: pv ? sumGroup(pv, 'showings') : null },
+    { label: 'Αναθέσεις & εντολές', v: sumGroup(m.values, 'mandates'), p: pv ? sumGroup(pv, 'mandates') : null }
+  ];
+  html += '<div class="mx-tiles">' + tiles.map(function (t) {
+    return '<div class="mx-tile"><b>' + fmtNum(t.v) + '</b><span>' + t.label + '</span>' + deltaHtml(t.v, t.p, live) + '</div>';
+  }).join('') + '</div>';
+
+  d.groups.forEach(function (g) {
+    html += '<div class="section">' + esc(g.label) + '</div>';
+    d.metrics.filter(function (x) { return x.group === g.key; }).forEach(function (x) {
+      var v = m.values[x.key] || 0;
+      html += '<button class="mx-row' + (v ? '' : ' zero') + '" data-k="' + x.key + '">' +
+        '<span class="mx-label"><b>' + esc(x.label) + '</b>' + (x.sub ? '<span>' + esc(x.sub) + '</span>' : '') + '</span>' +
+        deltaHtml(v, pv ? pv[x.key] || 0 : null, live) +
+        '<span class="mx-val">' + fmtNum(v) + '</span></button>';
+      if (S.mxOpen === x.key) {
+        html += '<div class="mx-weeks">' + (m.weeks.length ? m.weeks.map(function (w) {
+          return '<span>' + esc(w.label) + ': <b>' + fmtNum(w.values[x.key] || 0) + '</b></span>';
+        }).join('') : '<span>Καμία εβδομάδα</span>') + '</div>';
+      }
+    });
+  });
+
+  html += '<div class="mx-foot">' + (pv ? '▲▼ σε σχέση με ' + esc(prev.label.split(' ')[0]) + ' · ' : '') +
+          'Πάτα έναν δείκτη για ανάλυση ανά εβδομάδα.<br>Τελευταία υποβολή ' + esc(d.lastSent || '—') +
+          ' · ενημέρωση ' + esc(d.updated) + '</div>' + formLink(d);
+  body.innerHTML = html;
+  wireMetricRows(body);
+}
+
+function renderMetricsYear(d, body) {
+  var ys = mxYears();
+  if (ys.indexOf(S.mxYear) === -1) S.mxYear = ys[0];
+  var y = S.mxYear, i = ys.indexOf(y);
+  $('mx-title').textContent = 'Έτος ' + y;
+  $('mx-prev').disabled = i >= ys.length - 1;
+  $('mx-next').disabled = i <= 0;
+
+  // 12 θέσεις, Ιανουάριος → Δεκέμβριος
+  var months = [];
+  for (var k = 1; k <= 12; k++) months.push(monthOf(y + '-' + (k < 10 ? '0' : '') + k));
+  var active = months.filter(function (m) { return m && m.weeks.length; }).length;
+  var cur = new Date();
+  var curIdx = String(cur.getFullYear()) === y ? cur.getMonth() : -1;
+  var total = function (key) { return months.reduce(function (a, m) { return a + (m ? m.values[key] || 0 : 0); }, 0); };
+
+  var html = '<div class="mx-status"><span>' + active + (active === 1 ? ' μήνας' : ' μήνες') +
+    ' με υποβολές · δίπλα: μέσος όρος ανά μήνα</span></div>';
+
+  d.groups.forEach(function (g) {
+    html += '<div class="section">' + esc(g.label) + '</div>';
+    d.metrics.filter(function (x) { return x.group === g.key; }).forEach(function (x) {
+      var t = total(x.key);
+      var max = Math.max.apply(null, months.map(function (m) { return m ? m.values[x.key] || 0 : 0; }).concat([1]));
+      var bars = months.map(function (m, j) {
+        var v = m ? m.values[x.key] || 0 : 0;
+        return '<i class="' + (v ? 'on' : '') + (j === curIdx ? ' cur' : '') + '" style="height:' +
+               Math.max(7, Math.round(v / max * 100)) + '%" title="' + (j + 1) + ': ' + fmtNum(v) + '"></i>';
+      }).join('');
+      html += '<button class="mx-row' + (t ? '' : ' zero') + '" data-k="' + x.key + '">' +
+        '<span class="mx-label"><b>' + esc(x.label) + '</b>' +
+        '<span>' + (x.sub ? esc(x.sub) + ' · ' : '') + 'μ.ο. ' + fmtNum(active ? t / active : 0) + '</span></span>' +
+        '<span class="bars" aria-hidden="true">' + bars + '</span>' +
+        '<span class="mx-val">' + fmtNum(t) + '</span></button>';
+      if (S.mxOpen === x.key) {
+        html += '<div class="mx-weeks">' + months.map(function (m, j) {
+          return m && m.weeks.length ? '<span>' + esc(m.label.split(' ')[0].slice(0, 3)) + ': <b>' + fmtNum(m.values[x.key] || 0) + '</b></span>' : '';
+        }).join('') + '</div>';
+      }
+    });
+  });
+  html += '<div class="mx-foot">Πάτα έναν δείκτη για ανάλυση ανά μήνα · ενημέρωση ' + esc(d.updated) + '</div>';
+  body.innerHTML = html;
+  wireMetricRows(body);
+}
+
+function wireMetricRows(body) {
+  body.querySelectorAll('.mx-row').forEach(function (r) {
+    r.onclick = function () {
+      S.mxOpen = S.mxOpen === r.dataset.k ? '' : r.dataset.k;
+      var y = window.scrollY;
+      renderMetrics();
+      window.scrollTo(0, y);
+    };
+  });
+}
+
+function formLink(d) {
+  return d.formUrl ? '<div class="pad"><a class="btn wide link-btn" href="' + esc(d.formUrl) +
+    '" target="_blank" rel="noopener">Συμπλήρωση φόρμας εβδομάδας ↗</a></div>' : '';
 }
 
 function fillSelect(el, items) {
