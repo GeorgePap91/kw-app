@@ -9,6 +9,11 @@
   <meta name="apple-mobile-web-app-title" content="KW App">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Ασφάλεια: η σελίδα τρέχει ΜΟΝΟ τα δικά της scripts και μιλά ΜΟΝΟ με το Apps Script
+       και τις υπηρεσίες της Google. Ό,τι άλλο μπλοκάρεται από τον ίδιο τον browser. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <!-- Οι σελίδες που ανοίγουμε (Forms, Drive) δεν μαθαίνουν τη διεύθυνση της εφαρμογής. -->
+  <meta name="referrer" content="no-referrer">
   <title>KW App</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
@@ -23,6 +28,21 @@
   <div class="boot-mark">KW</div>
   <p id="boot-msg">Φόρτωση…</p>
   <button class="btn primary" id="boot-retry" hidden>Δοκίμασε ξανά</button>
+
+  <!-- Σύνδεση νέας συσκευής: κωδικός στο email του μεσίτη -->
+  <div class="pair" id="pair" hidden>
+    <h2>Σύνδεση συσκευής</h2>
+    <p>Για την ασφάλεια των στοιχείων των πελατών, κάθε νέα συσκευή επιβεβαιώνεται μία φορά με κωδικό στο email σου.</p>
+    <button class="btn primary wide" id="pair-send">Στείλε μου κωδικό</button>
+    <div id="pair-step2" hidden>
+      <p id="pair-sent"></p>
+      <input type="text" id="pair-code" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" pattern="[0-9]*" placeholder="••••••" aria-label="Κωδικός 6 ψηφίων">
+      <button class="btn primary wide" id="pair-verify">Σύνδεση</button>
+      <button class="link" id="pair-resend">Δεν ήρθε; Στείλε νέο κωδικό</button>
+    </div>
+    <p class="save-hint" id="pair-hint"></p>
+  </div>
 </div>
 
 <div id="app" hidden>
@@ -315,6 +335,10 @@
     <h3 class="sub-head">Drive</h3>
     <a class="link-out" id="drive-link" href="#" target="_blank" rel="noopener">Ο φάκελός μου με τα ακίνητα ↗</a>
     <p class="cal-status warn" id="drive-status" hidden></p>
+
+    <h3 class="sub-head">Ασφάλεια</h3>
+    <p class="cal-status muted" id="sec-device"></p>
+    <button class="btn danger wide" id="btn-logout">Αποσύνδεση αυτής της συσκευής</button>
 
     <p class="version" id="version"></p>
   </div>

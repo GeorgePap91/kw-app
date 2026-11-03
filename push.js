@@ -13,7 +13,9 @@
 'use strict';
 
 var cfg = window.KW_CONFIG || {};
-var FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
+// Firebase 10.12.2, αποθηκευμένο στο δικό μας repo (vendor/): η εφαρμογή δεν φορτώνει
+// κώδικα από άλλον server, οπότε κανείς τρίτος δεν μπορεί να «πειράξει» τι τρέχει.
+var FB = 'vendor/';
 var TOKEN_KEY = 'kw_push_token';
 var SENT_KEY = 'kw_push_sent';
 var regPromise = null;
@@ -95,12 +97,14 @@ function loadFirebase() {
   return withTimeout(
     loadScript(FB + 'firebase-app-compat.js')
       .then(function () { return loadScript(FB + 'firebase-messaging-compat.js'); }),
-    20000, 'Δεν φορτώθηκε το Firebase. Έλεγξε τη σύνδεση στο internet.');
+    20000, 'Δεν φορτώθηκε το Firebase. Υπάρχει ο φάκελος vendor/ στο GitHub;');
 }
 
 /** Τα λάθη του Firebase σε κατανοητή μορφή, με τον κωδικό τους για διάγνωση. */
 function firebaseError(e) {
-  var m = String((e && (e.code || e.message)) || e);
+  // Το Firebase δίνει κωδικό τύπου «messaging/…»· ο browser αριθμό (π.χ. 20) και περιγραφή.
+  var code = e && typeof e.code === 'string' ? e.code + ': ' : '';
+  var m = code + String((e && (e.message || e.name)) || e);
   var hint =
       /permission-blocked|permission-default/.test(m) ? 'Οι ειδοποιήσεις είναι μπλοκαρισμένες για την εφαρμογή στο κινητό.'
     : /installations|API key|api-key|403|PERMISSION_DENIED/i.test(m) ? 'Το Firebase αρνήθηκε τη σύνδεση. Έλεγξε τις τιμές FIREBASE στο config.js (apiKey, projectId, appId, messagingSenderId).'

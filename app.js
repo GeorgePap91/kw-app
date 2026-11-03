@@ -11,18 +11,28 @@
 (function () {
 'use strict';
 
+// Η εφαρμογή δεν ανοίγει μέσα σε ξένη σελίδα (προστασία από «clickjacking»).
+if (window.top !== window.self) {
+  document.documentElement.innerHTML = '';
+  try { window.top.location = window.self.location.href; } catch (e) { /* μπλοκαρισμένο */ }
+  return;
+}
+
 // ─────────────────────────────────────────────────────────────
 //  ΡΥΘΜΙΣΕΙΣ & ΚΑΤΑΣΤΑΣΗ
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. Πρέπει να ταιριάζει με το VERSION του Code.gs. */
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.4';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
 
-if (params.get('k')) store('kw_key', params.get('k'));
-var KEY = params.get('k') || store('kw_key');
+// KEY: το προσωπικό link. Χρησιμεύει ΜΟΝΟ για να ζητηθεί κωδικός σύνδεσης.
+// TOKEN: το κλειδί αυτής της συσκευής, μετά τον κωδικό. Με αυτό γίνονται όλα.
+var KEY = params.get('k') || '';
+var TOKEN = store('kw_token');
+store('kw_key', null);                     // καθαρίζει ό,τι κρατούσαν παλιότερες εκδόσεις
 var LEAD_PARAM = params.get('lead') || '';
 var REMIND_PARAM = params.get('remind') === '1';
 var DOCS_PARAM = params.get('docs') === '1';
@@ -30,9 +40,9 @@ var Push = window.KWPush;
 
 // Το ?lead / ?remind χρησιμοποιούνται μία φορά. Τα βγάζουμε από τη διεύθυνση,
 // ώστε μια ανανέωση της σελίδας να μην ξανανοίγει την ίδια κλήση.
-if ((LEAD_PARAM || DOCS_PARAM) && history.replaceState) {
-  history.replaceState(null, '', location.pathname + (params.get('k') ? '?k=' + encodeURIComponent(params.get('k')) : ''));
-}
+// Το link (?k=…) και τα ?lead / ?remind / ?docs φεύγουν από τη γραμμή διευθύνσεων
+// μόλις διαβαστούν: δεν μένουν στο ιστορικό, σε screenshots ή σε κοινοποιήσεις.
+if (location.search && history.replaceState) history.replaceState(null, '', location.pathname);
 
 var ST = {
   PENDING:   'Αναπάντητη',
@@ -63,8 +73,9 @@ var $$ = function (sel) { return Array.prototype.slice.call(document.querySelect
 function store(k, v) {
   try {
     if (v === undefined) return localStorage.getItem(k) || '';
-    localStorage.setItem(k, v);
-  } catch (e) { /* ιδιωτική περιήγηση: λειτουργεί από το URL */ }
+    if (v === null) localStorage.removeItem(k);
+    else localStorage.setItem(k, v);
+  } catch (e) { /* ιδιωτική περιήγηση: η σύνδεση κρατά μόνο όσο είναι ανοιχτή η σελίδα */ }
   return '';
 }
 
@@ -74,7 +85,7 @@ function store(k, v) {
 // text/plain: δεν προκαλεί CORS preflight, που το Apps Script δεν δέχεται.
 
 function body(action, data) {
-  return JSON.stringify({ k: KEY, action: action, data: data || {} });
+  return JSON.stringify({ t: TOKEN, action: action, data: data || {} });
 }
 
 function api(action, data) {
@@ -89,6 +100,7 @@ function api(action, data) {
     if (!res.ok) {
       var e = new Error(res.error || 'Άγνωστο σφάλμα');
       e.code = res.code;
+      if (e.code === 'auth' && S.boot) authLost();   // ανακλήθηκε ενώ ήταν ανοιχτή
       throw e;
     }
     return res.data;
@@ -114,18 +126,125 @@ start();
 
 function start() {
   if (!API || API.indexOf('ΒΑΛΕ') !== -1) return bootFail('Λείπει το API_URL στο config.js.', true);
-  if (!KEY) return bootFail('Άνοιξε την εφαρμογή από το προσωπικό σου link.', true);
+  if (!TOKEN) return needPairing();
 
   $('boot-msg').textContent = 'Φόρτωση…';
   $('boot-retry').hidden = true;
 
   api('bootstrap').then(onBoot).catch(function (e) {
-    if (e.code === 'auth') return bootFail('Το link δεν είναι έγκυρο. Ζήτα νέο.', true);
+    if (e.code === 'auth') { forgetDevice(); return needPairing(true); }
     bootFail('Δεν φόρτωσε: ' + e.message, false);
   });
 }
 
+// ─────────────────────────────────────────────────────────────
+//  ΣΥΝΔΕΣΗ ΣΥΣΚΕΥΗΣ
+// ─────────────────────────────────────────────────────────────
+
+var pairId = '';
+
+function deviceName() {
+  var ua = navigator.userAgent;
+  var os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android'
+         : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Συσκευή';
+  var app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  return os + (app ? ' · εφαρμογή' : ' · browser');
+}
+
+function forgetDevice() {
+  TOKEN = '';
+  store('kw_token', null);
+  store('kw_push_token', null);
+  store('kw_push_sent', null);
+}
+
+/** Χωρίς κλειδί συσκευής: με link → οθόνη κωδικού, χωρίς link → οδηγία. */
+function needPairing(expired) {
+  $('boot').hidden = false;
+  $('app').hidden = true;
+  if (!KEY) {
+    return bootFail(expired
+      ? 'Η σύνδεση αυτής της συσκευής έληξε ή ανακλήθηκε. Άνοιξε ξανά το προσωπικό σου link.'
+      : 'Άνοιξε την εφαρμογή από το προσωπικό σου link.', true);
+  }
+  $('boot-msg').textContent = expired ? 'Η σύνδεση αυτής της συσκευής έληξε ή ανακλήθηκε.' : '';
+  $('boot-msg').hidden = !expired;
+  $('boot-retry').hidden = true;
+  $('pair').hidden = false;
+  $('pair-send').onclick = sendPairCode;
+  $('pair-resend').onclick = sendPairCode;
+  $('pair-verify').onclick = verifyPairCode;
+  $('pair-code').oninput = function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 6);
+    if (this.value.length === 6) verifyPairCode();
+  };
+}
+
+function pairApi(action, data) {
+  return fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: action, data: data })
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    if (!res.ok) { var e = new Error(res.error); e.code = res.code; throw e; }
+    return res.data;
+  });
+}
+
+function pairHint(msg, err) {
+  $('pair-hint').textContent = msg || '';
+  $('pair-hint').className = 'save-hint' + (err ? ' err' : '');
+}
+
+function sendPairCode() {
+  var btn = $('pair-send');
+  btn.disabled = true;
+  pairHint('Αποστολή…');
+  pairApi('pairStart', { k: KEY, device: deviceName() }).then(function (r) {
+    pairId = r.pairId;
+    btn.hidden = true;
+    $('pair-step2').hidden = false;
+    $('pair-sent').textContent = 'Στείλαμε κωδικό 6 ψηφίων στο ' + r.email + '. Ισχύει ' + r.minutes + ' λεπτά.';
+    $('pair-code').value = '';
+    $('pair-code').focus();
+    pairHint('');
+  }).catch(function (e) {
+    pairHint(e.message, true);
+    if (e.code === 'badlink') { KEY = ''; btn.hidden = true; }
+  }).then(function () { btn.disabled = false; });
+}
+
+function verifyPairCode() {
+  var code = $('pair-code').value;
+  if (code.length !== 6) return pairHint('Ο κωδικός έχει 6 ψηφία.', true);
+  $('pair-verify').disabled = true;
+  pairHint('Έλεγχος…');
+  pairApi('pairVerify', { pairId: pairId, code: code, device: deviceName() }).then(function (r) {
+    TOKEN = r.token;
+    store('kw_token', TOKEN);
+    store('kw_push_sent', null);             // ξανακαταχώρηση ειδοποιήσεων για αυτή τη σύνδεση
+    pairHint('Συνδέθηκε ✓');
+    location.replace(location.pathname);
+  }).catch(function (e) {
+    pairHint(e.message, true);
+    $('pair-code').value = '';
+    if (e.code === 'expired') {
+      $('pair-step2').hidden = true;
+      $('pair-send').hidden = false;
+    }
+  }).then(function () { $('pair-verify').disabled = false; });
+}
+
+/** Η συσκευή ανακλήθηκε ενώ η εφαρμογή ήταν ανοιχτή. */
+function authLost() {
+  forgetDevice();
+  S.boot = null;
+  ['detail', 'showing', 'task', 'settings', 'templates', 'propdetail'].forEach(function (id) { $(id).hidden = true; });
+  needPairing(true);
+}
+
 function bootFail(msg, final) {
+  $('boot-msg').hidden = false;
   $('boot-msg').textContent = msg;
   $('boot-retry').hidden = !!final;
   $('boot-retry').onclick = start;
@@ -304,6 +423,7 @@ function wire() {
   $('doc-input').onchange = onDocFile;
   $('prop-filter-clear').onclick = function () { S.docsFilter = false; renderProps(); };
   $('btn-templates').onclick = openTemplates;
+  $('btn-logout').onclick = onLogout;
   $('btn-save-templates').onclick = onSaveTemplates;
 
   $('d-tel').onclick = onTelClick;
@@ -1040,6 +1160,11 @@ function fillSettings() {
   $('drive-status').hidden = !!drive.ready;
   $('drive-status').textContent = drive.ready ? '' : 'Ο φάκελος Drive δεν είναι διαθέσιμος ακόμα' + (drive.error ? ': ' + drive.error : '.');
 
+  var sess = S.boot.session || {};
+  $('sec-device').textContent = 'Αυτή η συσκευή: ' + (sess.device || '—') +
+    (sess.since ? ' · συνδέθηκε ' + sess.since : '') +
+    '. Αν χάσεις το κινητό, πες στο γραφείο να την ανακαλέσει.';
+
   var server = S.boot.version || '1.0';
   var v = $('version');
   v.textContent = 'Εφαρμογή ' + APP_VERSION + ' · Server ' + server +
@@ -1624,6 +1749,28 @@ function saveColors() {
   }).catch(function (e) {
     $('color-hint').className = 'save-hint err';
     $('color-hint').textContent = e.message;
+  });
+}
+
+var logoutTimer = null;
+
+/** Δύο πατήματα: αποσυνδέει ΜΟΝΟ αυτή τη συσκευή (σβήνει και τις ειδοποιήσεις της). */
+function onLogout() {
+  var b = $('btn-logout');
+  if (!b.classList.contains('confirming')) {
+    b.classList.add('confirming');
+    b.textContent = 'Πάτα ξανά για αποσύνδεση';
+    logoutTimer = setTimeout(function () {
+      b.classList.remove('confirming');
+      b.textContent = 'Αποσύνδεση αυτής της συσκευής';
+    }, 4000);
+    return;
+  }
+  clearTimeout(logoutTimer);
+  b.disabled = true;
+  api('logout').catch(function () { /* αποσυνδέεται τοπικά ούτως ή άλλως */ }).then(function () {
+    forgetDevice();
+    location.replace(location.pathname);
   });
 }
 
