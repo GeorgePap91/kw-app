@@ -11,7 +11,7 @@
   <meta name="robots" content="noindex, nofollow">
   <!-- Ασφάλεια: η σελίδα τρέχει ΜΟΝΟ τα δικά της scripts και μιλά ΜΟΝΟ με το Apps Script
        και τις υπηρεσίες της Google. Ό,τι άλλο μπλοκάρεται από τον ίδιο τον browser. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <!-- Οι σελίδες που ανοίγουμε (Forms, Drive) δεν μαθαίνουν τη διεύθυνση της εφαρμογής. -->
   <meta name="referrer" content="no-referrer">
   <title>KW App</title>
@@ -21,6 +21,29 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-tasks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11L12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-7M12 20V5M19 20v-11"/></symbol>
+  <symbol id="i-form" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4L20 15"/><path d="M20 20v-5h-5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></symbol>
+  <symbol id="i-sms" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H5v14h14v-4"/><path d="M13 4h7v7M20 4l-9 9"/></symbol>
+  <symbol id="i-room" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V5h16v15"/><path d="M2 20h20M13 12h1"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5M7 10l5-5 5 5M5 20h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.500C5 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></symbol>
+  <symbol id="i-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 9-9 9-9-9z"/><path d="M9 14v-2a1 1 0 0 1 1-1h5M13 8.500l2.500 2.500-2.500 2.500"/></symbol>
+</defs></svg>
 
 <div class="env" id="env" hidden>ΔΟΚΙΜΑΣΤΙΚΟ</div>
 
@@ -47,20 +70,37 @@
 
 <div id="app" hidden>
 
+  <!-- ΣΗΜΕΡΑ -->
+  <section class="view" id="view-today">
+    <header class="head">
+      <div class="head-row">
+        <h1>Σήμερα</h1>
+        <div class="head-actions">
+          <button class="icon-btn" data-refresh aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button>
+        </div>
+      </div>
+      <p class="today-date" id="today-date"></p>
+    </header>
+    <div class="today-hello"><b id="today-hello"></b><p id="today-sum"></p></div>
+    <div id="today-body"></div>
+  </section>
+
   <!-- ΚΛΗΣΕΙΣ -->
-  <section class="view" id="view-calls">
+  <section class="view" id="view-calls" hidden>
     <header class="head">
       <div class="head-row">
         <h1>Κλήσεις</h1>
         <div class="head-actions">
-          <button class="icon-btn" id="refresh" aria-label="Ανανέωση" title="Ανανέωση">↻</button>
-          <button class="icon-btn" id="btn-settings" aria-label="Ρυθμίσεις" title="Τα στοιχεία μου">⚙</button>
+          <button class="icon-btn" data-refresh aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button>
         </div>
       </div>
-      <div class="segmented" role="tablist">
-        <button class="seg is-on" data-filter="pending">Αναπάντητες <span class="pill" id="c-pending">0</span></button>
-        <button class="seg" data-filter="answered">Απαντημένες <span class="pill" id="c-answered">0</span></button>
-        <button class="seg" data-filter="all">Όλες</button>
+      <div class="subtabs stacked four" id="tabs-calls" role="tablist" aria-label="Κλήσεις">
+        <button class="subtab is-on" role="tab" data-tab="new"><b id="c-new">0</b><span>Νέες</span></button>
+        <button class="subtab" role="tab" data-tab="followup"><b id="c-followup">0</b><span>Follow-up</span></button>
+        <button class="subtab" role="tab" data-tab="showing"><b id="c-showing">0</b><span>Υποδείξεις</span></button>
+        <button class="subtab" role="tab" data-tab="all"><b id="c-all">0</b><span>Όλες</span></button>
       </div>
     </header>
     <div class="push-banner" id="push-banner" hidden>
@@ -80,10 +120,15 @@
       <div class="head-row">
         <h1>Εργασίες</h1>
         <div class="head-actions">
-          <button class="icon-btn" id="btn-new-task" aria-label="Νέα εργασία" title="Νέα εργασία">＋</button>
+          <button class="head-btn" id="btn-new-task"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Νέα</button>
+          <button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button>
         </div>
       </div>
-      <p class="head-note">Όσες έχουν ημερομηνία μπαίνουν και στο ημερολόγιό σου.</p>
+      <div class="subtabs counted" id="tabs-tasks" role="tablist" aria-label="Εργασίες">
+        <button class="subtab is-on" role="tab" data-tab="today"><span>Σήμερα</span> <i class="pill" id="c-t-today">0</i></button>
+        <button class="subtab" role="tab" data-tab="next"><span>Επόμενες</span> <i class="pill" id="c-t-next">0</i></button>
+        <button class="subtab" role="tab" data-tab="done"><span>Έγιναν</span> <i class="pill" id="c-t-done">0</i></button>
+      </div>
     </header>
     <div class="list" id="task-list"></div>
   </section>
@@ -91,153 +136,199 @@
   <!-- ΑΚΙΝΗΤΑ -->
   <section class="view" id="view-props" hidden>
     <header class="head">
-      <div class="head-row"><h1>Ακίνητα</h1></div>
-      <p class="head-note">Διαθέσιμα ακίνητα της ομάδας. Τα δικά σου πρώτα.</p>
+      <div class="head-row"><h1>Ακίνητα</h1><div class="head-actions"><button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button></div></div>
+      <div class="subtabs counted four" id="tabs-props" role="tablist" aria-label="Ακίνητα">
+        <button class="subtab is-on" role="tab" data-tab="mine"><span>Δικά μου</span> <i class="pill" id="c-p-mine">0</i></button>
+        <button class="subtab" role="tab" data-tab="team"><span>Ομάδας</span> <i class="pill" id="c-p-team">0</i></button>
+        <button class="subtab" role="tab" data-tab="docs"><span>Έγγραφα</span> <i class="pill warn" id="c-p-docs">0</i></button>
+        <button class="subtab" role="tab" data-tab="map" id="tab-map" hidden><span>Χάρτης</span> <i class="pill"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg></i></button>
+      </div>
     </header>
-    <div class="filter-bar" id="prop-filter-bar" hidden>
-      <span>Με εντολή, λείπουν έγγραφα</span>
-      <button class="link" id="prop-filter-clear">Όλα τα ακίνητα</button>
+    <div id="props-panes">
+      <div class="list" id="prop-list"></div>
+      <div class="map-pane" id="map-pane" hidden>
+        <div class="map-filters">
+          <label class="map-sel"><span>Συναλλαγή</span><select id="map-deal"></select></label>
+          <label class="map-sel"><span>Κατάσταση</span><select id="map-status"></select></label>
+        </div>
+        <div class="map-bar">
+          <span id="map-count" aria-live="polite"></span>
+          <button class="chip" id="map-mine" aria-pressed="false">Μόνο δικά μου</button>
+        </div>
+        <div class="map-wrap">
+          <div id="map"></div>
+          <div class="map-msg" id="map-msg" hidden></div>
+          <div class="map-card" id="map-card" hidden></div>
+        </div>
+      </div>
     </div>
-    <div class="list" id="prop-list"></div>
   </section>
 
-  <!-- ΜΕΤΡΗΣΙΜΟΤΗΤΑ (1.5) -->
+  <!-- ΑΛΛΑ -->
+  <section class="view" id="view-more" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Άλλα</h1><div class="head-actions"><button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button></div></div>
+    </header>
+    <div class="list">
+      <button class="row" data-goto="metrics"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="row-body"><span class="row-name">Μετρήσεις</span><span class="row-prop">Ραντεβού, υποδείξεις, εντολές ανά μήνα.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="row" data-goto="forms"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="row-body"><span class="row-name">Φόρμες και αίθουσες</span><span class="row-prop">Φόρμες γραφείου, κράτηση αίθουσας.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="row" data-settings><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="row-body"><span class="row-name">Ρυθμίσεις</span><span class="row-prop">Στοιχεία, γράμματα, ειδοποιήσεις.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+    </div>
+  </section>
+
+  <!-- ΜΕΤΡΗΣΕΙΣ (1.5) -->
   <section class="view" id="view-metrics" hidden>
     <header class="head">
       <div class="head-row">
-        <h1>Μετρησιμότητα</h1>
+        <div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Μετρήσεις</h1></div>
         <div class="head-actions">
-          <div class="mini-seg" id="mx-mode">
-            <button class="is-on" data-mode="month">Μήνας</button><button data-mode="year">Έτος</button>
-          </div>
-          <button class="icon-btn" id="mx-refresh" aria-label="Ανανέωση" title="Ανανέωση">↻</button>
+          <button class="icon-btn" id="mx-refresh" aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button>
         </div>
       </div>
+      <div class="subtabs" id="mx-mode" role="tablist" aria-label="Περίοδος">
+        <button class="subtab is-on" role="tab" data-mode="month"><span>Μήνας</span></button>
+        <button class="subtab" role="tab" data-mode="year"><span>Έτος</span></button>
+      </div>
       <div class="mx-nav" id="mx-nav" hidden>
-        <button class="icon-btn" id="mx-prev" aria-label="Προηγούμενος">‹</button>
+        <button class="icon-btn" id="mx-prev" aria-label="Προηγούμενος"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button>
         <b id="mx-title"></b>
-        <button class="icon-btn" id="mx-next" aria-label="Επόμενος">›</button>
+        <button class="icon-btn" id="mx-next" aria-label="Επόμενος"><svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
     </header>
     <div id="mx-body"><div class="empty">Φόρτωση…</div></div>
   </section>
 
-  <!-- ΦΟΡΜΕΣ & ΑΙΘΟΥΣΕΣ (από 1.5 στην ίδια καρτέλα) -->
+  <!-- ΦΟΡΜΕΣ & ΑΙΘΟΥΣΕΣ -->
   <section class="view" id="view-forms" hidden>
     <header class="head">
-      <div class="head-row"><h1>Φόρμες</h1></div>
-      <p class="head-note">Ανοίγουν σε νέα καρτέλα.</p>
+      <div class="head-row"><div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Φόρμες</h1></div><div class="head-actions"><button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button></div></div>
+      <div class="subtabs" id="tabs-forms" role="tablist" aria-label="Φόρμες">
+        <button class="subtab is-on" role="tab" data-tab="forms"><span>Φόρμες</span></button>
+        <button class="subtab" role="tab" data-tab="rooms" id="tab-rooms"><span>Αίθουσες</span></button>
+      </div>
     </header>
-    <div class="list" id="form-list"></div>
-    <div class="section">Αίθουσες συνεδριάσεων</div>
-    <div class="list">
-      <a class="row" id="book-link" href="#" target="_blank" rel="noopener">
-        <div class="row-top"><span class="row-name">Κράτηση αίθουσας</span><span class="row-time">Άνοιγμα ↗</span></div>
-        <div class="row-prop">Διάλεξε ώρα στο ημερολόγιο κρατήσεων.</div>
-      </a>
+    <div id="forms-panes">
+      <div class="list" id="form-list" data-pane="forms"></div>
+      <div class="list" data-pane="rooms" hidden>
+        <a class="row" id="book-link" href="#" target="_blank" rel="noopener">
+          <span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-room"/></svg></span>
+          <span class="row-body"><span class="row-name">Κράτηση αίθουσας</span>
+          <span class="row-prop">Διάλεξε ώρα στο ημερολόγιο κρατήσεων.</span></span>
+          <svg class="ico chev" aria-hidden="true"><use href="#i-out"/></svg>
+        </a>
+      </div>
     </div>
   </section>
 
-  <nav class="tabs">
-    <button class="tab is-on" data-view="calls">
-      <span class="tab-ico">☎</span>Κλήσεις
-      <span class="badge" id="tab-badge" hidden>0</span>
-    </button>
-    <button class="tab" data-view="tasks">
-      <span class="tab-ico">✓</span>Εργασίες
-      <span class="badge" id="task-badge" hidden>0</span>
-    </button>
-    <button class="tab" data-view="props"><span class="tab-ico">⌂</span>Ακίνητα</button>
-    <button class="tab" data-view="metrics"><span class="tab-ico">▥</span>Μετρησιμότητα</button>
-    <button class="tab" data-view="forms"><span class="tab-ico">✎</span>Φόρμες</button>
+  <nav class="tabs" aria-label="Κύριο μενού">
+    <button class="tab is-on" data-view="today"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span>Σήμερα</button>
+    <button class="tab" data-view="calls"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg><span class="badge" id="tab-badge" hidden>0</span></span>Κλήσεις</button>
+    <button class="tab" data-view="tasks"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg><span class="badge" id="task-badge" hidden>0</span></span>Εργασίες</button>
+    <button class="tab" data-view="props"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></span>Ακίνητα</button>
+    <button class="tab" data-view="more"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-more"/></svg></span>Άλλα</button>
   </nav>
 </div>
 
 <!-- ΛΕΠΤΟΜΕΡΕΙΑ ΚΛΗΣΗΣ -->
 <div class="sheet" id="detail" hidden>
   <div class="sheet-head">
-    <button class="back" id="detail-back">‹ Πίσω</button>
-    <span class="sheet-title" id="d-status"></span>
+    <button class="back" id="detail-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="tag" id="d-status"></span>
   </div>
   <div class="sheet-body">
     <h2 id="d-name"></h2>
     <p class="d-sub" id="d-prop"></p>
     <p class="d-sub small" id="d-deal"></p>
+    <a class="addr-link" id="d-addr" target="_blank" rel="noopener" hidden></a>
 
-    <div class="contact">
-      <a class="contact-btn" id="d-tel">Κλήση</a>
-      <a class="contact-btn ghost" id="d-mail">Email</a>
+    <div class="subtabs in-sheet" id="tabs-detail" role="tablist" aria-label="Κλήση">
+      <button class="subtab is-on" role="tab" data-tab="act"><span>Ενέργειες</span></button>
+      <button class="subtab" role="tab" data-tab="info"><span>Στοιχεία</span></button>
+      <button class="subtab" role="tab" data-tab="notes"><span>Σημειώσεις</span></button>
     </div>
 
-    <div class="sms-block">
-      <div class="chips" id="sms-kinds" role="tablist" aria-label="Τύπος SMS"></div>
-      <a class="btn primary wide" id="sms-link">Άνοιγμα SMS με έτοιμο μήνυμα</a>
-      <details class="sms-preview">
-        <summary>Δες ή άλλαξε το μήνυμα <span id="sms-count"></span></summary>
-        <textarea id="sms-text" rows="4"></textarea>
-        <div class="actions">
-          <button class="btn" id="btn-copy">Αντιγραφή</button>
-          <button class="btn" id="btn-lang">In English</button>
+    <div id="detail-panes">
+      <div data-pane="act">
+        <div class="sms-block">
+          <div class="chips" id="sms-kinds" role="tablist" aria-label="Τύπος SMS"></div>
+          <a class="btn primary wide" id="sms-link">Άνοιγμα SMS με έτοιμο μήνυμα</a>
+          <details class="sms-preview">
+            <summary>Δες ή άλλαξε το μήνυμα <span id="sms-count"></span></summary>
+            <textarea id="sms-text" rows="5"></textarea>
+            <div class="actions">
+              <button class="btn" id="btn-copy">Αντιγραφή</button>
+              <button class="btn" id="btn-lang">In English</button>
+            </div>
+          </details>
         </div>
-      </details>
+
+        <div class="actions">
+          <button class="btn" id="btn-noanswer">Δεν απάντησε</button>
+          <button class="btn" id="btn-showing">Υπόδειξη</button>
+        </div>
+        <button class="btn wide gap-top" id="btn-lead-task"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Εργασία για αυτή την κλήση</button>
+
+        <label class="field gap-field">
+          <span>Κατάσταση</span>
+          <select id="d-status-select"></select>
+        </label>
+      </div>
+
+      <div data-pane="info" hidden>
+        <div class="message" id="d-message-wrap" hidden>
+          <span>Μήνυμα πελάτη</span>
+          <p id="d-message"></p>
+        </div>
+        <dl class="facts">
+          <div><dt>Τηλέφωνο</dt><dd id="d-phone"></dd></div>
+          <div><dt>Email</dt><dd id="d-email"></dd></div>
+          <div><dt>Ήρθε</dt><dd id="d-date"></dd></div>
+          <div><dt>Πηγή</dt><dd id="d-source"></dd></div>
+          <div id="d-repeat-wrap" hidden><dt>Επανάληψη</dt><dd id="d-repeat"></dd></div>
+          <div id="d-called-wrap" hidden><dt>Κάλεσε</dt><dd id="d-called"></dd></div>
+          <div id="d-followup-wrap" hidden><dt>Follow-up</dt><dd id="d-followup"></dd></div>
+          <div id="d-showing-wrap" hidden><dt>Υπόδειξη</dt><dd id="d-showing"></dd></div>
+          <div id="d-outcome-wrap" hidden><dt>Αποτέλεσμα</dt><dd id="d-outcome"></dd></div>
+          <div id="d-sms-wrap" hidden><dt>SMS</dt><dd id="d-sms"></dd></div>
+          <div id="d-smsremind-wrap" hidden><dt>SMS υπενθύμισης</dt><dd id="d-smsremind"></dd></div>
+        </dl>
+      </div>
+
+      <div data-pane="notes" hidden>
+        <label class="field">
+          <span>Σημειώσεις</span>
+          <textarea id="d-notes" rows="7" placeholder="Τι είπε ο πελάτης, τι ψάχνει, budget…"></textarea>
+        </label>
+        <p class="save-hint" id="save-hint"></p>
+      </div>
     </div>
-
-    <div class="message" id="d-message-wrap" hidden>
-      <span>Μήνυμα πελάτη</span>
-      <p id="d-message"></p>
-    </div>
-
-    <dl class="facts">
-      <div><dt>Τηλέφωνο</dt><dd id="d-phone"></dd></div>
-      <div><dt>Email</dt><dd id="d-email"></dd></div>
-      <div><dt>Ήρθε</dt><dd id="d-date"></dd></div>
-      <div><dt>Πηγή</dt><dd id="d-source"></dd></div>
-      <div id="d-repeat-wrap" hidden><dt>Επανάληψη</dt><dd id="d-repeat"></dd></div>
-      <div id="d-called-wrap" hidden><dt>Κάλεσε</dt><dd id="d-called"></dd></div>
-      <div id="d-followup-wrap" hidden><dt>Follow-up</dt><dd id="d-followup"></dd></div>
-      <div id="d-showing-wrap" hidden><dt>Υπόδειξη</dt><dd id="d-showing"></dd></div>
-      <div id="d-sms-wrap" hidden><dt>SMS</dt><dd id="d-sms"></dd></div>
-      <div id="d-smsremind-wrap" hidden><dt>SMS υπενθύμισης</dt><dd id="d-smsremind"></dd></div>
-    </dl>
-
-    <label class="field">
-      <span>Κατάσταση</span>
-      <select id="d-status-select"></select>
-    </label>
-
-    <label class="field">
-      <span>Σημειώσεις</span>
-      <textarea id="d-notes" rows="5" placeholder="Τι είπε ο πελάτης, τι ψάχνει, budget…"></textarea>
-    </label>
-    <p class="save-hint" id="save-hint"></p>
-
-    <div class="actions">
-      <button class="btn" id="btn-noanswer">Δεν απάντησε</button>
-      <button class="btn primary" id="btn-showing">Υπόδειξη</button>
-    </div>
-    <button class="btn wide gap-top" id="btn-lead-task">＋ Εργασία για αυτή την κλήση</button>
+  </div>
+  <div class="sheet-foot">
+    <a class="contact-btn" id="d-tel"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Κλήση</a>
+    <a class="contact-btn ghost" id="d-mail" aria-label="Email"><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg>Email</a>
   </div>
 </div>
 
 <!-- ΕΡΓΑΣΙΑ (νέα ή αλλαγή) -->
 <div class="sheet" id="task" hidden>
   <div class="sheet-head">
-    <button class="back" id="task-back">‹ Πίσω</button>
+    <button class="back" id="task-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
     <span class="sheet-title" id="t-head">Νέα εργασία</span>
   </div>
   <div class="sheet-body">
     <label class="field"><span>Τι πρέπει να γίνει</span>
       <input type="text" id="t-title" maxlength="200" placeholder="π.χ. Κλήση ιδιοκτήτη για ΠΕΑ"></label>
     <p class="linked" id="t-lead" hidden></p>
-    <div class="field-row">
-      <label class="field"><span>Ημερομηνία</span><input type="date" id="t-date"></label>
-      <label class="field"><span>Ώρα (προαιρετικά)</span><input type="time" id="t-time" step="900"></label>
-    </div>
     <div class="quick" id="t-quick">
       <button class="chip" data-when="0">Σήμερα</button>
       <button class="chip" data-when="1">Αύριο</button>
       <button class="chip" data-when="7">Σε μία εβδομάδα</button>
       <button class="chip" data-when="">Χωρίς ημερομηνία</button>
+    </div>
+    <div class="field-row">
+      <label class="field"><span>Ημερομηνία</span><input type="date" id="t-date"></label>
+      <label class="field"><span>Ώρα (αν θες)</span><input type="time" id="t-time" step="900"></label>
     </div>
     <label class="field"><span>Σημειώσεις</span>
       <textarea id="t-notes" rows="3"></textarea></label>
@@ -252,15 +343,27 @@
 <!-- ΥΠΟΔΕΙΞΗ (νέα ή αλλαγή) -->
 <div class="sheet" id="showing" hidden>
   <div class="sheet-head">
-    <button class="back" id="showing-back">‹ Πίσω</button>
+    <button class="back" id="showing-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
     <span class="sheet-title" id="s-title">Νέα υπόδειξη</span>
   </div>
   <div class="sheet-body">
     <h2 id="s-name"></h2>
-    <p class="d-sub" id="s-prop"></p>
+    <p class="d-sub gap-sub" id="s-prop"></p>
 
-    <label class="field"><span>Ημερομηνία</span><input type="date" id="s-date"></label>
-    <label class="field"><span>Ώρα</span><input type="time" id="s-time" step="900"></label>
+    <section class="outcome" id="s-outcome" hidden>
+      <h3 class="sub-head first">Πώς πήγε η υπόδειξη;</h3>
+      <div class="outcome-list" id="s-outcome-list"></div>
+      <label class="field"><span>Σχόλιο (αν θες)</span>
+        <textarea id="s-outcome-note" rows="3" placeholder="Τι είπε ο πελάτης, τι του άρεσε, τι όχι…"></textarea></label>
+      <button class="btn primary wide" id="btn-save-outcome">Καταχώρηση αποτελέσματος</button>
+      <p class="save-hint" id="s-outcome-hint"></p>
+      <h3 class="sub-head">Αλλαγή ώρας</h3>
+    </section>
+
+    <div class="field-row">
+      <label class="field"><span>Ημερομηνία</span><input type="date" id="s-date"></label>
+      <label class="field"><span>Ώρα</span><input type="time" id="s-time" step="900"></label>
+    </div>
     <label class="field"><span>Διεύθυνση</span>
       <input type="text" id="s-addr" placeholder="Οδός, αριθμός, περιοχή"></label>
     <p class="field-hint" id="s-addr-note"></p>
@@ -277,105 +380,144 @@
 <!-- ΛΕΠΤΟΜΕΡΕΙΑ ΑΚΙΝΗΤΟΥ -->
 <div class="sheet" id="propdetail" hidden>
   <div class="sheet-head">
-    <button class="back" id="propdetail-back">‹ Πίσω</button>
+    <button class="back" id="propdetail-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
     <span class="sheet-title">Ακίνητο</span>
   </div>
   <div class="sheet-body">
     <h2 id="pd-name"></h2>
     <p class="d-sub" id="pd-sub"></p>
+    <a class="addr-link" id="pd-addr" target="_blank" rel="noopener" hidden></a>
     <div class="stats" id="pd-stats"></div>
+    <a class="btn wide gap" id="pd-nav" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-nav"/></svg>Οδηγίες στο Google Maps</a>
+    <button class="btn primary wide gap-top" id="pd-leads">Οι κλήσεις μου για αυτό</button>
 
-    <section class="docs" id="pd-docs" hidden>
-      <div class="docs-head">
-        <h3>Έγγραφα για live</h3>
-        <span class="docs-count" id="pd-docs-count"></span>
+    <div class="subtabs in-sheet" id="tabs-prop" role="tablist" aria-label="Ακίνητο">
+      <button class="subtab is-on" role="tab" data-tab="docs"><span>Έγγραφα</span> <i class="pill" id="pd-docs-count"></i></button>
+      <button class="subtab" role="tab" data-tab="facts"><span>Στοιχεία</span></button>
+    </div>
+
+    <div id="prop-panes">
+      <section class="docs" id="pd-docs" data-pane="docs" hidden>
+        <div id="pd-docs-list"></div>
+        <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
+        <input type="file" id="doc-input" accept="application/pdf,image/*" hidden>
+      </section>
+      <div data-pane="facts" hidden>
+        <dl class="facts" id="pd-facts"></dl>
       </div>
-      <div id="pd-docs-list"></div>
-      <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden>Άνοιγμα φακέλου στο Drive ↗</a>
-      <input type="file" id="doc-input" accept="application/pdf,image/*" hidden>
-    </section>
-
-    <button class="btn primary wide gap" id="pd-leads">Οι κλήσεις μου για αυτό</button>
-    <dl class="facts" id="pd-facts"></dl>
+    </div>
   </div>
 </div>
 
 <!-- ΤΑ ΣΤΟΙΧΕΙΑ ΜΟΥ -->
 <div class="sheet" id="settings" hidden>
   <div class="sheet-head">
-    <button class="back" id="settings-back">‹ Πίσω</button>
-    <span class="sheet-title">Τα στοιχεία μου</span>
+    <button class="back" id="settings-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title">Ρυθμίσεις</span>
   </div>
   <div class="sheet-body">
     <h2 id="p-title">Τα στοιχεία μου</h2>
-    <p class="d-sub">Μπαίνουν αυτούσια στο SMS που διαβάζει ο πελάτης.</p>
 
-    <label class="field"><span>Όνομα στο SMS</span><input type="text" id="p-name"></label>
-    <label class="field"><span>Κινητό</span>
-      <input type="tel" id="p-phone" inputmode="tel" placeholder="69XXXXXXXX"></label>
-    <label class="field"><span>Σύνδεσμος ή vCard (προαιρετικά)</span>
-      <input type="url" id="p-link" placeholder="https://…"></label>
-
-    <button class="btn primary wide" id="btn-save-settings">Αποθήκευση</button>
-    <p class="save-hint" id="p-hint"></p>
-
-    <h3 class="sub-head">Μηνύματα SMS</h3>
-    <p class="cal-status muted">Το κείμενο της πρώτης επαφής, της υπενθύμισης και της ακύρωσης, σε ελληνικά και αγγλικά.</p>
-    <button class="btn wide" id="btn-templates">Επεξεργασία μηνυμάτων</button>
-
-    <h3 class="sub-head">Χρώματα στο ημερολόγιο</h3>
-    <div id="color-rows"></div>
-    <p class="save-hint" id="color-hint"></p>
-
-    <h3 class="sub-head">Ειδοποιήσεις</h3>
-    <p class="cal-status" id="push-status"></p>
-    <div class="actions">
-      <button class="btn primary" id="btn-push-enable">Ενεργοποίηση</button>
-      <button class="btn" id="btn-push-test" hidden>Δοκιμή</button>
-    </div>
-    <p class="save-hint" id="push-hint"></p>
-    <p class="diag" id="push-diag"></p>
-
-    <h3 class="sub-head">Ημερολόγιο</h3>
-    <p class="cal-status" id="cal-status"></p>
-    <div class="note" id="cal-howto" hidden>
-      <p>Για να μπαίνουν οι υποδείξεις και τα follow-up κατευθείαν στο ημερολόγιό σου:</p>
-      <ol>
-        <li>Άνοιξε το Google Calendar στον υπολογιστή.</li>
-        <li>Ρυθμίσεις του ημερολογίου σου → «Κοινή χρήση με συγκεκριμένα άτομα».</li>
-        <li>Πρόσθεσε <b id="cal-account"></b> με δικαίωμα «Αλλαγές σε συμβάντα».</li>
-      </ol>
-      <p>Μέχρι τότε σου έρχονται ως προσκλήσεις.</p>
+    <div class="subtabs in-sheet two-rows" id="tabs-settings" role="tablist" aria-label="Ρυθμίσεις">
+      <button class="subtab is-on" role="tab" data-tab="me"><span>Στοιχεία</span></button>
+      <button class="subtab" role="tab" data-tab="push"><span>Ειδοποιήσεις</span></button>
+      <button class="subtab" role="tab" data-tab="cal"><span>Ημερολόγιο</span></button>
+      <button class="subtab" role="tab" data-tab="sec"><span>Ασφάλεια</span></button>
     </div>
 
-    <h3 class="sub-head">Drive</h3>
-    <a class="link-out" id="drive-link" href="#" target="_blank" rel="noopener">Ο φάκελός μου με τα ακίνητα ↗</a>
-    <p class="cal-status warn" id="drive-status" hidden></p>
+    <div id="settings-panes">
+      <div data-pane="me">
+        <h3 class="sub-head first">Μέγεθος γραμμάτων</h3>
+        <div class="size-pick" id="size-pick" role="group" aria-label="Μέγεθος γραμμάτων">
+          <button data-size="m"><b class="s1">Α</b>Κανονικά</button>
+          <button data-size="l"><b class="s2">Α</b>Μεγάλα</button>
+          <button data-size="xl"><b class="s3">Α</b>Πολύ μεγάλα</button>
+        </div>
 
-    <h3 class="sub-head">Ασφάλεια</h3>
-    <p class="cal-status muted" id="sec-device"></p>
-    <button class="btn danger wide" id="btn-logout">Αποσύνδεση αυτής της συσκευής</button>
+        <h3 class="sub-head">Στοιχεία στο SMS</h3>
+        <p class="cal-status muted">Μπαίνουν αυτούσια στο SMS που διαβάζει ο πελάτης.</p>
+        <label class="field"><span>Όνομα στο SMS</span><input type="text" id="p-name"></label>
+        <label class="field"><span>Κινητό</span>
+          <input type="tel" id="p-phone" inputmode="tel" placeholder="69XXXXXXXX"></label>
+        <label class="field"><span>Σύνδεσμος ή vCard (αν θες)</span>
+          <input type="url" id="p-link" placeholder="https://…"></label>
 
-    <p class="version" id="version"></p>
+        <button class="btn primary wide" id="btn-save-settings">Αποθήκευση</button>
+        <p class="save-hint" id="p-hint"></p>
+
+        <h3 class="sub-head">Μηνύματα SMS</h3>
+        <p class="cal-status muted">Το κείμενο της πρώτης επαφής, της υπενθύμισης και της ακύρωσης, σε ελληνικά και αγγλικά.</p>
+        <button class="btn wide" id="btn-templates"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg>Επεξεργασία μηνυμάτων</button>
+
+        <h3 class="sub-head">Drive</h3>
+        <a class="link-out" id="drive-link" href="#" target="_blank" rel="noopener"><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Ο φάκελός μου με τα ακίνητα</a>
+        <p class="cal-status warn" id="drive-status" hidden></p>
+      </div>
+
+      <div data-pane="push" hidden>
+        <h3 class="sub-head first">Ειδοποιήσεις</h3>
+        <p class="cal-status" id="push-status"></p>
+        <div class="actions">
+          <button class="btn primary" id="btn-push-enable">Ενεργοποίηση</button>
+          <button class="btn" id="btn-push-test" hidden>Δοκιμή</button>
+        </div>
+        <p class="save-hint spaced" id="push-hint"></p>
+        <p class="diag" id="push-diag"></p>
+      </div>
+
+      <div data-pane="cal" hidden>
+        <h3 class="sub-head first">Ημερολόγιο</h3>
+        <p class="cal-status" id="cal-status"></p>
+        <div class="note" id="cal-howto" hidden>
+          <p>Για να μπαίνουν οι υποδείξεις και τα follow-up κατευθείαν στο ημερολόγιό σου:</p>
+          <ol>
+            <li>Άνοιξε το Google Calendar στον υπολογιστή.</li>
+            <li>Ρυθμίσεις του ημερολογίου σου → «Κοινή χρήση με συγκεκριμένα άτομα».</li>
+            <li>Πρόσθεσε <b id="cal-account"></b> με δικαίωμα «Αλλαγές σε συμβάντα».</li>
+          </ol>
+          <p>Μέχρι τότε σου έρχονται ως προσκλήσεις.</p>
+        </div>
+        <h3 class="sub-head">Χρώματα στο ημερολόγιο</h3>
+        <div id="color-rows"></div>
+        <p class="save-hint spaced" id="color-hint"></p>
+      </div>
+
+      <div data-pane="sec" hidden>
+        <h3 class="sub-head first">Ασφάλεια</h3>
+        <p class="cal-status muted" id="sec-device"></p>
+        <button class="btn danger wide" id="btn-logout">Αποσύνδεση αυτής της συσκευής</button>
+        <p class="version" id="version"></p>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- ΜΗΝΥΜΑΤΑ SMS -->
 <div class="sheet" id="templates" hidden>
   <div class="sheet-head">
-    <button class="back" id="templates-back">‹ Πίσω</button>
+    <button class="back" id="templates-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
     <span class="sheet-title">Μηνύματα SMS</span>
   </div>
   <div class="sheet-body">
     <h2>Τα μηνύματά μου</h2>
-    <p class="note">Πάτα ένα κουμπί όπως <b>{πελάτης}</b> για να μπει στο σημείο που γράφεις· συμπληρώνεται αυτόματα. Ό,τι βάλεις μέσα σε <b>[ ]</b> παραλείπεται όταν λείπει κάποιο στοιχείο του (π.χ. ο πελάτης χωρίς όνομα).</p>
+    <p class="note gap-sub">Πάτα ένα κουμπί όπως <b>{πελάτης}</b> για να μπει στο σημείο που γράφεις· συμπληρώνεται αυτόματα. Ό,τι βάλεις μέσα σε <b>[ ]</b> παραλείπεται όταν λείπει κάποιο στοιχείο του (π.χ. ο πελάτης χωρίς όνομα).</p>
     <div id="tpl-list"></div>
     <button class="btn primary wide" id="btn-save-templates">Αποθήκευση</button>
-    <p class="save-hint" id="tpl-hint"></p>
+    <p class="save-hint spaced" id="tpl-hint"></p>
   </div>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<!-- ΕΡΩΤΗΣΗ ΕΠΙΒΕΒΑΙΩΣΗΣ -->
+<div class="ask" id="ask" role="alertdialog" aria-modal="true" aria-labelledby="ask-title" aria-describedby="ask-text" hidden>
+  <div class="ask-box">
+    <h2 id="ask-title"></h2>
+    <p id="ask-text"></p>
+    <button class="btn wide solid-red" id="ask-yes"></button>
+    <button class="btn wide" id="ask-no"></button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="config.js"></script>
 <script src="push.js"></script>
