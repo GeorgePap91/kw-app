@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.9';
+var APP_VERSION = '1.12';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.9';
+var API_VERSION = '1.11';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -152,7 +152,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var SHEETS = ['templates', 'task', 'settings', 'showing', 'propdetail', 'detail'];
+var SHEETS = ['contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
 function backGuard() { if (history.pushState) history.pushState({ kw: 1 }, ''); }
@@ -207,7 +207,7 @@ window.addEventListener('popstate', function () {
   if (exiting || !S.boot) return;
   backGuard();
   if (closeTop()) return;
-  if (S.view === 'metrics' || S.view === 'forms') goto('more');
+  if (NAV_OF[S.view]) goto('more');
   else if (S.view !== 'today') goto('today');
   else askExit();
 });
@@ -604,6 +604,19 @@ function wire() {
   $('btn-showing').onclick = openShowingForm;
   $('btn-save-showing').onclick = onSaveShowing;
   $('btn-save-outcome').onclick = onSaveOutcome;
+  wireTabs('tabs-contact', 'contact-panes', function (v) {
+    showPane('contact-panes', v);
+    if (v === 'mail') loadContactMail();
+  });
+  wireSearch('contact-search', function () { S.contactLimit = 0; renderContacts(); });
+  wireSearch('prop-search', function () { renderProps(); });
+  wireSearch('global-search', renderGlobal);
+  $('global-search').onfocus = function () { if (!S.contacts) loadContacts().then(function () { renderGlobal($('global-search').value); }, function () {}); };
+  $('btn-new-contact').onclick = function () { editContact(null); };
+  $('btn-edit-contact').onclick = function () { editContact(S.contact); };
+  $('btn-save-contact').onclick = onSaveContact;
+  $('contact-back').onclick = function () { closeSheet('contact'); };
+  $('contact-edit-back').onclick = function () { closeSheet('contact-edit'); };
   $('btn-save-settings').onclick = onSaveSettings;
   $('btn-cancel-showing').onclick = onCancelShowing;
   $('push-banner-btn').onclick = onEnablePush;
@@ -625,8 +638,8 @@ function wire() {
   });
 }
 
-var VIEWS = ['today', 'calls', 'tasks', 'props', 'more', 'metrics', 'forms'];
-var NAV_OF = { metrics: 'more', forms: 'more' };   // ποιο κουμπί του μενού φωτίζεται
+var VIEWS = ['today', 'calls', 'tasks', 'props', 'more', 'contacts', 'metrics', 'forms'];
+var NAV_OF = { metrics: 'more', forms: 'more', contacts: 'more' };   // ποιο κουμπί του μενού φωτίζεται
 
 function goto(view) {
   var dir = VIEWS.indexOf(view) - VIEWS.indexOf(S.view);
@@ -644,6 +657,7 @@ function goto(view) {
   if (view === 'props') renderProps();
   if (view === 'tasks') renderTasks();
   if (view === 'today') renderToday();
+  if (view === 'contacts') loadContacts();
   if (view === 'metrics') loadMetrics(false);
 }
 
@@ -687,6 +701,7 @@ function niceDate(s) {
   var iso = m[3] + '-' + m[2] + '-' + m[1];
   if (iso === isoDate(new Date())) return 'Σήμερα ' + m[4];
   if (iso === isoDate(new Date(Date.now() - 86400000))) return 'Χθες ' + m[4];
+  if (+m[3] !== new Date().getFullYear()) return m[1] + '/' + m[2] + '/' + m[3];
   return WEEKDAYS[new Date(+m[3], +m[2] - 1, +m[1]).getDay()] + ' ' + m[1] + '/' + m[2] + ', ' + m[4];
 }
 
@@ -753,6 +768,225 @@ function wireLeadRows(el) {
   el.querySelectorAll('[data-id]').forEach(function (r) {
     r.onclick = function () { openLead(r.dataset.id); };
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ΕΠΑΦΕΣ (1.10)
+// ─────────────────────────────────────────────────────────────
+
+/** Πάνω στην κλήση: ο πελάτης είχε καλέσει και για άλλα ακίνητά μου. */
+function renderKnown(l) {
+  var el = $('d-known');
+  var others = l.otherCodes || [];
+  el.hidden = !l.contactId;
+  if (!l.contactId) return;
+  var names = others.map(function (c) {
+    var p = S.props.filter(function (x) { return normCode(x.code) === normCode(c); })[0];
+    return (p && p.street ? p.street + ', ' : '') + c;
+  });
+  el.innerHTML = (others.length ? '<b>Έχει καλέσει και για:</b> ' + esc(names.join(' · ')) : '') +
+    '<button class="link" id="d-open-contact">Άνοιγμα επαφής</button>';
+  $('d-open-contact').onclick = function () { openContact(l.contactId); };
+}
+
+function loadContacts() {
+  if (!S.contacts) $('contact-list').innerHTML = '<div class="empty">Φόρτωση…</div>';
+  return api('contacts').then(function (list) {
+    S.contacts = list;
+    renderContacts();
+    return list;
+  }).catch(function (e) {
+    if (!S.contacts) $('contact-list').innerHTML = '<div class="empty"><b>Δεν φορτώθηκαν</b>' + esc(e.message) + '</div>';
+    throw e;
+  });
+}
+
+var CONTACT_PAGE = 60;
+
+/** Αναζήτηση σε όνομα, τηλέφωνο, email, κωδικό. Χωρίς τόνους, ελληνικά ή λατινικά. */
+
+function renderContacts() {
+  var list = S.contacts;
+  if (!list) return;
+  var words = searchWords($('contact-search').value), q = words.length;
+  var shown = !q ? list : list.filter(function (c) { return matches(words, contactFields(c)); });
+  var page = shown.slice(0, S.contactLimit || CONTACT_PAGE);
+
+  var el = $('contact-list');
+  if (!shown.length) {
+    el.innerHTML = '<div class="empty"><b>' + (q ? 'Δεν βρέθηκε επαφή' : 'Καμία επαφή ακόμα') + '</b>' +
+      (q ? 'Δοκίμασε όνομα, τηλέφωνο ή κωδικό.' : 'Επικόλλησε το Excel του CRM στο φύλλο «Επαφές».') + '</div>';
+    return;
+  }
+  el.innerHTML = page.map(function (c) {
+    var sub = [(c.phones || [])[0], c.role].filter(Boolean).join(' · ');
+    return '<button class="row" data-contact="' + esc(c.id) + '"><span class="row-body">' +
+      '<span class="row-name">' + esc(c.name || (c.phones || [])[0] || (c.emails || [])[0]) + '</span>' +
+      (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
+      (c.codes || !c.crm ? '<span class="row-meta">' +
+        (c.codes ? '<span>Κάλεσε για ' + plural(c.codes.length, 'ακίνητο', 'ακίνητα') + '</span>' : '') +
+        (!c.crm ? '<span class="tag noanswer">Από κλήση</span>' : '') + '</span>' : '') +
+      '</span>' + ico('next', 'ico chev') + '</button>';
+  }).join('') + (shown.length > page.length
+    ? '<button class="today-more" id="contacts-more"><span>Δες περισσότερες (' + (shown.length - page.length).toLocaleString('el-GR') +
+      ' ακόμα)</span>' + ico('next', 'ico chev') + '</button>' : '');
+
+  el.querySelectorAll('[data-contact]').forEach(function (b) {
+    b.onclick = function () { openContact(b.dataset.contact); };
+  });
+  if ($('contacts-more')) $('contacts-more').onclick = function () {
+    S.contactLimit = (S.contactLimit || CONTACT_PAGE) + CONTACT_PAGE * 2;
+    renderContacts();
+  };
+}
+
+function findContact(id) {
+  return (S.contacts || []).filter(function (c) { return c.id === id; })[0] || null;
+}
+
+function openContact(id) {
+  var c = findContact(id);
+  if (c) return showContact(c);
+  loadContacts().then(function () {
+    var f = findContact(id);
+    if (f) showContact(f); else toast('Δεν βρέθηκε η επαφή.', true);
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+function intlPhone(d) { return !d ? '' : d.length === 10 ? '+30' + d : '+' + d; }
+
+/** Λίγες γραμμές, μόνο όσες έχουν τιμή. Τηλέφωνα, email και διεύθυνση πατιούνται. */
+function showContact(c) {
+  S.contact = c;
+  S.contactMail = null;
+  var phones = c.phones || [], emails = c.emails || [];
+  $('ct-name').textContent = c.name || phones[0] || emails[0];
+  $('ct-sub').innerHTML = [c.role, c.tags].filter(Boolean).map(esc).join(' · ') +
+    (!c.crm ? ' <span class="tag noanswer">Από κλήση</span>' : '') +
+    (c.inactive ? ' <span class="tag">Μη ενεργή στο CRM</span>' : '');
+
+  var codes = c.codes || [];
+  $('ct-codes-wrap').hidden = !codes.length;
+  $('ct-codes').innerHTML = codes.map(function (x) {
+    var known = S.props.some(function (p) { return p.code === x.code; });
+    var text = (x.street ? x.street + ', ' : '') + 'κωδικός ' + x.code;
+    return known ? '<button class="code-row" data-code="' + esc(x.code) + '"><span>' + esc(text) + '</span>' + ico('next', 'ico chev') + '</button>'
+      : '<div class="code-row"><span>' + esc(text) + '</span>' + (x.status ? '<i class="tag">' + esc(x.status) + '</i>' : '') + '</div>';
+  }).join('');
+  $('ct-codes').querySelectorAll('[data-code]').forEach(function (b) {
+    b.onclick = function () { openProp(b.dataset.code); };
+  });
+
+  var link = function (href, text, out) {
+    return '<a href="' + esc(href) + '"' + (out ? ' target="_blank" rel="noopener"' : '') + '>' + esc(text) + '</a>';
+  };
+  var addr = [c.street, c.area].filter(Boolean).join(', ');
+  var rows = [
+    ['Τηλέφωνο', phones.map(function (p) { return link('tel:' + intlPhone(p), p); }).join('<br>')],
+    ['Email', emails.map(function (e) { return link('mailto:' + e, e); }).join('<br>')],
+    ['Διεύθυνση', addr && c.street ? link(placeUrl(c.street, c.area), addr, true) : esc(addr)],
+    ['Επάγγελμα', esc(c.job || '')],
+    ['Πηγή', esc(c.source || '')],
+    ['Τελευταία κλήση', esc(c.last ? niceDate(c.last) : '')],
+    ['Στο CRM από', esc(c.added || '')],
+    ['Σημειώσεις', esc(c.notes || '')]
+  ];
+  $('ct-facts').innerHTML = rows.filter(function (f) { return f[1]; }).map(function (f) {
+    return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>';
+  }).join('');
+  label($('btn-edit-contact'), 'form', c.crm ? (c.notes ? 'Αλλαγή σημειώσεων' : 'Προσθήκη σημείωσης') : 'Επεξεργασία επαφής');
+
+  var tel = intlPhone(phones[0]);
+  $('ct-tel').href = tel ? 'tel:' + tel : '#';
+  $('ct-tel').classList.toggle('muted', !tel);
+  $('ct-sms').href = tel ? smsHref(tel, '') : '#';
+  $('ct-sms').classList.toggle('muted', !tel);
+
+  setTab('tabs-contact', 'info');
+  showPane('contact-panes', 'info');
+  $('contact').querySelector('.sheet-body').scrollTop = 0;
+  openSheet('contact');
+}
+
+function loadContactMail() {
+  var c = S.contact, el = $('ct-mail');
+  if (!c) return;
+  if (!(c.emails || []).length) {
+    el.innerHTML = '<div class="empty small"><b>Χωρίς email</b>' + (c.crm ? 'Πρόσθεσε το email στο CRM.' : 'Πρόσθεσε το email στα Στοιχεία.') + '</div>';
+    return;
+  }
+  if (S.contactMail && S.contactMail.id === c.id) return;
+  el.innerHTML = '<div class="empty small">Φόρτωση email…</div>';
+  api('contactMail', { id: c.id }).then(function (r) {
+    if (!S.contact || S.contact.id !== c.id) return;
+    S.contactMail = { id: c.id };
+    renderContactMail(r);
+  }).catch(function (e) {
+    el.innerHTML = '<div class="empty small"><b>Δεν φορτώθηκαν</b>' + esc(e.message) + '</div>';
+  });
+}
+
+/** Το κείμενο ενός email είναι ξένο: μπαίνει πάντα ως κείμενο, ποτέ ως HTML. */
+function renderContactMail(r) {
+  var el = $('ct-mail');
+  if (!r.available) {
+    el.innerHTML = '<div class="empty small"><b>Όχι ακόμα</b>Τα email φαίνονται προς το παρόν μόνο στον λογαριασμό της εφαρμογής.</div>';
+    return;
+  }
+  if (!r.items.length) {
+    el.innerHTML = '<div class="empty small"><b>Κανένα email</b>Δεν βρέθηκε αλληλογραφία με αυτή την επαφή.</div>';
+    return;
+  }
+  el.innerHTML = r.items.map(function (m) {
+    return '<article class="mail"><h4>' + esc(m.subject) + '</h4>' +
+      '<div class="row-meta"><span class="tag ' + (m.inbound ? 'closed' : 'answered') + '">' + (m.inbound ? 'Από την επαφή' : 'Από εμένα') + '</span>' +
+      '<span>' + esc(niceDate(m.date)) + '</span></div><p>' + esc(m.text) + '</p>' +
+      '<button class="link" data-more-mail>Δες όλο το κείμενο</button>' +
+      (/^https:\/\/mail\.google\.com\//.test(m.url) ? '<a class="link" href="' + esc(m.url) + '" target="_blank" rel="noopener">Άνοιγμα στο Gmail</a>' : '') +
+      '</article>';
+  }).join('');
+  el.querySelectorAll('[data-more-mail]').forEach(function (b) {
+    var card = b.parentNode, p = card.querySelector('p');
+    if (p.scrollHeight <= p.clientHeight + 2) { b.hidden = true; return; }
+    b.onclick = function () { card.classList.add('open'); b.hidden = true; };
+  });
+}
+
+/** Επαφή του CRM: μόνο σημειώσεις. Επαφή από κλήση ή νέα: όλα. */
+function editContact(c) {
+  var crm = !!(c && c.crm);
+  S.contactEdit = c ? c.id : '';
+  $('ce-head').textContent = crm ? 'Σημειώσεις' : c ? 'Αλλαγή επαφής' : 'Νέα επαφή';
+  $('ce-fields').hidden = crm;
+  $('ce-crm-note').hidden = !crm;
+  $('ce-name').value = c ? c.name || '' : '';
+  $('ce-phone').value = c ? (c.phones || [])[0] || '' : '';
+  $('ce-email').value = c ? (c.emails || [])[0] || '' : '';
+  $('ce-notes').value = c ? c.notes || '' : '';
+  $('ce-hint').textContent = '';
+  $('ce-hint').className = 'save-hint';
+  openSheet('contact-edit');
+}
+
+function onSaveContact() {
+  var btn = $('btn-save-contact'), hint = $('ce-hint');
+  btn.disabled = true;
+  api('contactSave', {
+    id: S.contactEdit, name: $('ce-name').value, phone: $('ce-phone').value,
+    email: $('ce-email').value, notes: $('ce-notes').value
+  }).then(function (c) {
+    var list = S.contacts || (S.contacts = []);
+    var i = list.map(function (x) { return x.id; }).indexOf(c.id);
+    if (i === -1) list.push(c); else list[i] = c;
+    list.sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'el'); });
+    renderContacts();
+    closeSheet('contact-edit');
+    showContact(c);
+    toast('Αποθηκεύτηκε');
+  }).catch(function (e) {
+    hint.className = 'save-hint err';
+    hint.textContent = e.message;
+  }).then(function () { btn.disabled = false; });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -855,6 +1089,47 @@ function renderToday() {
 // ─────────────────────────────────────────────────────────────
 
 /** Ίδια λογική με το normCode_() του Code.gs. */
+// ── Αναζήτηση ────────────────────────────────────────────
+// Κεφαλαία ή πεζά, με ή χωρίς τόνους, λέξεις με οποιαδήποτε σειρά:
+// «βαρικα 13», «13 ΒΑΡΙΚΑ» και «Βαρίκα» βρίσκουν το ίδιο ακίνητο.
+
+function fold(s) {
+  return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^0-9A-ZΑ-Ω@.]+/g, ' ');
+}
+
+/** Οι λέξεις της αναζήτησης. Κενή λίστα = καμία αναζήτηση. */
+function searchWords(q) { return fold(q).split(' ').filter(Boolean); }
+
+/** Βρίσκεται κάθε λέξη κάπου στα πεδία; Τα τηλέφωνα συγκρίνονται και χωρίς κενά. */
+function matches(words, fields) {
+  var hay = ' ' + fold(fields.join(' ')) + ' ' + fields.join(' ').replace(/\D/g, '');
+  return words.every(function (w) { return hay.indexOf(w) !== -1; });
+}
+
+function propFields(p) {
+  return [p.street, p.title, p.code, p.type, p.area, p.partner, p.deal, p.status, p.price];
+}
+
+function contactFields(c) {
+  return [c.name, c.role, c.tags, c.job, c.street, c.area].concat(c.phones || [], c.emails || [],
+    (c.codes || []).map(function (x) { return x.code + ' ' + x.street; }));
+}
+
+/** Συνδέει πεδίο αναζήτησης με το ✕ του και καλεί onInput σε κάθε αλλαγή. */
+function wireSearch(id, onInput) {
+  var input = $(id), x = document.querySelector('[data-clear="' + id + '"]');
+  var update = function () { x.hidden = !input.value; onInput(input.value); };
+  input.oninput = update;
+  input.onkeydown = function (e) { if (e.key === 'Enter') input.blur(); };    // κλείνει το πληκτρολόγιο
+  x.onclick = function () { input.value = ''; update(); input.focus(); };
+}
+
+function setSearch(id, value) {
+  $(id).value = value || '';
+  document.querySelector('[data-clear="' + id + '"]').hidden = !value;
+}
+
 function normCode(s) {
   return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toUpperCase().replace(/[^0-9A-ZΑ-Ω]/g, '');
@@ -863,6 +1138,26 @@ function normCode(s) {
 function myLeadsFor(code) {
   var k = normCode(code);
   return k ? S.leads.filter(function (l) { return normCode(l.code) === k; }) : [];
+}
+
+function propRow(p, lacking) {
+  var open = myLeadsFor(p.code).filter(isOpen).length;
+  var sub = [p.type, fmtPrice(p.price), p.code ? 'Κωδικός ' + p.code : ''].filter(Boolean).join(', ');
+  return '<button class="row' + (open ? ' is-pending' : '') + '" data-code="' + esc(p.code) + '">' +
+    '<span class="row-body"><span class="row-name">' + esc(p.street || p.title || p.code) + '</span>' +
+    (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
+    '<span class="row-meta">' +
+      (lacking && lacking.length ? '<span>Λείπουν: ' + esc(lacking.join(', ')) + '</span>' : '<span>' + p.total + ' κλήσεις συνολικά</span>') +
+      (p.mine ? docsTag(p) + mandateTag(p) : '<span>' + esc(p.partner) + '</span>') +
+      (open ? '<span class="tag pending">' + open + ' ανοιχτές</span>' : '') +
+    '</span></span>' +
+    '<span class="count">' + p.month + '<small>τον μήνα</small></span></button>';
+}
+
+function wirePropRows(el) {
+  el.querySelectorAll('[data-code]').forEach(function (r) {
+    r.onclick = function () { openProp(r.dataset.code); };
+  });
 }
 
 function renderProps() {
@@ -877,22 +1172,23 @@ function renderProps() {
   var onMap = S.propTab === 'map';
   $('prop-list').hidden = onMap;
   $('map-pane').hidden = !onMap;
+  $('prop-search').parentNode.hidden = onMap;
   if (onMap) { showMap(); return; }
 
-  var row = function (p) {
-    var open = myLeadsFor(p.code).filter(isOpen).length;
-    var sub = [p.type, fmtPrice(p.price), p.code ? 'Κωδικός ' + p.code : ''].filter(Boolean).join(', ');
-    var lacking = S.propTab === 'docs' ? missingDocs(p) : [];
-    return '<button class="row' + (open ? ' is-pending' : '') + '" data-code="' + esc(p.code) + '">' +
-      '<span class="row-body"><span class="row-name">' + esc(p.street || p.title || p.code) + '</span>' +
-      (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
-      '<span class="row-meta">' +
-        (lacking.length ? '<span>Λείπουν: ' + esc(lacking.join(', ')) + '</span>' : '<span>' + p.total + ' κλήσεις συνολικά</span>') +
-        (p.mine ? docsTag(p) + mandateTag(p) : '<span>' + esc(p.partner) + '</span>') +
-        (open ? '<span class="tag pending">' + open + ' ανοιχτές</span>' : '') +
-      '</span></span>' +
-      '<span class="count">' + p.month + '<small>τον μήνα</small></span></button>';
-  };
+  var el = $('prop-list');
+  var words = searchWords($('prop-search').value);
+
+  // Με αναζήτηση: ψάχνει σε όλα, δικά μου και ομάδας, όποιο tab κι αν είναι ανοιχτό.
+  if (words.length) {
+    var hit = function (p) { return matches(words, propFields(p)); };
+    var m = mine.filter(hit), t = team.filter(hit);
+    el.innerHTML = m.length || t.length
+      ? (m.length ? '<div class="section">Δικά μου (' + m.length + ')</div>' + m.map(function (p) { return propRow(p); }).join('') : '') +
+        (t.length ? '<div class="section">Ομάδας (' + t.length + ')</div>' + t.map(function (p) { return propRow(p); }).join('') : '')
+      : '<div class="empty"><b>Δεν βρέθηκε ακίνητο</b>Δοκίμασε οδό, κωδικό ή περιοχή.</div>';
+    wirePropRows(el);
+    return;
+  }
 
   var list = S.propTab === 'team' ? team : S.propTab === 'docs' ? lack : mine;
   var empty = {
@@ -901,11 +1197,58 @@ function renderProps() {
     docs: ['Όλα τα έγγραφα είναι εντάξει', 'Εδώ φαίνονται τα ακίνητα με εντολή που τους λείπουν έγγραφα.']
   }[S.propTab];
 
-  var el = $('prop-list');
-  el.innerHTML = list.length ? list.map(row).join('')
-    : '<div class="empty"><b>' + empty[0] + '</b>' + empty[1] + '</div>';
-  el.querySelectorAll('[data-code]').forEach(function (r) {
-    r.onclick = function () { openProp(r.dataset.code); };
+  el.innerHTML = list.length ? list.map(function (p) {
+    return propRow(p, S.propTab === 'docs' ? missingDocs(p) : null);
+  }).join('') : '<div class="empty"><b>' + empty[0] + '</b>' + empty[1] + '</div>';
+  wirePropRows(el);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ΚΕΝΤΡΙΚΗ ΑΝΑΖΗΤΗΣΗ (Σήμερα)
+//  Ακίνητα και επαφές μαζί, λίγα από το καθένα. «Δες όλα» ανοίγει την καρτέλα
+//  με την ίδια αναζήτηση ήδη γραμμένη.
+// ─────────────────────────────────────────────────────────────
+
+var GLOBAL_MAX = 5;
+
+function renderGlobal(q) {
+  var words = searchWords(q);
+  $('today-main').hidden = !!words.length;
+  $('global-results').hidden = !words.length;
+  if (!words.length) return;
+
+  var props = S.props.filter(function (p) { return matches(words, propFields(p)); });
+  var contacts = (S.contacts || []).filter(function (c) { return matches(words, contactFields(c)); });
+  var all = function (go, n, text) {
+    return n > GLOBAL_MAX ? '<button class="today-more" data-all="' + go + '"><span>' + text + ' (' + n.toLocaleString('el-GR') + ')</span>' +
+      ico('next', 'ico chev') + '</button>' : '';
+  };
+
+  var html = '<div class="section">Ακίνητα</div>' + (props.length
+    ? props.slice(0, GLOBAL_MAX).map(function (p) { return propRow(p); }).join('') + all('props', props.length, 'Δες όλα τα ακίνητα')
+    : '<p class="none">Κανένα ακίνητο.</p>');
+
+  html += '<div class="section">Επαφές</div>' + (!S.contacts ? '<p class="none">Φόρτωση επαφών…</p>' : contacts.length
+    ? contacts.slice(0, GLOBAL_MAX).map(function (c) {
+        var sub = [(c.phones || [])[0], c.role].filter(Boolean).join(' · ');
+        return '<button class="row" data-contact="' + esc(c.id) + '"><span class="row-body"><span class="row-name">' +
+          esc(c.name || (c.phones || [])[0]) + '</span>' + (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
+          '</span>' + ico('next', 'ico chev') + '</button>';
+      }).join('') + all('contacts', contacts.length, 'Δες όλες τις επαφές')
+    : '<p class="none">Καμία επαφή.</p>');
+
+  var el = $('global-results');
+  el.innerHTML = html;
+  wirePropRows(el);
+  el.querySelectorAll('[data-contact]').forEach(function (b) {
+    b.onclick = function () { openContact(b.dataset.contact); };
+  });
+  el.querySelectorAll('[data-all]').forEach(function (b) {
+    b.onclick = function () {
+      var text = $('global-search').value;
+      if (b.dataset.all === 'props') { setSearch('prop-search', text); goto('props'); }
+      else { setSearch('contact-search', text); S.contactLimit = 0; goto('contacts'); }
+    };
   });
 }
 
@@ -1146,6 +1489,7 @@ function openProp(code) {
   b.disabled = !n;
   b.onclick = function () {
     closeSheet('propdetail');
+    closeSheet('contact');
     S.propFilter = { key: normCode(p.code), label: (p.street || p.code) + ' · ' + n + (n === 1 ? ' κλήση' : ' κλήσεις') };
     S.filter = 'all';
     goto('calls');
@@ -1200,6 +1544,7 @@ function showLead(l, opts) {
   closeSheet('showing');
   closeSheet('settings');
   closeSheet('propdetail');
+  closeSheet('contact');
 
   S.smsLang = 'el';
   S.smsKind = opts.remind && upcoming(l) ? 'reminder' : 'intro';
@@ -1242,6 +1587,7 @@ function fillDetail(l) {
   addrLink($('d-addr'), l.address, lp ? lp.area : '');
   $('d-status').textContent = l.status;
   $('d-status').className = 'tag ' + (STATUS_CLASS[l.status] || 'answered');
+  renderKnown(l);
   $('d-phone').textContent = l.phoneIntl || '—';
   $('d-email').textContent = l.email || '—';
   $('d-date').textContent = niceDate(l.date);

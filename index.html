@@ -43,6 +43,8 @@
   <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.500C5 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></symbol>
   <symbol id="i-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 9-9 9-9-9z"/><path d="M9 14v-2a1 1 0 0 1 1-1h5M13 8.500l2.500 2.500-2.500 2.500"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-find" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
 </defs></svg>
 
 <div class="env" id="env" hidden>ΔΟΚΙΜΑΣΤΙΚΟ</div>
@@ -81,9 +83,17 @@
         </div>
       </div>
       <p class="today-date" id="today-date"></p>
+      <div class="search-box">
+        <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+        <input class="search" type="search" id="global-search" placeholder="Αναζήτηση σε ακίνητα και επαφές" aria-label="Αναζήτηση σε ακίνητα και επαφές" autocomplete="off" enterkeyhint="search">
+        <button class="search-x" data-clear="global-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+      </div>
     </header>
-    <div class="today-hello"><b id="today-hello"></b><p id="today-sum"></p></div>
-    <div id="today-body"></div>
+    <div id="today-main">
+      <div class="today-hello"><b id="today-hello"></b><p id="today-sum"></p></div>
+      <div id="today-body"></div>
+    </div>
+    <div id="global-results" hidden></div>
   </section>
 
   <!-- ΚΛΗΣΕΙΣ -->
@@ -143,6 +153,11 @@
         <button class="subtab" role="tab" data-tab="docs"><span>Έγγραφα</span> <i class="pill warn" id="c-p-docs">0</i></button>
         <button class="subtab" role="tab" data-tab="map" id="tab-map" hidden><span>Χάρτης</span> <i class="pill"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg></i></button>
       </div>
+      <div class="search-box">
+        <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+        <input class="search" type="search" id="prop-search" placeholder="Οδός, κωδικός, περιοχή…" aria-label="Αναζήτηση ακινήτου" autocomplete="off" enterkeyhint="search">
+        <button class="search-x" data-clear="prop-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+      </div>
     </header>
     <div id="props-panes">
       <div class="list" id="prop-list"></div>
@@ -170,10 +185,27 @@
       <div class="head-row"><h1>Άλλα</h1><div class="head-actions"><button class="icon-btn" data-settings aria-label="Ρυθμίσεις"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></button></div></div>
     </header>
     <div class="list">
+      <button class="row" data-goto="contacts"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="row-body"><span class="row-name">Επαφές</span><span class="row-prop">Πελάτες, τι τους ενδιέφερε, email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-goto="metrics"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="row-body"><span class="row-name">Μετρήσεις</span><span class="row-prop">Ραντεβού, υποδείξεις, εντολές ανά μήνα.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-goto="forms"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="row-body"><span class="row-name">Φόρμες και αίθουσες</span><span class="row-prop">Φόρμες γραφείου, κράτηση αίθουσας.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-settings><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="row-body"><span class="row-name">Ρυθμίσεις</span><span class="row-prop">Στοιχεία, γράμματα, ειδοποιήσεις.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
     </div>
+  </section>
+
+  <!-- ΕΠΑΦΕΣ (1.10) -->
+  <section class="view" id="view-contacts" hidden>
+    <header class="head">
+      <div class="head-row">
+        <div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Επαφές</h1></div>
+        <div class="head-actions"><button class="head-btn" id="btn-new-contact"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Νέα</button></div>
+      </div>
+<div class="search-box">
+        <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+        <input class="search" type="search" id="contact-search" placeholder="Όνομα, τηλέφωνο ή κωδικός" aria-label="Αναζήτηση επαφής" autocomplete="off" enterkeyhint="search">
+        <button class="search-x" data-clear="contact-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+      </div>
+    </header>
+    <div class="list" id="contact-list"></div>
   </section>
 
   <!-- ΜΕΤΡΗΣΕΙΣ (1.5) -->
@@ -241,6 +273,7 @@
     <p class="d-sub" id="d-prop"></p>
     <p class="d-sub small" id="d-deal"></p>
     <a class="addr-link" id="d-addr" target="_blank" rel="noopener" hidden></a>
+    <div class="known" id="d-known" hidden></div>
 
     <div class="subtabs in-sheet" id="tabs-detail" role="tablist" aria-label="Κλήση">
       <button class="subtab is-on" role="tab" data-tab="act"><span>Ενέργειες</span></button>
@@ -307,6 +340,37 @@
   <div class="sheet-foot">
     <a class="contact-btn" id="d-tel"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Κλήση</a>
     <a class="contact-btn ghost" id="d-mail" aria-label="Email"><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg>Email</a>
+  </div>
+</div>
+
+<!-- ΕΠΑΦΗ -->
+<div class="sheet" id="contact" hidden>
+  <div class="sheet-head">
+    <button class="back" id="contact-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title">Επαφή</span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="ct-name"></h2>
+    <p class="d-sub ct-sub" id="ct-sub"></p>
+    <div class="subtabs in-sheet" id="tabs-contact" role="tablist" aria-label="Επαφή">
+      <button class="subtab is-on" role="tab" data-tab="info"><span>Στοιχεία</span></button>
+      <button class="subtab" role="tab" data-tab="mail"><span>Email</span></button>
+    </div>
+    <div id="contact-panes">
+      <div data-pane="info">
+        <div id="ct-codes-wrap" hidden>
+          <h3 class="sub-head first">Ενδιαφερόμενος για</h3>
+          <div id="ct-codes"></div>
+        </div>
+        <dl class="facts" id="ct-facts"></dl>
+        <button class="btn wide" id="btn-edit-contact">Επεξεργασία επαφής</button>
+      </div>
+      <div data-pane="mail" hidden><div id="ct-mail"></div></div>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <a class="contact-btn" id="ct-tel"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg>Κλήση</a>
+    <a class="contact-btn ghost" id="ct-sms"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg>SMS</a>
   </div>
 </div>
 
@@ -504,6 +568,25 @@
     <div id="tpl-list"></div>
     <button class="btn primary wide" id="btn-save-templates">Αποθήκευση</button>
     <p class="save-hint spaced" id="tpl-hint"></p>
+  </div>
+</div>
+
+<!-- ΕΠΑΦΗ: ΝΕΑ Ή ΑΛΛΑΓΗ -->
+<div class="sheet" id="contact-edit" hidden>
+  <div class="sheet-head">
+    <button class="back" id="contact-edit-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title" id="ce-head">Νέα επαφή</span>
+  </div>
+  <div class="sheet-body">
+    <p class="note" id="ce-crm-note" hidden>Τα στοιχεία της επαφής αλλάζουν στο CRM. Εδώ γράφεις σημειώσεις που μένουν μόνο στην εφαρμογή.</p>
+    <div id="ce-fields">
+      <label class="field"><span>Όνομα</span><input type="text" id="ce-name" maxlength="120"></label>
+      <label class="field"><span>Τηλέφωνο</span><input type="tel" id="ce-phone" inputmode="tel" placeholder="69XXXXXXXX"></label>
+      <label class="field"><span>Email</span><input type="email" id="ce-email" inputmode="email"></label>
+    </div>
+    <label class="field"><span>Σημειώσεις</span><textarea id="ce-notes" rows="4"></textarea></label>
+    <button class="btn primary wide" id="btn-save-contact">Αποθήκευση</button>
+    <p class="save-hint" id="ce-hint"></p>
   </div>
 </div>
 
