@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.14';
+var APP_VERSION = '1.14.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.14';
@@ -620,6 +620,11 @@ function wire() {
   $('d-mail').onclick = function (e) { if (!S.lead || !S.lead.email) e.preventDefault(); };
   $('btn-noanswer').onclick = onNoAnswer;
   $('btn-showing').onclick = openShowingForm;
+  $('btn-showform').onclick = function () {
+    openShowingForm();
+    // Το έντυπο είναι πάνω-πάνω στο φύλλο της υπόδειξης.
+    $('showing').querySelector('.sheet-body').scrollTop = 0;
+  };
   $('btn-save-showing').onclick = onSaveShowing;
   $('btn-save-outcome').onclick = onSaveOutcome;
   wireTabs('tabs-contact', 'contact-panes', function (v) {
@@ -1832,6 +1837,8 @@ function fillDetail(l) {
 
   $('btn-noanswer').textContent = l.status === ST.NO_ANSWER ? 'Δεν απάντησε ξανά' : 'Δεν απάντησε';
   label($('btn-showing'), 'calendar', needsOutcome(l) ? 'Πώς πήγε;' : hasShowing(l) ? 'Αλλαγή υπόδειξης' : 'Υπόδειξη');
+  // 1.14.1: το έντυπο υπόδειξης έχει δικό του κουμπί, μόλις υπάρχει υπόδειξη.
+  $('btn-showform').hidden = !hasShowing(l);
 
   prepareSms(l);
 }
