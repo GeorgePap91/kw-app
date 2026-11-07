@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.14.3';
+const VERSION = '1.15.1';
 
 const CONFIG = {
   // 'test' δείχνει μπάρα «ΔΟΚΙΜΑΣΤΙΚΟ» στην εφαρμογή. 'prod' την κρύβει.
@@ -126,6 +126,19 @@ const CONFIG = {
     FEE_RENT: '1 ΜΙΣΘΩΜΑ + Φ.Π.Α. 24%'
   },
 
+  // ── Σύσταση / Συνεργασία (1.15) ─────────────────────────
+  // Ο μεσίτης συμπληρώνει το έντυπο στην εφαρμογή, υπογράφει στην οθόνη, και το PDF
+  // φεύγει με email στο SEND_TO. Τα πρότυπα βρίσκονται από το όνομά τους στο Drive
+  // (ή από το ID, αν το γράψεις εδώ).
+  REFERRAL: {
+    TEMPLATE_SYSTASI: '', TEMPLATE_SYNERGASIA: '',
+    NAME_SYSTASI: 'Έντυπο σύστασης - πρότυπο KW App',
+    NAME_SYNERGASIA: 'Έντυπο συνεργασίας - πρότυπο KW App',
+    SEND_TO: 'georgepapadakis532@gmail.com',   // δοκιμή· στο παραγωγικό: το email του γραφείου
+    CC_AGENT: false,                           // αντίγραφο και στον μεσίτη
+    FOLDER: 'Συστάσεις - Συνεργασίες'          // μέσα στον φάκελο του μεσίτη στο Drive
+  },
+
   // ── Τιμολόγηση (1.13) ───────────────────────────────────
   // Τα έντυπα που ζητά το λογιστήριο για την απόδειξη. Μπαίνουν στον φάκελο FOLDER,
   // μέσα στον φάκελο του ακινήτου (δίπλα στο «Έγγραφα KWAC»).
@@ -178,7 +191,9 @@ const CONFIG = {
     MAP:      'Χάρτης',
     CONTACTS: 'Επαφές',              // το Excel του CRM, μόνο ανάγνωση
     CONTACTS_APP: 'Επαφές εφαρμογής', // γράφει η εφαρμογή
-    SHOWFORM: 'Έντυπα υπόδειξης'      // 1.14: ΜΟΝΟ κατάσταση, ποτέ στοιχεία πελάτη
+    SHOWFORM: 'Έντυπα υπόδειξης',     // 1.14: ΜΟΝΟ κατάσταση, ποτέ στοιχεία πελάτη
+    KW_PARTNERS: 'Συνεργάτες KW',     // 1.15: συνεργάτες άλλων γραφείων KW (μόνο ανάγνωση)
+    REFERRALS: 'Συστάσεις'            // 1.15: ιστορικό συστάσεων/συνεργασιών, χωρίς στοιχεία πελάτη
   },
 
   AVAILABLE: 'Διαθέσιμ',        // αρχή λέξης στη στήλη Κατάσταση (χωρίς τόνους/κεφαλαία)
@@ -308,6 +323,8 @@ const ACTIONS = {
   formCreate: actFormCreate_,
   formStatus: actFormStatus_,
   formCancel: actFormCancel_,
+  kwPartners: actKwPartners_,
+  referral:   actReferral_,
   tasks:     (agent) => tasksFor_(agent),
   taskSave:  actTaskSave_,
   taskDone:  actTaskDone_,
@@ -386,6 +403,18 @@ function sheet_(name) {
   const sh = getSS().getSheetByName(name);
   if (!sh) throw new Error('Λείπει το φύλλο: ' + name);
   return sh;
+}
+
+/**
+ * Φύλλο με αυτό το όνομα, ή με όνομα κομμένο στο τέλος (π.χ. εισαγωγή από Excel, που κόβει
+ * στους 31 χαρακτήρες: «Συνολικές κλήσεις διαθέσιμων ακ»).
+ */
+function sheetLike_(name) {
+  const ss = getSS();
+  const exact = ss.getSheetByName(name);
+  if (exact) return exact;
+  const want = norm_(name);
+  return ss.getSheets().find(sh => { const n = norm_(sh.getName()); return n.length >= 20 && want.indexOf(n) === 0; }) || null;
 }
 
 /** 'A' → 1, 'L' → 12, 'AA' → 27 */
@@ -829,7 +858,7 @@ function readTotals_() {
   if (_totals) return _totals;
   _totals = {};
 
-  const sh = getSS().getSheetByName(CONFIG.SHEETS.TOTALS);
+  const sh = sheetLike_(CONFIG.SHEETS.TOTALS);
   if (!sh || sh.getLastRow() < 2) return _totals;
 
   const width = Math.max(sh.getLastColumn(), colIdx_(TCOL.WEEK));
@@ -3788,6 +3817,7 @@ function actFormCreate_(agent, d) {
   }
   const prop = sfPropFor_(l, d.deal);
   if (!prop.deal) throw err_('Διάλεξε αν είναι Πώληση ή Ενοικίαση.', 'deal');
+  prop.showAt = appGet_(l.id, ACOL.SHOW_AT) ? new Date(appGet_(l.id, ACOL.SHOW_AT)).toISOString() : '';
   const defects = sfText_(d.defects, 600);
 
   const token = randomHex_(48);
@@ -3966,7 +3996,8 @@ function actFormSubmit_(d) {
     const prop = sfProp_(r);
     const now = new Date();
     aa = sfNextAa_(now);
-    const values = sfValues_(client, prop, String(sfGet_(r, SFC.DEFECTS) || ''), now, aa);
+    const showAt = appGet_(String(sfGet_(r, SFC.LEAD)), ACOL.SHOW_AT) || prop.showAt || '';
+    const values = sfValues_(client, prop, String(sfGet_(r, SFC.DEFECTS) || ''), now, aa, showAt);
     check = sha256_(JSON.stringify(values) + (d.sig || ''));
     values['ΕΛΕΓΧΟΣ'] = (mode === 'sign'
       ? 'Υπογράφηκε ηλεκτρονικά στην οθόνη από τον Εντολέα στις '
@@ -4034,13 +4065,20 @@ function sfNextAa_(now) {
 }
 
 /** Όλα τα {{ΠΕΔΙΑ}} του προτύπου. */
-function sfValues_(c, prop, defects, now, aa) {
+/**
+ * Όλα τα {{ΠΕΔΙΑ}} του προτύπου.
+ * 1.15: οι ημερομηνίες είναι δύο. Η πρώτη στο έντυπο («Στην Αθήνα σήμερα στις…») =
+ * ημερομηνία της υπόδειξης. Η δεύτερη («Αθήνα, …», δίπλα στις υπογραφές) = ημερομηνία
+ * υπογραφής. Το sfFill_ γράφει τις τιμές ενός πίνακα με τη σειρά που εμφανίζονται.
+ */
+function sfValues_(c, prop, defects, now, aa, showAt) {
   const fee = sfFee_(prop);
   const dash = v => v || '—';
+  const shown = showAt && ts_(showAt) ? new Date(showAt) : now;
+  const two = f => [Utilities.formatDate(shown, TZ, f), Utilities.formatDate(now, TZ, f)];
   return {
     'ΑΑ': aa,
-    'ΗΜΕΡΑ': Utilities.formatDate(now, TZ, 'dd'), 'ΜΗΝΑΣ': Utilities.formatDate(now, TZ, 'MM'),
-    'ΕΤΟΣ': Utilities.formatDate(now, TZ, 'yyyy'),
+    'ΗΜΕΡΑ': two('dd'), 'ΜΗΝΑΣ': two('MM'), 'ΕΤΟΣ': two('yyyy'),
     'ΟΝΟΜΑΤΕΠΩΝΥΜΟ': c.name, 'ΠΑΤΡΩΝΥΜΟ': c.father, 'ΚΑΤΟΙΚΟΣ': c.city, 'ΟΔΟΣ': c.street,
     'ΑΡΙΘΜΟΣ': c.number, 'ΕΠΑΓΓΕΛΜΑ': c.job, 'ΑΔΤ': c.adt, 'ΑΦΜ': c.afm, 'ΔΟΥ': c.doy,
     'ΤΗΛ': c.phone, 'EMAIL': c.email,
@@ -4062,11 +4100,13 @@ function sfFolder_(agent, code) {
 }
 
 /** Γράφει την τιμή στη θέση κάθε {{ΚΛΕΙΔΙ}}, κρατώντας τη μορφοποίηση του προτύπου. */
-function sfFill_(container, key, value) {
+function sfFill_(container, key, values) {
   if (!container) return;
   const pat = '\\{\\{' + key + '\\}\\}';
-  let r = container.findText(pat);
+  const list = Array.isArray(values) ? values : [values];
+  let r = container.findText(pat), n = 0;
   while (r) {
+    const value = list[Math.min(n++, list.length - 1)];
     const t = r.getElement().asText();
     const a = r.getStartOffset(), b = r.getEndOffsetInclusive();
     if (value) {
@@ -4093,14 +4133,14 @@ function sfPlaceSignature_(body, sig) {
 }
 
 /** Αντίγραφο προτύπου → πεδία → PDF στον φάκελο → οριστικό σβήσιμο του προσωρινού Doc. */
-function sfBuildPdf_(values, sig, folder, name) {
-  const tmp = DriveApp.getFileById(CONFIG.SHOWING_FORM.TEMPLATE_ID).makeCopy('~ προσωρινό KW App', folder);
+function sfBuildPdf_(values, sig, folder, name, templateId, keys) {
+  const tmp = DriveApp.getFileById(templateId || CONFIG.SHOWING_FORM.TEMPLATE_ID).makeCopy('~ προσωρινό KW App', folder);
   try {
     const doc = DocumentApp.openById(tmp.getId());
     const parts = [doc.getBody(), doc.getHeader(), doc.getFooter()];
     if (!sfPlaceSignature_(doc.getBody(), sig) && sig) throw new Error('Στο πρότυπο λείπει το {{ΥΠΟΓΡΑΦΗ}}.');
-    Object.keys(values).forEach(k => parts.forEach(c => sfFill_(c, k, values[k])));
-    SF_KEYS.forEach(k => parts.forEach(c => sfFill_(c, k, '')));   // ό,τι περίσσεψε, κενό
+    Object.keys(values).forEach(k => { const v = values[k]; parts.forEach(c => sfFill_(c, k, v)); });
+    (keys || SF_KEYS).forEach(k => parts.forEach(c => sfFill_(c, k, '')));   // ό,τι περίσσεψε, κενό
     doc.saveAndClose();
     const blob = tmp.getAs('application/pdf').setName(name);
     return folder.createFile(blob);
@@ -4134,6 +4174,221 @@ function showingTemplateCheck() {
   console.log('Έντυπο υπόδειξης «' + doc.getName() + '»: ' + found.length + '/' + SF_KEYS.length + ' πεδία.');
   if (missing.length) console.log('Λείπουν: ' + missing.join(', ') + (missing.indexOf('ΥΠΟΓΡΑΦΗ') !== -1 ? '  ⚠ χωρίς {{ΥΠΟΓΡΑΦΗ}} δεν γίνεται υπογραφή στην οθόνη' : ''));
   if (unknown.length) console.log('⚠ Άγνωστα (λάθος γραφή;): ' + unknown.join(', '));
+}
+
+
+// ═════════════════════════════════════════════════════════════
+//  ΣΥΣΤΑΣΗ / ΣΥΝΕΡΓΑΣΙΑ (1.15)
+// ═════════════════════════════════════════════════════════════
+// Ο μεσίτης διαλέγει γραφείο και συνεργάτη από το «Συνεργάτες KW», γράφει πελάτη και
+// χαρακτηριστικά, υπογράφει στην οθόνη. Το PDF μπαίνει στον φάκελό του
+// («<μεσίτης>/Συστάσεις - Συνεργασίες») και φεύγει με email στο REFERRAL.SEND_TO.
+// Στη Συνεργασία το τηλέφωνο του πελάτη γράφεται κρυμμένο: 694xxxx123.
+// Το φύλλο «Συστάσεις» κρατά μόνο ποιος, πότε, προς ποιον. Όχι στοιχεία πελάτη.
+
+const REF_KIND = { systasi: 'Σύσταση', synergasia: 'Συνεργασία' };
+const REF_HEADERS = ['ID', 'Ημερομηνία', 'Μεσίτης', 'Είδος', 'Α/Α', 'Γραφείο', 'Συνεργάτης', 'Αρχείο', 'Στάλθηκε σε', 'Κλήση'];
+const REF_KEYS = ['ΗΜΕΡΑ', 'ΜΗΝΑΣ', 'ΕΤΟΣ', 'Κ_ΑΓΟΡΑ', 'Κ_ΠΩΛΗΣΗ', 'Κ_ΑΛΛΟ', 'ΑΛΛΟ', 'Κ_ΚΑΤ_ΝΑΙ', 'Κ_ΚΑΤ_ΟΧΙ',
+  'ΣΥΝΕΡΓΑΤΗΣ', 'ΚΙΝΗΤΟ', 'EMAIL_ΜΕΣΙΤΗ', 'ΓΡΑΦΕΙΟ', 'ΣΥΝΕΡΓΑΤΗΣ_ΠΡΟΣ', 'ΔΙΕΥΘΥΝΣΗ_ΠΡΟΣ', 'ΠΟΛΗ_ΠΡΟΣ', 'ΤΚ_ΠΡΟΣ',
+  'ΤΗΛ_ΠΡΟΣ', 'EMAIL_ΠΡΟΣ', 'Κ_ΕΝΤ_ΟΧΙ', 'Κ_ΕΝΤ_ΑΠΛΗ', 'Κ_ΕΝΤ_ΑΠΟΚΛ', 'ΠΕΛΑΤΗΣ', 'ΤΗΛ_ΠΕΛΑΤΗ', 'EMAIL_ΠΕΛΑΤΗ',
+  'Κ_Σ_ΑΓΟΡΑ', 'Κ_Σ_ΠΩΛΗΣΗ', 'Κ_Σ_ΜΙΣΘΩΣΗ', 'Κ_Σ_ΕΚΜΙΣΘΩΣΗ', 'Κ_Σ_ΑΝΤΙΠΑΡΟΧΗ', 'ΤΙΜΗ', 'ΠΡΟΚΑΤΑΒΟΛΗ', 'ΔΑΝΕΙΟ',
+  'ΔΙΑΚΑΝΟΝΙΣΜΟΣ', 'ΠΕΡΙΟΧΗ', 'ΗΛΙΚΙΑ', 'ΤΜ', 'Κ_Τ_ΚΑΤΟΙΚΙΑ', 'Κ_Τ_ΚΑΤΑΣΤΗΜΑ', 'Κ_Τ_ΓΡΑΦΕΙΟ', 'Κ_Τ_ΟΙΚΟΠΕΔΟ',
+  'Κ_Τ_ΑΛΛΟ', 'ΤΥΠΟΣ_ΑΛΛΟ', 'ΥΔ', 'ΜΠΑΝΙΑ', 'ΥΠΟΓΕΙΟ', 'ΣΤΑΘΜΕΥΣΗ', 'ΣΑΛΟΝΙ', 'ΤΡΑΠΕΖΑΡΙΑ', 'ΒΕΡΑΝΤΕΣ',
+  'ΘΕΡΜΑΝΣΗ', 'ΑΛΛΑ', 'Κ_25', 'ΥΠΟΓΡΑΦΗ', 'ΕΛΕΓΧΟΣ'];
+const BOX = on => (on ? '☒' : '☐');
+
+// ── «Συνεργάτες KW» ─────────────────────────────────────────
+// Οι στήλες βρίσκονται από τις επικεφαλίδες (σε μία από τις 5 πρώτες γραμμές),
+// οπότε κενές στήλες στην αρχή ή αλλαγή σειράς δεν πειράζουν.
+
+let _kwp = null;
+
+function readKwPartners_() {
+  if (_kwp) return _kwp;
+  const sh = getSS().getSheetByName(CONFIG.SHEETS.KW_PARTNERS);
+  if (!sh || sh.getLastRow() < 2) throw new Error('Λείπει ή είναι άδειο το φύλλο «' + CONFIG.SHEETS.KW_PARTNERS + '».');
+  const vals = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  const want = { ID: /^id$/, NAME: /^επαφη$|^ονομα/, OFFICE: /^γραφειο$/, TEAM: /^ομαδα$/, PHONE: /^τηλεφων/,
+                 EMAIL: /^e-?mail$/, CITY: /^πολη$/, AREA: /^περιοχη$/ };
+  let hr = -1, col = {};
+  for (let i = 0; i < Math.min(5, vals.length) && hr < 0; i++) {
+    const h = vals[i].map(x => norm_(x));
+    const c = {};
+    Object.keys(want).forEach(k => { const j = h.findIndex(x => want[k].test(x)); if (j >= 0) c[k] = j; });
+    if (c.NAME != null && c.OFFICE != null) { hr = i; col = c; }
+  }
+  if (hr < 0) throw new Error('Στο «' + CONFIG.SHEETS.KW_PARTNERS + '» δεν βρέθηκαν οι στήλες «Επαφή» και «Γραφείο».');
+  const at = (r, k) => (col[k] != null ? cellText_(r[col[k]]) : '');
+  _kwp = vals.slice(hr + 1).map((r, i) => {
+    const phones = at(r, 'PHONE').split(/[,;\/]/).map(x => x.trim()).filter(Boolean);
+    const mobile = phones.find(x => /^(\+?30)?\s*69/.test(x.replace(/\s/g, ''))) || phones[0] || '';
+    return { id: at(r, 'ID') || 'r' + (i + hr + 2), name: at(r, 'NAME'), office: at(r, 'OFFICE'), team: at(r, 'TEAM'),
+             phone: mobile, phones: phones, email: at(r, 'EMAIL').split(/[,;\s]/)[0] || '', city: at(r, 'CITY'), area: at(r, 'AREA') };
+  }).filter(p => p.name && p.office);
+  return _kwp;
+}
+
+/** Για τη φόρμα: γραφεία με τους συνεργάτες τους, ταξινομημένα. */
+function actKwPartners_(agent) {
+  const by = {};
+  readKwPartners_().forEach(p => {
+    const k = norm_(p.office);
+    if (!by[k]) by[k] = { name: p.office, people: [] };
+    by[k].people.push({ id: p.id, name: p.name, team: p.team, phone: p.phone, email: p.email, city: p.city, area: p.area });
+  });
+  const offices = Object.keys(by).map(k => by[k]).sort((a, b) => a.name.localeCompare(b.name, 'el'));
+  offices.forEach(o => o.people.sort((a, b) => a.name.localeCompare(b.name, 'el')));
+  return { offices: offices, me: { name: agent.smsName || agent.name, phone: agent.phone || '', email: agent.email || '' },
+           sendTo: CONFIG.REFERRAL.SEND_TO, ready: { systasi: !!refTemplate_('systasi', true), synergasia: !!refTemplate_('synergasia', true) } };
+}
+
+// ── Πρότυπα ─────────────────────────────────────────────────
+
+/** Το ID του προτύπου: από το CONFIG, αλλιώς από το όνομα στο Drive (και το κρατά). */
+function refTemplate_(kind, quiet) {
+  const cfg = CONFIG.REFERRAL;
+  const id = kind === 'systasi' ? cfg.TEMPLATE_SYSTASI : cfg.TEMPLATE_SYNERGASIA;
+  if (id) return id;
+  const sp = PropertiesService.getScriptProperties();
+  const key = 'REF_TPL_' + kind;
+  const cached = sp.getProperty(key);
+  if (cached) {
+    try { if (!DriveApp.getFileById(cached).isTrashed()) return cached; } catch (e) { /* ξαναψάχνουμε */ }
+  }
+  const name = kind === 'systasi' ? cfg.NAME_SYSTASI : cfg.NAME_SYNERGASIA;
+  const it = DriveApp.getFilesByName(name);
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!f.isTrashed() && f.getMimeType() === MimeType.GOOGLE_DOCS) { sp.setProperty(key, f.getId()); return f.getId(); }
+  }
+  if (quiet) return '';
+  throw new Error('Δεν βρέθηκε το πρότυπο «' + name + '» ως Έγγραφο Google στο Drive.');
+}
+
+/** Τρέξ' το με ▶: βρέθηκαν τα πρότυπα; έχουν όλα τα πεδία; */
+function referralTemplateCheck() {
+  ['systasi', 'synergasia'].forEach(kind => {
+    const id = refTemplate_(kind, true);
+    if (!id) { console.log(REF_KIND[kind] + ': ⚠ δεν βρέθηκε πρότυπο (ανέβασέ το .docx και Αρχείο → Αποθήκευση ως Έγγραφο Google).'); return; }
+    const doc = DocumentApp.openById(id);
+    const text = doc.getBody().getText();
+    const need = REF_KEYS.filter(k => k !== 'Κ_ΚΑΤ_ΝΑΙ' && k !== 'Κ_ΚΑΤ_ΟΧΙ' && k !== 'Κ_25' || kind === 'systasi');
+    const missing = need.filter(k => text.indexOf('{{' + k + '}}') === -1);
+    console.log(REF_KIND[kind] + ' «' + doc.getName() + '»: ' + (need.length - missing.length) + '/' + need.length + ' πεδία' +
+                (missing.length ? ' · λείπουν: ' + missing.join(', ') : ' ✓'));
+  });
+  try { console.log('Συνεργάτες KW: ' + readKwPartners_().length + ' άτομα σε ' + actKwPartners_({}).offices.length + ' γραφεία.'); }
+  catch (e) { console.log('⚠ ' + e.message); }
+}
+
+// ── Αποστολή ────────────────────────────────────────────────
+
+/** 6941234567 → 694xxxx567 (στη Συνεργασία ο πελάτης δεν φαίνεται). */
+function maskPhone_(p) {
+  const d = String(p || '').replace(/\D/g, '');
+  if (d.length < 7) return d ? 'xxxx' : '';
+  return d.slice(0, 3) + 'x'.repeat(d.length - 6) + d.slice(-3);
+}
+
+/** nikos.p@gmail.com → nixxxx@gmail.com (στη Συνεργασία: φαίνεται μόνο ότι υπάρχει και σε ποιον πάροχο). */
+function maskMail_(e) {
+  const m = String(e || '').match(/^([^@]+)@(.+)$/);
+  if (!m) return '';
+  return m[1].slice(0, Math.min(2, m[1].length - 1)) + 'xxxx@' + m[2];
+}
+
+function refNextAa_(kind, now) {
+  const sh = ensureSheet_(CONFIG.SHEETS.REFERRALS, REF_HEADERS);
+  const y = Utilities.formatDate(now, TZ, 'yyyy');
+  const pre = (kind === 'systasi' ? 'ΣΥΣ' : 'ΣΥΝ') + '-' + y + '/';
+  const last = sh.getLastRow();
+  const list = last > 1 ? sh.getRange(2, 5, last - 1, 1).getValues().map(r => String(r[0])) : [];
+  const max = list.filter(a => a.indexOf(pre) === 0).reduce((m, a) => Math.max(m, Number(a.slice(pre.length)) || 0), 0);
+  return pre + String(max + 1).padStart(3, '0');
+}
+
+/**
+ * { kind, interest, interestOther, prevCall, office, partnerId, mandate,
+ *   client: {name, phone, email}, prop: {...}, sig, leadId }
+ */
+function actReferral_(agent, d) {
+  const kind = d.kind === 'synergasia' ? 'synergasia' : d.kind === 'systasi' ? 'systasi' : '';
+  if (!kind) throw new Error('Διάλεξε Σύσταση ή Συνεργασία.');
+  const t = (v, n) => sfText_(v, n || 80);
+  const partner = readKwPartners_().find(p => String(p.id) === String(d.partnerId) && norm_(p.office) === norm_(d.office));
+  if (!partner) throw sfFail_('partner', 'Διάλεξε γραφείο και συνεργάτη.');
+  const c = d.client || {};
+  const client = { name: t(c.name, 120), phone: t(c.phone, 20), email: t(c.email, 120).toLowerCase() };
+  if (!client.name) throw sfFail_('client', 'Γράψε το ονοματεπώνυμο του πελάτη.');
+  if (client.email && !/^[^\s@,;<>"]+@[^\s@,;<>"]+\.[a-z]{2,}$/i.test(client.email)) throw sfFail_('email', 'Το email του πελάτη δεν φαίνεται σωστό.');
+  if (!agent.phone) throw sfFail_('me', 'Συμπλήρωσε πρώτα το κινητό σου: ⚙ → Στοιχεία.');
+  const interest = ['Αγορά', 'Πώληση', 'Άλλο'].indexOf(d.interest) >= 0 ? d.interest : '';
+  if (!interest) throw sfFail_('interest', 'Διάλεξε για τι ενδιαφέρεται ο πελάτης.');
+  const sig = sfSignature_(d.sig);
+  const p = d.prop || {};
+  const pick = (v, list) => (list.indexOf(v) >= 0 ? v : '');
+  const deal = pick(p.deal, ['Αγορά', 'Πώληση', 'Μίσθωση', 'Εκμίσθωση', 'Αντιπαροχή']);
+  const type = pick(p.type, ['Κατοικία', 'Κατάστημα', 'Γραφείο', 'Οικόπεδο', 'Άλλο']);
+  const mandate = pick(d.mandate, ['Όχι', 'Απλή', 'Αποκλειστική']);
+  const now = new Date();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  let aa, pdf;
+  try {
+    aa = refNextAa_(kind, now);
+    const f = n => Utilities.formatDate(now, TZ, n);
+    const values = {
+      'ΗΜΕΡΑ': f('dd'), 'ΜΗΝΑΣ': f('MM'), 'ΕΤΟΣ': f('yyyy'),
+      'Κ_ΑΓΟΡΑ': BOX(interest === 'Αγορά'), 'Κ_ΠΩΛΗΣΗ': BOX(interest === 'Πώληση'), 'Κ_ΑΛΛΟ': BOX(interest === 'Άλλο'),
+      'ΑΛΛΟ': interest === 'Άλλο' ? t(d.interestOther) : '',
+      'Κ_ΚΑΤ_ΝΑΙ': BOX(d.prevCall === 'Ναι'), 'Κ_ΚΑΤ_ΟΧΙ': BOX(d.prevCall === 'Όχι'),
+      'ΣΥΝΕΡΓΑΤΗΣ': agent.smsName || agent.name, 'ΚΙΝΗΤΟ': agent.phone, 'EMAIL_ΜΕΣΙΤΗ': agent.email || '',
+      'ΓΡΑΦΕΙΟ': partner.office, 'ΣΥΝΕΡΓΑΤΗΣ_ΠΡΟΣ': partner.name, 'ΔΙΕΥΘΥΝΣΗ_ΠΡΟΣ': partner.area,
+      'ΠΟΛΗ_ΠΡΟΣ': partner.city, 'ΤΚ_ΠΡΟΣ': '', 'ΤΗΛ_ΠΡΟΣ': partner.phones.join(', '), 'EMAIL_ΠΡΟΣ': partner.email,
+      'Κ_ΕΝΤ_ΟΧΙ': BOX(mandate === 'Όχι'), 'Κ_ΕΝΤ_ΑΠΛΗ': BOX(mandate === 'Απλή'), 'Κ_ΕΝΤ_ΑΠΟΚΛ': BOX(mandate === 'Αποκλειστική'),
+      'ΠΕΛΑΤΗΣ': client.name,
+      'ΤΗΛ_ΠΕΛΑΤΗ': kind === 'synergasia' ? maskPhone_(client.phone) : client.phone,
+      'EMAIL_ΠΕΛΑΤΗ': kind === 'synergasia' ? maskMail_(client.email) : client.email,
+      'Κ_Σ_ΑΓΟΡΑ': BOX(deal === 'Αγορά'), 'Κ_Σ_ΠΩΛΗΣΗ': BOX(deal === 'Πώληση'), 'Κ_Σ_ΜΙΣΘΩΣΗ': BOX(deal === 'Μίσθωση'),
+      'Κ_Σ_ΕΚΜΙΣΘΩΣΗ': BOX(deal === 'Εκμίσθωση'), 'Κ_Σ_ΑΝΤΙΠΑΡΟΧΗ': BOX(deal === 'Αντιπαροχή'),
+      'ΤΙΜΗ': t(p.price, 30), 'ΠΡΟΚΑΤΑΒΟΛΗ': t(p.down, 30), 'ΔΑΝΕΙΟ': t(p.loan, 30), 'ΔΙΑΚΑΝΟΝΙΣΜΟΣ': t(p.settle, 40),
+      'ΠΕΡΙΟΧΗ': t(p.area, 60), 'ΗΛΙΚΙΑ': t(p.age, 20), 'ΤΜ': t(p.sqm, 12),
+      'Κ_Τ_ΚΑΤΟΙΚΙΑ': BOX(type === 'Κατοικία'), 'Κ_Τ_ΚΑΤΑΣΤΗΜΑ': BOX(type === 'Κατάστημα'), 'Κ_Τ_ΓΡΑΦΕΙΟ': BOX(type === 'Γραφείο'),
+      'Κ_Τ_ΟΙΚΟΠΕΔΟ': BOX(type === 'Οικόπεδο'), 'Κ_Τ_ΑΛΛΟ': BOX(type === 'Άλλο'), 'ΤΥΠΟΣ_ΑΛΛΟ': type === 'Άλλο' ? t(p.typeOther, 40) : '',
+      'ΥΔ': t(p.rooms, 10), 'ΜΠΑΝΙΑ': t(p.baths, 10), 'ΥΠΟΓΕΙΟ': t(p.basement, 10), 'ΣΤΑΘΜΕΥΣΗ': t(p.parking, 20),
+      'ΣΑΛΟΝΙ': t(p.living, 10), 'ΤΡΑΠΕΖΑΡΙΑ': t(p.dining, 10), 'ΒΕΡΑΝΤΕΣ': t(p.balconies, 10), 'ΘΕΡΜΑΝΣΗ': t(p.heating, 40),
+      'ΑΛΛΑ': t(p.other, 500), 'Κ_25': BOX(true)
+    };
+    const check = sha256_(JSON.stringify(values) + String(d.sig || ''));
+    values['ΕΛΕΓΧΟΣ'] = REF_KIND[kind] + ' ' + aa + ' · υπογράφηκε ηλεκτρονικά από ' + (agent.smsName || agent.name) +
+      ' στις ' + stamp_(now) + ' · κωδικός ελέγχου ' + check.slice(0, 16).replace(/(.{4})(?!$)/g, '$1-');
+
+    const af = agentFolder_(agent);
+    const folder = childByName_(af, CONFIG.REFERRAL.FOLDER) || af.createFolder(CONFIG.REFERRAL.FOLDER);
+    const clean = x => String(x).replace(/[\/\\:*?"<>|]/g, ' ');
+    pdf = sfBuildPdf_(values, sig, folder,
+      REF_KIND[kind] + ' ' + aa.replace(/^.*-/, '').replace('/', '-') + ' - ' + clean(partner.office) + ' - ' + clean(client.name) + '.pdf',
+      refTemplate_(kind), REF_KEYS);
+
+    ensureSheet_(CONFIG.SHEETS.REFERRALS, REF_HEADERS).appendRow(safeRow_([
+      'R-' + randomHex_(10), now, agent.name, REF_KIND[kind], aa, partner.office, partner.name, pdf.getId(),
+      CONFIG.REFERRAL.SEND_TO, String(d.leadId || '')]));
+  } finally {
+    lock.releaseLock();
+  }
+
+  const to = CONFIG.REFERRAL.SEND_TO;
+  MailApp.sendEmail({
+    to: to, cc: CONFIG.REFERRAL.CC_AGENT && agent.email ? agent.email : '', name: 'KW App',
+    replyTo: agent.email || CONFIG.OFFICE.email,
+    subject: REF_KIND[kind] + ' ' + aa + ' · ' + (agent.smsName || agent.name) + ' → ' + partner.name + ' (' + partner.office + ')',
+    body: REF_KIND[kind] + ' ' + aa + '\n\nΑπό: ' + (agent.smsName || agent.name) + ', ' + CONFIG.OFFICE.name +
+          '\nΠρος: ' + partner.name + ', ' + partner.office + '\n\nΤο έντυπο είναι συνημμένο.',
+    attachments: [pdf.getBlob()]
+  });
+  log_(REF_KIND[kind] + ': στάλθηκε', agent.name, aa + ' · ' + partner.office);
+  return { aa: aa, fileUrl: sfFileUrl_(pdf.getId()), sentTo: to, kind: REF_KIND[kind] };
 }
 
 
@@ -4178,7 +4433,9 @@ function setup() {
   ensureSheet_(CONFIG.SHEETS.DOCS, docHeaders_());
   ensureSheet_(CONFIG.SHEETS.TASKS, TASK_HEADERS);
   ensureSheet_(CONFIG.SHEETS.SHOWFORM, SF_HEADERS);
+  ensureSheet_(CONFIG.SHEETS.REFERRALS, REF_HEADERS);
   showingTemplateCheck();
+  referralTemplateCheck();
   ensureContactSheets_();
   if (CONFIG.MAP.ENABLED) ensureSheet_(CONFIG.SHEETS.MAP, MAP_HEADERS);
 

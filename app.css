@@ -575,6 +575,13 @@ html[data-size="xl"] .map-filters{grid-template-columns:1fr}
 .f-must b{color:var(--red);font-size:.875rem;white-space:nowrap}
 .f-warn{margin:0 0 1rem;border-color:#f1d9b8;background:#fffaf3}
 .f-must.is-bad{border-color:var(--red);background:#fdeaed}
+.field>span .req{margin-left:.375rem;font-size:.8125rem;font-weight:700;color:var(--red)}
+.field input.is-bad{outline:3px solid var(--red);outline-offset:-1px;border-color:transparent}
+.rf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 .625rem}
+.rf-grid .field{min-width:0}
+html[data-size="xl"] .rf-grid{grid-template-columns:1fr}
+#rf-pad-box+.link{display:block;margin:.25rem 0 0 auto}
+.rf-done{border:1.5px solid #cfe3d7;background:#f6fbf8;border-radius:.875rem;padding:.875rem;margin-top:1rem}
 .f-ok{display:grid;place-items:center;width:4rem;height:4rem;margin:0 auto 1rem;border-radius:50%;background:var(--green);color:#fff;font-size:2rem;font-weight:800}
 #f-closed b,#f-done b{font-size:1.375rem}
 

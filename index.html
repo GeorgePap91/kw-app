@@ -199,6 +199,7 @@
     </header>
     <div class="list">
       <button class="row" data-goto="contacts"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="row-body"><span class="row-name">Επαφές</span><span class="row-prop">Πελάτες, τι τους ενδιέφερε, email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="row" id="btn-referral-more"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="row-body"><span class="row-name">Σύσταση ή συνεργασία</span><span class="row-prop">Έντυπο προς συνεργάτη άλλου γραφείου KW.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-goto="metrics"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="row-body"><span class="row-name">Μετρήσεις</span><span class="row-prop">Ραντεβού, υποδείξεις, εντολές ανά μήνα.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-goto="forms"><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="row-body"><span class="row-name">Φόρμες και αίθουσες</span><span class="row-prop">Φόρμες γραφείου, κράτηση αίθουσας.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="row" data-settings><span class="row-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="row-body"><span class="row-name">Ρυθμίσεις</span><span class="row-prop">Στοιχεία, γράμματα, ειδοποιήσεις.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
@@ -323,6 +324,7 @@
           <button class="btn" id="btn-showing">Υπόδειξη</button>
         </div>
         <button class="btn primary wide gap-top" id="btn-showform" hidden><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg>Έντυπο υπόδειξης για τον πελάτη</button>
+        <button class="btn wide gap-top" id="btn-lead-referral"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg>Σύσταση ή συνεργασία</button>
         <button class="btn wide gap-top" id="btn-lead-task"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Εργασία για αυτή την κλήση</button>
 
         <label class="field gap-field">
@@ -622,6 +624,82 @@
     <label class="field"><span>Σημειώσεις</span><textarea id="ce-notes" rows="4"></textarea></label>
     <button class="btn primary wide" id="btn-save-contact">Αποθήκευση</button>
     <p class="save-hint" id="ce-hint"></p>
+  </div>
+</div>
+
+<!-- ΣΥΣΤΑΣΗ / ΣΥΝΕΡΓΑΣΙΑ (1.15) -->
+<div class="sheet" id="referral" hidden>
+  <div class="sheet-head">
+    <button class="back" id="referral-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title">Σύσταση / Συνεργασία</span>
+  </div>
+  <div class="sheet-body">
+    <div class="subtabs in-sheet" id="rf-kind" role="tablist" aria-label="Είδος εντύπου">
+      <button class="subtab is-on" role="tab" data-kind="systasi"><span>Σύσταση</span></button>
+      <button class="subtab" role="tab" data-kind="synergasia"><span>Συνεργασία</span></button>
+    </div>
+    <p class="note" id="rf-kind-note"></p>
+
+    <h3 class="sub-head first">Ενδιαφερόμενος για</h3>
+    <div class="chips" id="rf-interest" role="radiogroup" aria-label="Ενδιαφερόμενος για">
+      <button class="chip" data-v="Αγορά">Αγορά</button><button class="chip" data-v="Πώληση">Πώληση</button><button class="chip" data-v="Άλλο">Άλλο</button>
+    </div>
+    <label class="field" id="rf-interest-other-wrap" hidden><span>Τι άλλο</span><input id="rf-interest-other" maxlength="80"></label>
+
+    <div id="rf-prev-wrap">
+      <h3 class="sub-head">Επιβεβαίωση καταγραφής από προηγούμενο τηλεφώνημα</h3>
+      <div class="chips" id="rf-prev" role="radiogroup"><button class="chip" data-v="Ναι">Ναι</button><button class="chip" data-v="Όχι">Όχι</button></div>
+    </div>
+
+    <h3 class="sub-head">Προς το γραφείο</h3>
+    <label class="field"><span>Γραφείο</span><select id="rf-office"><option value="">Φόρτωση…</option></select></label>
+    <label class="field"><span>Συνεργάτης</span><select id="rf-partner" disabled><option value="">Διάλεξε πρώτα γραφείο</option></select></label>
+    <p class="cal-status muted" id="rf-partner-info"></p>
+    <label class="field"><span>Υπάρχει εντολή</span><select id="rf-mandate"><option value="">—</option><option>Όχι</option><option>Απλή</option><option>Αποκλειστική</option></select></label>
+
+    <h3 class="sub-head">Από εσένα</h3>
+    <p class="cal-status" id="rf-me"></p>
+
+    <h3 class="sub-head">Στοιχεία πελάτη</h3>
+    <label class="field"><span>Ονοματεπώνυμο <b class="req">Υποχρεωτικό</b></span><input id="rf-c-name" maxlength="120" required aria-required="true"></label>
+    <label class="field"><span>Τηλέφωνο</span><input id="rf-c-phone" type="tel" inputmode="tel" maxlength="20"></label>
+    <p class="field-hint" id="rf-mask-note"></p>
+    <label class="field"><span>Email</span><input id="rf-c-email" type="email" inputmode="email" maxlength="120"></label>
+    <p class="field-hint" id="rf-mask-mail"></p>
+
+    <h3 class="sub-head">Χαρακτηριστικά ακινήτου</h3>
+    <p class="cal-status muted">Συμπλήρωσε ό,τι γνωρίζεις. Τα κενά μένουν κενά στο έντυπο.</p>
+    <label class="field"><span>Συναλλαγή</span><select id="rf-deal"><option value="">—</option><option>Αγορά</option><option>Πώληση</option><option>Μίσθωση</option><option>Εκμίσθωση</option><option>Αντιπαροχή</option></select></label>
+    <div class="rf-grid">
+      <label class="field"><span>Τιμή</span><input id="rf-price" inputmode="decimal" maxlength="30" placeholder="π.χ. 250.000 €"></label>
+      <label class="field"><span>Προκαταβολή</span><input id="rf-down" maxlength="30"></label>
+      <label class="field"><span>Δάνειο</span><select id="rf-loan"><option value="">—</option><option>Ναι</option><option>Όχι</option><option>Σε διαδικασία</option></select></label>
+      <label class="field"><span>Διακανονισμός</span><input id="rf-settle" maxlength="40"></label>
+      <label class="field"><span>Περιοχή</span><input id="rf-area" maxlength="60"></label>
+      <label class="field"><span>Ηλικία</span><select id="rf-age"><option value="">—</option><option>Νεόδμητο</option><option>Έως 5 έτη</option><option>5–10 έτη</option><option>10–20 έτη</option><option>20–30 έτη</option><option>Πάνω από 30 έτη</option></select></label>
+      <label class="field"><span>Τ.μ.</span><input id="rf-sqm" inputmode="numeric" maxlength="12"></label>
+      <label class="field"><span>Τύπος</span><select id="rf-type"><option value="">—</option><option>Κατοικία</option><option>Κατάστημα</option><option>Γραφείο</option><option>Οικόπεδο / Αγροτεμάχιο</option><option>Άλλο</option></select></label>
+    </div>
+    <label class="field" id="rf-type-other-wrap" hidden><span>Τύπος: άλλο</span><input id="rf-type-other" maxlength="40"></label>
+    <div class="rf-grid">
+      <label class="field"><span>Υ/Δ</span><select id="rf-rooms"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></label>
+      <label class="field"><span>Μπάνια</span><select id="rf-baths"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>4+</option></select></label>
+      <label class="field"><span>Υπόγειο</span><select id="rf-basement"><option value="">—</option><option>Ναι</option><option>Όχι</option></select></label>
+      <label class="field"><span>Θέση στάθμευσης</span><select id="rf-parking"><option value="">—</option><option>Όχι</option><option>1</option><option>2</option><option>3+</option></select></label>
+      <label class="field"><span>Σαλόνι</span><select id="rf-living"><option value="">—</option><option>Ναι</option><option>Όχι</option><option>2</option></select></label>
+      <label class="field"><span>Τραπεζαρία</span><select id="rf-dining"><option value="">—</option><option>Ναι</option><option>Όχι</option></select></label>
+      <label class="field"><span>Βεράντες</span><select id="rf-balconies"><option value="">—</option><option>Όχι</option><option>1</option><option>2</option><option>3+</option></select></label>
+      <label class="field"><span>Θέρμανση</span><select id="rf-heating"><option value="">—</option><option>Αυτόνομη</option><option>Κεντρική</option><option>Ατομική</option><option>Ενδοδαπέδια</option><option>Αντλία θερμότητας</option><option>Κλιματιστικά</option><option>Χωρίς</option></select></label>
+    </div>
+    <label class="field"><span>Άλλα ιδιαίτερα χαρακτηριστικά / προτιμήσεις</span><textarea id="rf-other" rows="3" maxlength="500"></textarea></label>
+
+    <h3 class="sub-head">Η υπογραφή σου</h3>
+    <div class="f-pad" id="rf-pad-box"><canvas id="rf-pad" aria-label="Πλαίσιο υπογραφής"></canvas><span class="f-pad-hint" id="rf-pad-hint">Υπόγραψε εδώ</span></div>
+    <button class="link" id="rf-pad-clear">Καθαρισμός υπογραφής</button>
+
+    <button class="btn primary wide gap-top" id="btn-send-referral">Δημιουργία και αποστολή</button>
+    <p class="save-hint" id="rf-hint"></p>
+    <div id="rf-done"></div>
   </div>
 </div>
 

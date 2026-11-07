@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.14.1';
+var APP_VERSION = '1.15.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.14';
+var API_VERSION = '1.15';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -152,7 +152,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var SHEETS = ['contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
+var SHEETS = ['referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
 function backGuard() { if (history.pushState) history.pushState({ kw: 1 }, ''); }
@@ -596,6 +596,10 @@ function wire() {
   $('propdetail-back').onclick = function () { closeSheet('propdetail'); S.prop = null; };
   $('task-back').onclick = function () { closeSheet('task'); };
   $('templates-back').onclick = function () { closeSheet('templates'); };
+  $('referral-back').onclick = function () { closeSheet('referral'); };
+  $('btn-referral-more').onclick = function () { openReferral(null); };
+  $('btn-lead-referral').onclick = function () { openReferral(S.lead); };
+  wireReferral();
 
   $('btn-new-task').onclick = function () { openTask(null); };
   $('btn-lead-task').onclick = onLeadTask;
@@ -2326,6 +2330,244 @@ function onSfCancel() {
       if (S.lead && S.lead.id === id) renderShowingForm(st);
       toast('Το link ακυρώθηκε');
     }).catch(function (e) { toast(e.message, true); });
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  ΣΥΣΤΑΣΗ / ΣΥΝΕΡΓΑΣΙΑ (1.15)
+//  Ο μεσίτης συμπληρώνει, υπογράφει στην οθόνη, και ο server φτιάχνει το PDF
+//  και το στέλνει με email. Τα γραφεία έρχονται από το φύλλο «Συνεργάτες KW».
+// ─────────────────────────────────────────────────────────────
+
+var RF_NOTE = {
+  systasi: 'Συστήνεις πελάτη σε άλλο γραφείο. Αμοιβή του γραφείου μας: 25% επί της προμήθειας του πελάτη.',
+  synergasia: 'Δουλεύετε μαζί τη συναλλαγή. Στο έντυπο το τηλέφωνο και το email του πελάτη φαίνονται κρυμμένα, π.χ. 694xxxx567 και nixxxx@gmail.com.'
+};
+
+/** Υπογραφή με το δάχτυλο σε καμβά. Ίδια λογική με τη φόρμα του πελάτη. */
+function makePad(canvas, hint) {
+  var ctx = canvas.getContext('2d'), drawing = false, last = null, ink = 0, strokes = [];
+  function draw(st) {
+    ctx.beginPath();
+    st.forEach(function (p, i) { if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+    if (st.length === 1) ctx.lineTo(st[0].x + 0.1, st[0].y);
+    ctx.stroke();
+  }
+  function resize() {
+    var r = canvas.getBoundingClientRect();
+    if (!r.width) return;
+    var k = window.devicePixelRatio || 1;
+    canvas.width = Math.round(r.width * k); canvas.height = Math.round(r.height * k);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#10204a';
+    strokes.forEach(draw);
+  }
+  function pos(e) { var r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  canvas.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); canvas.setPointerCapture(e.pointerId);
+    drawing = true; last = pos(e); strokes.push([last]); hint.hidden = true;
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!drawing) return;
+    var p = pos(e);
+    ink += Math.hypot(p.x - last.x, p.y - last.y);
+    strokes[strokes.length - 1].push(p);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p;
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { canvas.addEventListener(ev, function () { drawing = false; }); });
+  window.addEventListener('resize', resize);
+  return {
+    resize: resize,
+    clear: function () { strokes = []; ink = 0; ctx.clearRect(0, 0, canvas.width, canvas.height); hint.hidden = false; },
+    ok: function () { return ink > 120; },
+    png: function () {
+      var out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height;
+      var o = out.getContext('2d'); o.fillStyle = '#fff'; o.fillRect(0, 0, out.width, out.height); o.drawImage(canvas, 0, 0);
+      return out.toDataURL('image/png');
+    }
+  };
+}
+
+function chipPick(id, value) {
+  $(id).querySelectorAll('.chip').forEach(function (c) {
+    var on = c.dataset.v === value;
+    c.classList.toggle('is-on', on);
+    c.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+}
+
+function chipValue(id) {
+  var on = $(id).querySelector('.chip.is-on');
+  return on ? on.dataset.v : '';
+}
+
+function wireReferral() {
+  S.rfPad = makePad($('rf-pad'), $('rf-pad-hint'));
+  $('rf-pad-clear').onclick = function () { S.rfPad.clear(); };
+  $('rf-kind').querySelectorAll('[data-kind]').forEach(function (b) {
+    b.onclick = function () { setReferralKind(b.dataset.kind); };
+  });
+  ['rf-interest', 'rf-prev'].forEach(function (id) {
+    $(id).querySelectorAll('.chip').forEach(function (c) {
+      c.setAttribute('role', 'radio');
+      c.onclick = function () {
+        chipPick(id, c.dataset.v === chipValue(id) && id === 'rf-prev' ? '' : c.dataset.v);
+        if (id === 'rf-interest') $('rf-interest-other-wrap').hidden = chipValue(id) !== 'Άλλο';
+      };
+    });
+  });
+  $('rf-type').onchange = function () { $('rf-type-other-wrap').hidden = this.value !== 'Άλλο'; };
+  $('rf-office').onchange = fillReferralPartners;
+  $('rf-partner').onchange = showReferralPartner;
+  $('rf-c-phone').oninput = maskNote;
+  $('rf-c-email').oninput = maskNote;
+  $('rf-c-name').oninput = function () { if (this.value.trim()) this.classList.remove('is-bad'); };
+  $('btn-send-referral').onclick = onSendReferral;
+}
+
+function setReferralKind(kind) {
+  S.rfKind = kind;
+  $('rf-kind').querySelectorAll('[data-kind]').forEach(function (b) { b.classList.toggle('is-on', b.dataset.kind === kind); });
+  $('rf-kind-note').textContent = RF_NOTE[kind];
+  $('rf-prev-wrap').hidden = kind !== 'systasi';
+  $('btn-send-referral').textContent = (kind === 'systasi' ? 'Δημιουργία σύστασης' : 'Δημιουργία συνεργασίας') + ' και αποστολή';
+  maskNote();
+}
+
+/** Στη Συνεργασία: προεπισκόπηση του κρυμμένου τηλεφώνου και email (ίδιος κανόνας με τον server). */
+function maskNote() {
+  var co = S.rfKind === 'synergasia';
+  var d = $('rf-c-phone').value.replace(/\D/g, '');
+  var m = $('rf-c-email').value.trim().match(/^([^@]+)@(.+)$/);
+  $('rf-mask-note').textContent = co && d.length >= 7
+    ? 'Στο έντυπο: ' + d.slice(0, 3) + new Array(d.length - 5).join('x') + d.slice(-3) : '';
+  $('rf-mask-mail').textContent = co && m
+    ? 'Στο έντυπο: ' + m[1].slice(0, Math.min(2, m[1].length - 1)) + 'xxxx@' + m[2] : '';
+}
+
+function openReferral(lead) {
+  // Νέα φόρμα κάθε φορά. Από κλήση: τα στοιχεία του πελάτη και η περιοχή μπαίνουν από πριν.
+  $('referral').querySelectorAll('input, textarea').forEach(function (el) { el.value = ''; el.classList.remove('is-bad'); });
+  $('referral').querySelectorAll('select').forEach(function (el) { if (el.id !== 'rf-office' && el.id !== 'rf-partner') el.value = ''; });
+  chipPick('rf-interest', ''); chipPick('rf-prev', '');
+  $('rf-interest-other-wrap').hidden = true; $('rf-type-other-wrap').hidden = true;
+  $('rf-hint').textContent = ''; $('rf-hint').className = 'save-hint'; $('rf-done').innerHTML = '';
+  $('btn-send-referral').disabled = false;
+  $('btn-send-referral').hidden = false;
+  S.rfLead = lead ? lead.id : '';
+  if (lead) {
+    $('rf-c-name').value = lead.name || '';
+    $('rf-c-phone').value = lead.phone || '';
+    $('rf-c-email').value = lead.email || '';
+    $('rf-area').value = lead.location || '';
+  }
+  setReferralKind(S.rfKind || 'systasi');
+  var me = S.me || {};
+  $('rf-me').innerHTML = esc(me.smsName || me.name || '') + (me.phone ? ' · ' + esc(me.phone)
+    : ' · <b class="warn-text">λείπει το κινητό σου</b> <button class="link" id="rf-go-settings">Συμπλήρωσέ το</button>');
+  if ($('rf-go-settings')) $('rf-go-settings').onclick = function () { closeSheet('referral'); openSettings(); };
+  openSheet('referral');
+  $('referral').querySelector('.sheet-body').scrollTop = 0;
+  setTimeout(function () { S.rfPad.resize(); S.rfPad.clear(); }, 300);
+  loadKwPartners();
+}
+
+function loadKwPartners() {
+  if (S.kwp) { fillReferralOffices(); return; }
+  api('kwPartners').then(function (res) {
+    S.kwp = res;
+    fillReferralOffices();
+  }).catch(function (e) {
+    $('rf-office').innerHTML = '<option value="">Δεν φορτώθηκαν</option>';
+    $('rf-hint').className = 'save-hint err';
+    $('rf-hint').textContent = e.message;
+  });
+}
+
+function fillReferralOffices() {
+  var cur = $('rf-office').value;
+  $('rf-office').innerHTML = '<option value="">Διάλεξε γραφείο…</option>' + S.kwp.offices.map(function (o) {
+    return '<option value="' + esc(o.name) + '">' + esc(o.name) + ' (' + o.people.length + ')</option>';
+  }).join('');
+  $('rf-office').value = cur;
+  fillReferralPartners();
+}
+
+function referralOffice() {
+  var v = $('rf-office').value;
+  return (S.kwp ? S.kwp.offices : []).filter(function (o) { return o.name === v; })[0] || null;
+}
+
+/** Μόνο οι συνεργάτες του γραφείου που διάλεξε. */
+function fillReferralPartners() {
+  var o = referralOffice(), sel = $('rf-partner');
+  sel.disabled = !o;
+  sel.innerHTML = o ? '<option value="">Διάλεξε συνεργάτη…</option>' + o.people.map(function (p) {
+    return '<option value="' + esc(p.id) + '">' + esc(p.name) + (p.team ? ' · ' + esc(p.team) : '') + '</option>';
+  }).join('') : '<option value="">Διάλεξε πρώτα γραφείο</option>';
+  if (o && o.people.length === 1) sel.value = o.people[0].id;
+  showReferralPartner();
+}
+
+function referralPartner() {
+  var o = referralOffice(), id = $('rf-partner').value;
+  return o ? o.people.filter(function (p) { return p.id === id; })[0] || null : null;
+}
+
+function showReferralPartner() {
+  var p = referralPartner();
+  $('rf-partner-info').textContent = p ? [p.phone, p.email, [p.area, p.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ') : '';
+}
+
+function onSendReferral() {
+  var hint = $('rf-hint'), btn = $('btn-send-referral');
+  var bad = function (msg, el) {
+    hint.className = 'save-hint err'; hint.textContent = msg;
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  var interest = chipValue('rf-interest');
+  if (!interest) return bad('Διάλεξε για τι ενδιαφέρεται ο πελάτης.', $('rf-interest'));
+  if (!referralPartner()) return bad('Διάλεξε γραφείο και συνεργάτη.', $('rf-office'));
+  if (!$('rf-c-name').value.trim()) {
+    $('rf-c-name').classList.add('is-bad');
+    return bad('Το ονοματεπώνυμο του πελάτη είναι υποχρεωτικό.', $('rf-c-name'));
+  }
+  if (!S.me.phone) return bad('Συμπλήρωσε πρώτα το κινητό σου στις Ρυθμίσεις.', $('rf-me'));
+  if (!S.rfPad.ok()) return bad('Υπόγραψε στο πλαίσιο.', $('rf-pad-box'));
+
+  var type = $('rf-type').value;
+  var data = {
+    kind: S.rfKind, interest: interest, interestOther: $('rf-interest-other').value.trim(), prevCall: chipValue('rf-prev'),
+    office: $('rf-office').value, partnerId: $('rf-partner').value, mandate: $('rf-mandate').value, leadId: S.rfLead,
+    client: { name: $('rf-c-name').value.trim(), phone: $('rf-c-phone').value.trim(), email: $('rf-c-email').value.trim() },
+    prop: {
+      deal: $('rf-deal').value, price: $('rf-price').value, down: $('rf-down').value, loan: $('rf-loan').value,
+      settle: $('rf-settle').value, area: $('rf-area').value, age: $('rf-age').value, sqm: $('rf-sqm').value,
+      type: /^Οικόπεδο/.test(type) ? 'Οικόπεδο' : type, typeOther: $('rf-type-other').value,
+      rooms: $('rf-rooms').value, baths: $('rf-baths').value, basement: $('rf-basement').value, parking: $('rf-parking').value,
+      living: $('rf-living').value, dining: $('rf-dining').value, balconies: $('rf-balconies').value,
+      heating: $('rf-heating').value, other: $('rf-other').value
+    },
+    sig: S.rfPad.png()
+  };
+  btn.disabled = true;
+  btn.textContent = 'Δημιουργία…';
+  hint.className = 'save-hint'; hint.textContent = 'Φτιάχνεται το PDF. Παίρνει λίγα δευτερόλεπτα.';
+  api('referral', data).then(function (res) {
+    hint.textContent = '';
+    btn.hidden = true;
+    $('rf-done').innerHTML = '<div class="rf-done"><p class="sf-state"><span class="tag showing">Στάλθηκε</span><b>' + esc(res.kind + ' ' + res.aa) + '</b></p>' +
+      '<p class="cal-status muted">Το PDF στάλθηκε στο ' + esc(res.sentTo) + ' και κρατήθηκε στον φάκελό σου.</p>' +
+      '<a class="btn primary wide" href="' + esc(res.fileUrl) + '" target="_blank" rel="noopener">' + ico('out') + 'Άνοιγμα PDF</a>' +
+      '<button class="link" id="rf-again">Νέο έντυπο</button></div>';
+    $('rf-again').onclick = function () { openReferral(null); };
+    toast(res.kind + ' ' + res.aa + ' στάλθηκε');
+  }).catch(function (e) {
+    btn.disabled = false;
+    setReferralKind(S.rfKind);
+    bad(e.message);
   });
 }
 
