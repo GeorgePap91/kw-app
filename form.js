@@ -213,17 +213,24 @@
   /** Μήνυμα για τον ΑΦΜ, ή '' αν είναι έγκυρος. */
   function afmProblem(a) {
     if (a.length !== 9) return 'Ο ΑΦΜ έχει 9 ψηφία. Γράψατε ' + a.length + '.';
-    if (!validAfm(a)) return 'Ο ΑΦΜ δεν είναι έγκυρος. Ελέγξτε μήπως κάποιο ψηφίο γράφτηκε λάθος.';
+    if (!validAfm(a)) return 'Ελέγξτε τα ψηφία: δεν περνά τον αυτόματο έλεγχο.';
     return '';
   }
 
-  // Έλεγχος την ώρα που γράφει: φαίνεται αμέσως αν ο ΑΦΜ είναι σωστός.
-  form.elements.afm.addEventListener('input', function () {
-    var a = cleanAfm(this.value), hint = $('f-afm-hint');
-    var msg = a.length >= 9 ? afmProblem(a) : '';
-    hint.textContent = a.length < 9 ? '' : msg || '✓ Έγκυρος ΑΦΜ';
-    hint.className = 'f-fieldhint' + (a.length < 9 ? '' : msg ? ' bad' : ' good');
-    if (!msg) this.classList.remove('is-bad');
+  // Έλεγχος την ώρα που γράφει. Ο αυτόματος έλεγχος (ψηφίο ελέγχου) ΔΕΝ μπλοκάρει:
+  // αν ο ΑΦΜ δεν τον περνά, ο πελάτης μπορεί να επιβεβαιώσει ότι είναι σωστός.
+  function afmUi() {
+    var el = form.elements.afm, a = cleanAfm(el.value), hint = $('f-afm-hint');
+    var full = a.length === 9, ok = full && validAfm(a);
+    hint.textContent = a.length < 9 ? '' : ok ? '✓ Έγκυρος ΑΦΜ' : afmProblem(a);
+    hint.className = 'f-fieldhint' + (a.length < 9 ? '' : ok ? ' good' : ' bad');
+    $('f-afm-okbox').hidden = !(full && !ok);
+    if (ok || !full) $('f-afm-ok').checked = false;
+    if (ok) el.classList.remove('is-bad');
+  }
+  form.elements.afm.addEventListener('input', afmUi);
+  $('f-afm-ok').addEventListener('change', function () {
+    if (this.checked) { form.elements.afm.classList.remove('is-bad'); $('f-afm-okbox').classList.remove('is-bad'); }
   });
 
   var LABEL = { name: 'Ονοματεπώνυμο', father: 'Πατρώνυμο', city: 'Κάτοικος', street: 'Οδός', number: 'Αριθμός',
@@ -244,7 +251,8 @@
     var keys = Object.keys(LABEL);
     for (var i = 0; i < keys.length; i++) if (!v[keys[i]]) return [keys[i], 'Συμπληρώστε: ' + LABEL[keys[i]] + '.'];
     if (v.name.split(/\s+/).length < 2) return ['name', 'Γράψτε όνομα και επώνυμο.'];
-    if (afmProblem(v.afm)) return ['afm', afmProblem(v.afm)];
+    if (v.afm.length !== 9) return ['afm', afmProblem(v.afm)];
+    if (!validAfm(v.afm) && !v.afmOk) return ['afmOk', 'Ο ΑΦΜ δεν περνά τον αυτόματο έλεγχο. Ελέγξτε τα ψηφία, ή τσεκάρετε «Ο ΑΦΜ μου είναι σωστός».'];
     var ph = v.phone.replace(/\D/g, '');
     if (ph.length < 10 || ph.length > 15) return ['phone', 'Το τηλέφωνο δεν φαίνεται σωστό.'];
     if (!/^[^\s@,;<>"]+@[^\s@,;<>"]+\.[a-z]{2,}$/i.test(v.email)) return ['email', 'Το email δεν φαίνεται σωστό.'];
@@ -262,10 +270,11 @@
     if (!field) return;
     var el = field === 'sig' ? $('f-pad') : field === 'consent' ? $('f-consent') : form.elements[field];
     if (!el) return;
-    var box = field === 'sig' ? el.parentNode : field === 'consent' ? $('f-consent-box') : el;
+    if (field === 'afmOk') { $('f-afm-okbox').hidden = false; el = $('f-afm-ok'); }
+    var box = field === 'sig' ? el.parentNode : field === 'consent' ? $('f-consent-box') : field === 'afmOk' ? $('f-afm-okbox') : el;
     box.classList.add('is-bad');
     if (el.setAttribute) el.setAttribute('aria-invalid', 'true');
-    (field === 'sig' || field === 'consent' ? box : el).scrollIntoView({ block: 'center', behavior: 'smooth' });
+    (field === 'sig' || field === 'consent' || field === 'afmOk' ? box : el).scrollIntoView({ block: 'center', behavior: 'smooth' });
     if (field !== 'sig' && el.focus) el.focus({ preventScroll: true });
   }
 

@@ -573,6 +573,7 @@ html[data-size="xl"] .map-filters{grid-template-columns:1fr}
 .f-fieldhint.bad{color:var(--red)}
 .f-must{margin-top:.375rem;padding:.75rem;border:1.5px solid var(--line);border-radius:.75rem}
 .f-must b{color:var(--red);font-size:.875rem;white-space:nowrap}
+.f-warn{margin:0 0 1rem;border-color:#f1d9b8;background:#fffaf3}
 .f-must.is-bad{border-color:var(--red);background:#fdeaed}
 .f-ok{display:grid;place-items:center;width:4rem;height:4rem;margin:0 auto 1rem;border-radius:50%;background:var(--green);color:#fff;font-size:2rem;font-weight:800}
 #f-closed b,#f-done b{font-size:1.375rem}
