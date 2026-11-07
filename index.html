@@ -46,6 +46,9 @@
   <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
   <symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
   <symbol id="i-find" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
 </defs></svg>
 
@@ -223,6 +226,13 @@
         <a class="mrow" id="more-book" href="#" target="_blank" rel="noopener"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-room"/></svg></span><span class="mrow-body"><b>Κράτηση αίθουσας</b><span>Διάλεξε ώρα στο ημερολόγιο κρατήσεων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-out"/></svg></a>
       </div>
 
+      <div id="mode-wrap" hidden>
+        <h2 class="group-title">Λειτουργία</h2>
+        <div class="mlist">
+          <button class="mrow" data-mode-to="admin"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Admin</b><span>Έλεγχος εντύπων, κλήσεις και αρχεία όλων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+
       <h2 class="group-title">Εφαρμογή</h2>
       <div class="mlist">
         <button class="mrow" data-settings><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="mrow-body"><b>Ρυθμίσεις</b><span>Στοιχεία, γράμματα, ειδοποιήσεις, ασφάλεια.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
@@ -311,15 +321,153 @@
     </div>
   </section>
 
+  <!-- ══ ADMIN (1.17) ══════════════════════════════════════
+       Ο Admin βλέπει και εγκρίνει. Δεν έχει «Νέο», κλήση, SMS ή αλλαγή κατάστασης. -->
+
+  <!-- ΕΛΕΓΧΟΣ ΕΝΤΥΠΩΝ -->
+  <section class="view" id="view-a-review" hidden>
+    <header class="head">
+      <div class="head-row">
+        <h1>Έλεγχος</h1>
+        <div class="head-actions">
+          <button class="icon-btn" data-refresh aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="avatar-btn" data-goto="a-more" aria-label="Προφίλ και ρυθμίσεις"><span data-initials></span></button>
+        </div>
+      </div>
+      <div class="subtabs chipbar" id="tabs-a-review" role="tablist" aria-label="Έλεγχος εντύπων">
+        <button class="subtab is-on" role="tab" data-tab="pending"><span>Σε έλεγχο</span><b id="c-rv-pending">0</b></button>
+        <button class="subtab" role="tab" data-tab="fix"><span>Θέλουν διόρθωση</span><b id="c-rv-fix">0</b></button>
+        <button class="subtab" role="tab" data-tab="ok"><span>Εγκρίθηκαν</span><b id="c-rv-ok">0</b></button>
+      </div>
+      <div class="search-row">
+        <div class="search-box">
+          <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+          <input class="search" type="search" id="rv-search" placeholder="Έντυπο, οδός, κωδικός, μεσίτης" aria-label="Αναζήτηση εντύπου" autocomplete="off" enterkeyhint="search">
+          <button class="search-x" data-clear="rv-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+        </div>
+        <button class="filter-btn" id="rv-ftoggle" aria-expanded="false" aria-controls="rv-fpanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"/></svg>Φίλτρα<span class="badge" id="rv-fcount" hidden></span></button>
+      </div>
+      <div class="filter-panel" id="rv-fpanel" hidden>
+        <div class="filter-grid">
+          <label class="map-sel"><span>Μεσίτης</span><select id="f-rv-agent"></select></label>
+          <label class="map-sel"><span>Είδος</span><select id="f-rv-kind"></select></label>
+        </div>
+        <button class="link" id="rv-fclear" hidden>Καθαρισμός φίλτρων</button>
+      </div>
+    </header>
+    <div class="list" id="rv-list"></div>
+  </section>
+
+  <!-- ΟΛΕΣ ΟΙ ΚΛΗΣΕΙΣ -->
+  <section class="view" id="view-a-calls" hidden>
+    <header class="head">
+      <div class="head-row">
+        <h1>Όλες οι κλήσεις</h1>
+        <div class="head-actions">
+          <button class="icon-btn" data-refresh aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="avatar-btn" data-goto="a-more" aria-label="Προφίλ και ρυθμίσεις"><span data-initials></span></button>
+        </div>
+      </div>
+      <div class="subtabs chipbar" id="tabs-a-calls" role="tablist" aria-label="Κλήσεις">
+        <button class="subtab is-on" role="tab" data-tab="all"><span>Όλες</span><b id="c-a-all">0</b></button>
+        <button class="subtab" role="tab" data-tab="new"><span>Νέες</span><b id="c-a-new">0</b></button>
+        <button class="subtab" role="tab" data-tab="followup"><span>Follow-up</span><b id="c-a-followup">0</b></button>
+        <button class="subtab" role="tab" data-tab="showing"><span>Υποδείξεις</span><b id="c-a-showing">0</b></button>
+      </div>
+      <div class="search-row">
+        <div class="search-box">
+          <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+          <input class="search" type="search" id="ac-search" placeholder="Όνομα, τηλέφωνο, οδός, κωδικός" aria-label="Αναζήτηση κλήσης" autocomplete="off" enterkeyhint="search">
+          <button class="search-x" data-clear="ac-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+        </div>
+        <button class="filter-btn" id="ac-ftoggle" aria-expanded="false" aria-controls="ac-fpanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"/></svg>Φίλτρα<span class="badge" id="ac-fcount" hidden></span></button>
+      </div>
+      <div class="filter-panel" id="ac-fpanel" hidden>
+        <div class="filter-grid">
+          <label class="map-sel"><span>Μεσίτης</span><select id="f-ac-agent"></select></label>
+          <label class="map-sel"><span>Ακίνητο</span><select id="f-ac-prop"></select></label>
+        </div>
+        <button class="link" id="ac-fclear" hidden>Καθαρισμός φίλτρων</button>
+      </div>
+    </header>
+    <div class="list" id="ac-list"></div>
+  </section>
+
+  <!-- ΑΚΙΝΗΤΑ ΟΛΩΝ -->
+  <section class="view" id="view-a-props" hidden>
+    <header class="head">
+      <div class="head-row">
+        <h1>Ακίνητα</h1>
+        <div class="head-actions">
+          <button class="icon-btn" data-refresh aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+          <button class="avatar-btn" data-goto="a-more" aria-label="Προφίλ και ρυθμίσεις"><span data-initials></span></button>
+        </div>
+      </div>
+      <div class="search-row">
+        <div class="search-box">
+          <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+          <input class="search" type="search" id="ap-search" placeholder="Οδός, κωδικός, περιοχή, μεσίτης" aria-label="Αναζήτηση ακινήτου" autocomplete="off" enterkeyhint="search">
+          <button class="search-x" data-clear="ap-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+        </div>
+        <button class="filter-btn" id="ap-ftoggle" aria-expanded="false" aria-controls="ap-fpanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"/></svg>Φίλτρα<span class="badge" id="ap-fcount" hidden></span></button>
+      </div>
+      <div class="filter-panel" id="ap-fpanel" hidden>
+        <div class="filter-grid">
+          <label class="map-sel"><span>Μεσίτης</span><select id="f-ap-agent"></select></label>
+          <label class="map-sel"><span>Κατάσταση</span><select id="f-ap-status"></select></label>
+        </div>
+        <button class="link" id="ap-fclear" hidden>Καθαρισμός φίλτρων</button>
+      </div>
+    </header>
+    <div class="list" id="ap-list"></div>
+  </section>
+
+  <!-- ΑΛΛΑ (ADMIN) -->
+  <section class="view" id="view-a-more" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Άλλα</h1></div>
+    </header>
+    <div class="more">
+      <button class="profile-card" data-settings>
+        <span class="avatar big" data-initials></span>
+        <span class="profile-body"><b id="a-more-name"></b><span id="a-more-sub"></span></span>
+        <svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg>
+      </button>
+
+      <div id="a-mode-wrap">
+        <h2 class="group-title">Λειτουργία</h2>
+        <div class="mlist">
+          <button class="mrow" data-mode-to="agent"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Μεσίτη</b><span>Οι δικές σου κλήσεις, εργασίες και ακίνητα.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+
+      <h2 class="group-title">Ομάδα</h2>
+      <div class="mlist" id="a-team"></div>
+
+      <h2 class="group-title">Εφαρμογή</h2>
+      <div class="mlist">
+        <button class="mrow" data-settings><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="mrow-body"><b>Ρυθμίσεις</b><span>Γράμματα, ειδοποιήσεις, ασφάλεια.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      </div>
+    </div>
+  </section>
+
   <button class="fab" id="fab" aria-haspopup="dialog" aria-controls="quick"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Νέο</button>
   <div class="ptr" id="ptr" aria-hidden="true"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></div>
 
-  <nav class="tabs" aria-label="Κύριο μενού">
+  <nav class="tabs" id="nav-agent" aria-label="Κύριο μενού">
     <button class="tab is-on" data-view="today"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span>Σήμερα</button>
     <button class="tab" data-view="calls"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg><span class="badge" id="tab-badge" hidden>0</span></span>Κλήσεις</button>
     <button class="tab" data-view="tasks"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg><span class="badge" id="task-badge" hidden>0</span></span>Εργασίες</button>
     <button class="tab" data-view="props"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></span>Ακίνητα</button>
     <button class="tab" data-view="more"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-more"/></svg></span>Άλλα</button>
+  </nav>
+
+  <!-- 1.17: μενού Admin -->
+  <nav class="tabs" id="nav-admin" aria-label="Μενού Admin" hidden>
+    <button class="tab" data-view="a-review"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span class="badge" id="a-badge" hidden>0</span></span>Έλεγχος</button>
+    <button class="tab" data-view="a-calls"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span>Κλήσεις</button>
+    <button class="tab" data-view="a-props"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></span>Ακίνητα</button>
+    <button class="tab" data-view="a-more"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-more"/></svg></span>Άλλα</button>
   </nav>
 </div>
 
@@ -597,7 +745,7 @@
       <div class="mlist">
         <button class="mrow" data-sub="me"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="mrow-body"><b>Στοιχεία και γράμματα</b><span id="sub-me">Όνομα και κινητό στο SMS, μέγεθος γραμμάτων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-sub="push"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b>Ειδοποιήσεις</b><span id="sub-push"></span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
-        <button class="mrow" data-sub="cal"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b>Ημερολόγιο</b><span id="sub-cal"></span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="mrow" data-sub="cal" id="set-cal"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b>Ημερολόγιο</b><span id="sub-cal"></span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" id="btn-templates"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg></span><span class="mrow-body"><b>Μηνύματα SMS</b><span>Πρώτη επαφή, υπενθύμιση, ακύρωση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-sub="sec"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span><span class="mrow-body"><b>Ασφάλεια</b><span>Αυτή η συσκευή, αποσύνδεση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
@@ -778,6 +926,94 @@
 </div>
 
 <!-- ΕΡΩΤΗΣΗ ΕΠΙΒΕΒΑΙΩΣΗΣ -->
+<!-- ══ ADMIN (1.17): ακίνητο με όλα τα αρχεία ══ -->
+<div class="sheet" id="aprop" hidden>
+  <div class="sheet-head">
+    <button class="back" id="aprop-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title">Ακίνητο</span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="ap-name"></h2>
+    <p class="d-sub" id="ap-sub"></p>
+    <div class="pd-chips" id="ap-chips"></div>
+    <div class="stats" id="ap-stats"></div>
+
+    <div class="subtabs in-sheet" id="tabs-aprop" role="tablist" aria-label="Ακίνητο">
+      <button class="subtab is-on" role="tab" data-tab="files"><span>Αρχεία</span> <i class="pill" id="ap-files-count"></i></button>
+      <button class="subtab" role="tab" data-tab="facts"><span>Στοιχεία</span></button>
+      <button class="subtab" role="tab" data-tab="leads"><span>Κλήσεις</span> <i class="pill" id="ap-leads-count"></i></button>
+    </div>
+
+    <div id="aprop-panes">
+      <section data-pane="files">
+        <div id="ap-files"></div>
+        <button class="btn wide gap-top" id="ap-zip"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg><span>Κατέβασμα όλων (zip)</span></button>
+        <a class="link-out" id="ap-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
+      </section>
+      <div data-pane="facts" hidden><dl class="facts" id="ap-facts"></dl></div>
+      <div data-pane="leads" hidden>
+        <div class="card-list" id="ap-leads"></div>
+        <button class="btn wide gap-top" id="ap-leads-all">Άνοιγμα στη λίστα Κλήσεις</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN (1.17): κλήση, μόνο για ανάγνωση ══ -->
+<div class="sheet" id="alead" hidden>
+  <div class="sheet-head">
+    <button class="back" id="alead-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="tag" id="al-status"></span>
+  </div>
+  <div class="sheet-body">
+    <h2 id="al-name"></h2>
+    <p class="d-sub" id="al-sub"></p>
+    <p class="ro-note"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Μόνο προβολή. Τις ενέργειες τις κάνει ο μεσίτης.</p>
+    <dl class="facts" id="al-facts"></dl>
+    <h3 class="sub-head">Τι έγινε</h3>
+    <ol class="timeline" id="al-hist"></ol>
+    <div id="al-msg-wrap" hidden><h3 class="sub-head">Μήνυμα πελάτη</h3><p class="message" id="al-msg"></p></div>
+    <div id="al-notes-wrap" hidden><h3 class="sub-head">Σημειώσεις μεσίτη</h3><p class="message" id="al-notes"></p></div>
+    <button class="btn wide gap-top" id="al-prop"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg><span>Άνοιγμα ακινήτου</span></button>
+  </div>
+</div>
+
+<!-- ══ ADMIN (1.17): έλεγχος ενός εντύπου ══ -->
+<div class="sheet" id="review" hidden>
+  <div class="sheet-head">
+    <button class="back" id="review-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="tag" id="rv-status"></span>
+  </div>
+  <div class="sheet-body">
+    <p class="rv-kind" id="rv-kind"></p>
+    <h2 id="rv-title"></h2>
+    <p class="d-sub" id="rv-sub"></p>
+    <dl class="facts" id="rv-facts"></dl>
+
+    <div class="rv-view">
+      <a class="btn" id="rv-open" href="#" target="_blank" rel="noopener"><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span>Άνοιγμα</span></a>
+      <button class="btn" id="rv-download"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg><span>Κατέβασμα</span></button>
+    </div>
+    <div class="rv-preview" id="rv-preview" hidden></div>
+
+    <div class="rv-last" id="rv-last" hidden></div>
+
+    <div id="rv-decide">
+      <h3 class="sub-head">Απόφαση</h3>
+      <button class="btn solid-red wide" id="rv-ok"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><span>Έγκριση</span></button>
+      <button class="btn wide gap-top" id="rv-fix-open"><svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg><span>Θέλει διόρθωση</span></button>
+      <div class="rv-fix" id="rv-fix" hidden>
+        <p class="field-hint">Γράψε τι πρέπει να αλλάξει. Ο μεσίτης θα πάρει ειδοποίηση. Μη γράφεις Α.Δ.Τ. ή ΑΦΜ.</p>
+        <div class="chips tight" id="rv-reasons"></div>
+        <label class="field"><span>Σχόλιο προς τον μεσίτη</span>
+          <textarea id="rv-note" rows="3" maxlength="500" placeholder="π.χ. Λείπει η υπογραφή του ιδιοκτήτη στη 2η σελίδα."></textarea></label>
+        <button class="btn solid-red wide" id="rv-fix-send"><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg><span>Αποστολή στον μεσίτη</span></button>
+        <p class="save-hint" id="rv-hint"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="ask" id="ask" role="alertdialog" aria-modal="true" aria-labelledby="ask-title" aria-describedby="ask-text" hidden>
   <div class="ask-box">
     <h2 id="ask-title"></h2>
