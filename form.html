@@ -51,7 +51,7 @@
       <label class="field"><span>Επάγγελμα</span><input name="job" autocomplete="organization-title" maxlength="60" required></label>
       <label class="field"><span>Α.Δ.Τ. ή αριθμός διαβατηρίου</span><input name="adt" autocapitalize="characters" autocomplete="off" maxlength="20" placeholder="π.χ. ΑΒ 123456" required></label>
       <div class="f-row">
-        <label class="field f-grow"><span>ΑΦΜ</span><input name="afm" inputmode="numeric" autocomplete="off" maxlength="9" pattern="[0-9]{9}" required></label>
+        <label class="field f-grow"><span>ΑΦΜ</span><input name="afm" inputmode="numeric" autocomplete="off" maxlength="16" required aria-describedby="f-afm-hint"><small class="f-fieldhint" id="f-afm-hint" aria-live="polite"></small></label>
         <label class="field f-grow"><span>ΔΟΥ</span><input name="doy" maxlength="60" required></label>
       </div>
       <label class="field"><span>Τηλέφωνο</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required></label>
@@ -98,7 +98,7 @@
       </div>
       <p class="f-note" id="f-print-note" hidden>Τα στοιχεία σας μπαίνουν στο έντυπο και ο μεσίτης θα σας το φέρει να το υπογράψετε.</p>
 
-      <label class="f-check"><input type="checkbox" name="consent" id="f-consent"><span>Διάβασα τους όρους της εντολής και αποδέχομαι την επεξεργασία των προσωπικών μου δεδομένων για τη σύμβαση αυτή (όρος 8).</span></label>
+      <label class="f-check f-must" id="f-consent-box"><input type="checkbox" name="consent" id="f-consent" required aria-required="true"><span>Διάβασα τους όρους της εντολής και αποδέχομαι την επεξεργασία των προσωπικών μου δεδομένων για τη σύμβαση αυτή (όρος 8). <b>Υποχρεωτικό</b></span></label>
     </section>
 
     <button type="submit" class="btn primary wide f-send" id="f-send">Υπογραφή και αποστολή</button>

@@ -108,6 +108,10 @@
 
   // ── Εταιρεία, τρόπος υπογραφής ──────────────────────────
 
+  $('f-consent').addEventListener('change', function () {
+    if (this.checked) { $('f-consent-box').classList.remove('is-bad'); if (/όρους/.test($('f-hint').textContent)) mark(null, ''); }
+  });
+
   $('f-behalf').onchange = function () { $('f-company').hidden = !this.checked; };
 
   document.querySelectorAll('.f-opt').forEach(function (b) {
@@ -203,6 +207,25 @@
     return (sum % 11) % 10 === Number(a[8]);
   }
 
+  /** «EL 801 085 328», «801.085.328» → «801085328». */
+  function cleanAfm(a) { return String(a || '').trim().replace(/^(EL|GR|ΕΛ)\s*/i, '').replace(/\D/g, ''); }
+
+  /** Μήνυμα για τον ΑΦΜ, ή '' αν είναι έγκυρος. */
+  function afmProblem(a) {
+    if (a.length !== 9) return 'Ο ΑΦΜ έχει 9 ψηφία. Γράψατε ' + a.length + '.';
+    if (!validAfm(a)) return 'Ο ΑΦΜ δεν είναι έγκυρος. Ελέγξτε μήπως κάποιο ψηφίο γράφτηκε λάθος.';
+    return '';
+  }
+
+  // Έλεγχος την ώρα που γράφει: φαίνεται αμέσως αν ο ΑΦΜ είναι σωστός.
+  form.elements.afm.addEventListener('input', function () {
+    var a = cleanAfm(this.value), hint = $('f-afm-hint');
+    var msg = a.length >= 9 ? afmProblem(a) : '';
+    hint.textContent = a.length < 9 ? '' : msg || '✓ Έγκυρος ΑΦΜ';
+    hint.className = 'f-fieldhint' + (a.length < 9 ? '' : msg ? ' bad' : ' good');
+    if (!msg) this.classList.remove('is-bad');
+  });
+
   var LABEL = { name: 'Ονοματεπώνυμο', father: 'Πατρώνυμο', city: 'Κάτοικος', street: 'Οδός', number: 'Αριθμός',
                 job: 'Επάγγελμα', adt: 'Α.Δ.Τ.', afm: 'ΑΦΜ', doy: 'ΔΟΥ', phone: 'Τηλέφωνο', email: 'Email' };
 
@@ -212,7 +235,7 @@
       if (!el.name || el.name === 'consent') return;
       v[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim();
     });
-    v.afm = (v.afm || '').replace(/\s/g, '');
+    v.afm = cleanAfm(v.afm);
     return v;
   }
 
@@ -221,14 +244,14 @@
     var keys = Object.keys(LABEL);
     for (var i = 0; i < keys.length; i++) if (!v[keys[i]]) return [keys[i], 'Συμπληρώστε: ' + LABEL[keys[i]] + '.'];
     if (v.name.split(/\s+/).length < 2) return ['name', 'Γράψτε όνομα και επώνυμο.'];
-    if (!validAfm(v.afm)) return ['afm', 'Ο ΑΦΜ δεν είναι σωστός (9 ψηφία).'];
+    if (afmProblem(v.afm)) return ['afm', afmProblem(v.afm)];
     var ph = v.phone.replace(/\D/g, '');
     if (ph.length < 10 || ph.length > 15) return ['phone', 'Το τηλέφωνο δεν φαίνεται σωστό.'];
     if (!/^[^\s@,;<>"]+@[^\s@,;<>"]+\.[a-z]{2,}$/i.test(v.email)) return ['email', 'Το email δεν φαίνεται σωστό.'];
     if (v.onBehalf && !v.company) return ['company', 'Γράψτε για λογαριασμό ποιου συμβάλλεστε.'];
     if (v.onBehalf && !v.capacity) return ['capacity', 'Γράψτε την ιδιότητά σας (π.χ. νόμιμος εκπρόσωπος).'];
     if (mode === 'sign' && !pad.ok()) return ['sig', 'Υπογράψτε στο πλαίσιο.'];
-    if (!$('f-consent').checked) return ['consent', 'Χρειάζεται η αποδοχή για τα προσωπικά δεδομένα.'];
+    if (!$('f-consent').checked) return ['consent', 'Για να σταλεί το έντυπο, τσεκάρετε ότι διαβάσατε τους όρους και αποδέχεστε τον όρο 8.'];
     return null;
   }
 
@@ -239,10 +262,10 @@
     if (!field) return;
     var el = field === 'sig' ? $('f-pad') : field === 'consent' ? $('f-consent') : form.elements[field];
     if (!el) return;
-    var box = field === 'sig' ? el.parentNode : el;
+    var box = field === 'sig' ? el.parentNode : field === 'consent' ? $('f-consent-box') : el;
     box.classList.add('is-bad');
     if (el.setAttribute) el.setAttribute('aria-invalid', 'true');
-    (field === 'sig' ? box : el).scrollIntoView({ block: 'center', behavior: 'smooth' });
+    (field === 'sig' || field === 'consent' ? box : el).scrollIntoView({ block: 'center', behavior: 'smooth' });
     if (field !== 'sig' && el.focus) el.focus({ preventScroll: true });
   }
 
