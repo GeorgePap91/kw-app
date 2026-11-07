@@ -44,6 +44,8 @@
   <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.500C5 14.800 12 21 12 21z"/><circle cx="12" cy="9.500" r="2.500"/></symbol>
   <symbol id="i-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 9-9 9-9-9z"/><path d="M9 14v-2a1 1 0 0 1 1-1h5M13 8.500l2.500 2.500-2.500 2.500"/></symbol>
   <symbol id="i-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
   <symbol id="i-find" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
 </defs></svg>
 
@@ -153,10 +155,21 @@
         <button class="subtab" role="tab" data-tab="docs"><span>Έγγραφα</span> <i class="pill warn" id="c-p-docs">0</i></button>
         <button class="subtab" role="tab" data-tab="map" id="tab-map" hidden><span>Χάρτης</span> <i class="pill"><svg class="ico" aria-hidden="true"><use href="#i-map"/></svg></i></button>
       </div>
-      <div class="search-box">
-        <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
-        <input class="search" type="search" id="prop-search" placeholder="Οδός, κωδικός, περιοχή…" aria-label="Αναζήτηση ακινήτου" autocomplete="off" enterkeyhint="search">
-        <button class="search-x" data-clear="prop-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+      <div class="search-row" id="prop-search-row">
+        <div class="search-box">
+          <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+          <input class="search" type="search" id="prop-search" placeholder="Οδός, κωδικός, περιοχή…" aria-label="Αναζήτηση ακινήτου" autocomplete="off" enterkeyhint="search">
+          <button class="search-x" data-clear="prop-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+        </div>
+        <button class="filter-btn" id="prop-ftoggle" aria-expanded="false" aria-controls="prop-fpanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"/></svg>Φίλτρα<span class="badge" id="prop-fcount" hidden></span></button>
+      </div>
+      <div class="filter-panel" id="prop-fpanel" hidden>
+        <div class="filter-grid">
+          <label class="map-sel"><span>Κατάσταση</span><select id="f-p-status"></select></label>
+          <label class="map-sel"><span>Εντολή</span><select id="f-p-mandate"></select></label>
+          <label class="map-sel"><span>Ισχύς εντολής</span><select id="f-p-active"></select></label>
+        </div>
+        <button class="link" id="prop-fclear" hidden>Καθαρισμός φίλτρων</button>
       </div>
     </header>
     <div id="props-panes">
@@ -199,10 +212,19 @@
         <div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Επαφές</h1></div>
         <div class="head-actions"><button class="head-btn" id="btn-new-contact"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Νέα</button></div>
       </div>
-<div class="search-box">
-        <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
-        <input class="search" type="search" id="contact-search" placeholder="Όνομα, τηλέφωνο ή κωδικός" aria-label="Αναζήτηση επαφής" autocomplete="off" enterkeyhint="search">
-        <button class="search-x" data-clear="contact-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+<div class="search-row" id="contact-search-row">
+        <div class="search-box">
+          <svg class="ico search-ico" aria-hidden="true"><use href="#i-find"/></svg>
+          <input class="search" type="search" id="contact-search" placeholder="Όνομα, τηλέφωνο ή κωδικός" aria-label="Αναζήτηση επαφής" autocomplete="off" enterkeyhint="search">
+          <button class="search-x" data-clear="contact-search" aria-label="Καθαρισμός αναζήτησης" hidden>✕</button>
+        </div>
+        <button class="filter-btn" id="contact-ftoggle" aria-expanded="false" aria-controls="contact-fpanel"><svg class="ico" aria-hidden="true"><use href="#i-filter"/></svg>Φίλτρα<span class="badge" id="contact-fcount" hidden></span></button>
+      </div>
+      <div class="filter-panel" id="contact-fpanel" hidden>
+        <div class="filter-grid">
+          <label class="map-sel"><span>Ιδιότητα</span><select id="f-c-role"></select></label>
+        </div>
+        <button class="link" id="contact-fclear" hidden>Καθαρισμός φίλτρων</button>
       </div>
     </header>
     <div class="list" id="contact-list"></div>
@@ -414,6 +436,12 @@
     <h2 id="s-name"></h2>
     <p class="d-sub gap-sub" id="s-prop"></p>
 
+    <!-- Έντυπο υπόδειξης (1.14): link μίας χρήσης για τον πελάτη -->
+    <section id="s-form" hidden>
+      <h3 class="sub-head first">Έντυπο υπόδειξης</h3>
+      <div id="sf-body"></div>
+    </section>
+
     <section class="outcome" id="s-outcome" hidden>
       <h3 class="sub-head first">Πώς πήγε η υπόδειξη;</h3>
       <div class="outcome-list" id="s-outcome-list"></div>
@@ -457,6 +485,7 @@
 
     <div class="subtabs in-sheet" id="tabs-prop" role="tablist" aria-label="Ακίνητο">
       <button class="subtab is-on" role="tab" data-tab="docs"><span>Έγγραφα</span> <i class="pill" id="pd-docs-count"></i></button>
+      <button class="subtab" role="tab" data-tab="bill"><span>Τιμολόγηση</span> <i class="pill" id="pd-bill-count"></i></button>
       <button class="subtab" role="tab" data-tab="facts"><span>Στοιχεία</span></button>
     </div>
 
@@ -465,6 +494,11 @@
         <div id="pd-docs-list"></div>
         <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
         <input type="file" id="doc-input" accept="application/pdf,image/*" hidden>
+      </section>
+      <section class="docs" id="pd-bill" data-pane="bill" hidden>
+        <p class="note">Τα έντυπα για την απόδειξη. Μπαίνουν στον φάκελο «Τιμολόγηση» του ακινήτου στο Drive.</p>
+        <div id="pd-bill-list"></div>
+        <a class="link-out" id="pd-bill-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου Τιμολόγησης</a>
       </section>
       <div data-pane="facts" hidden>
         <dl class="facts" id="pd-facts"></dl>
@@ -595,8 +629,7 @@
   <div class="ask-box">
     <h2 id="ask-title"></h2>
     <p id="ask-text"></p>
-    <button class="btn wide solid-red" id="ask-yes"></button>
-    <button class="btn wide" id="ask-no"></button>
+    <div class="ask-btns" id="ask-btns"></div>
   </div>
 </div>
 

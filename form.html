@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex, nofollow">
+  <!-- Ίδια πολιτική με την εφαρμογή: μόνο δικά μας scripts, μιλά μόνο με το Apps Script. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <!-- Το κλειδί είναι στο # και δεν φεύγει ποτέ προς άλλη σελίδα. -->
+  <meta name="referrer" content="no-referrer">
+  <title>Εντολή υπόδειξης · KW Athens Center</title>
+  <link rel="icon" href="icon-192.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="f-page">
+
+<header class="f-top"><span class="boot-mark f-mark">KW</span><span id="f-office">KW Athens Center</span></header>
+
+<main class="f-wrap">
+  <div id="f-load" class="empty">Φόρτωση…</div>
+
+  <div id="f-closed" class="empty" hidden><b id="f-closed-title">Το link δεν ισχύει</b><span id="f-closed-text"></span></div>
+
+  <div id="f-done" class="empty" hidden>
+    <span class="f-ok" aria-hidden="true">✓</span>
+    <b id="f-done-title">Ευχαριστούμε!</b>
+    <span id="f-done-text"></span>
+  </div>
+
+  <form id="f-form" novalidate hidden>
+    <h1 class="f-h1">Εντολή υπόδειξης ακινήτου</h1>
+    <p class="f-lead" id="f-intro"></p>
+
+    <section class="f-card" aria-labelledby="f-prop-h">
+      <h2 class="f-h2" id="f-prop-h">Το ακίνητο που σας υποδείχθηκε</h2>
+      <dl class="facts f-facts" id="f-prop"></dl>
+    </section>
+
+    <section class="f-card" aria-labelledby="f-me-h">
+      <h2 class="f-h2" id="f-me-h">Τα στοιχεία σας</h2>
+      <p class="f-note">Όπως στην ταυτότητά σας. Χρειάζονται για να είναι έγκυρη η εντολή.</p>
+
+      <label class="field"><span>Ονοματεπώνυμο</span><input name="name" autocomplete="name" maxlength="120" required></label>
+      <label class="field"><span>Πατρώνυμο</span><input name="father" maxlength="60" required></label>
+      <label class="field"><span>Κάτοικος (πόλη ή περιοχή)</span><input name="city" autocomplete="address-level2" maxlength="60" required></label>
+      <div class="f-row">
+        <label class="field f-grow"><span>Οδός</span><input name="street" autocomplete="address-line1" maxlength="80" required></label>
+        <label class="field f-num"><span>Αριθμός</span><input name="number" inputmode="text" maxlength="12" required></label>
+      </div>
+      <label class="field"><span>Επάγγελμα</span><input name="job" autocomplete="organization-title" maxlength="60" required></label>
+      <label class="field"><span>Α.Δ.Τ. ή αριθμός διαβατηρίου</span><input name="adt" autocapitalize="characters" autocomplete="off" maxlength="20" placeholder="π.χ. ΑΒ 123456" required></label>
+      <div class="f-row">
+        <label class="field f-grow"><span>ΑΦΜ</span><input name="afm" inputmode="numeric" autocomplete="off" maxlength="9" pattern="[0-9]{9}" required></label>
+        <label class="field f-grow"><span>ΔΟΥ</span><input name="doy" maxlength="60" required></label>
+      </div>
+      <label class="field"><span>Τηλέφωνο</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required></label>
+      <label class="field"><span>Email</span><input name="email" type="email" inputmode="email" autocomplete="email" maxlength="120" required></label>
+
+      <label class="f-check"><input type="checkbox" name="onBehalf" id="f-behalf"><span>Υπογράφω και για λογαριασμό εταιρείας ή άλλου προσώπου</span></label>
+      <div id="f-company" hidden>
+        <label class="field"><span>Για λογαριασμό (επωνυμία ή ονοματεπώνυμο)</span><input name="company" maxlength="120"></label>
+        <label class="field"><span>Με την ιδιότητα (π.χ. νόμιμος εκπρόσωπος)</span><input name="capacity" maxlength="80"></label>
+      </div>
+    </section>
+
+    <section class="f-card" aria-labelledby="f-terms-h">
+      <h2 class="f-h2" id="f-terms-h">Οι όροι της εντολής</h2>
+      <p class="f-note">Διαβάστε τους πριν υπογράψετε. Θα λάβετε όλο το έντυπο συμπληρωμένο στο email σας.</p>
+      <details class="f-terms">
+        <summary>Διαβάστε τους όρους 1 έως 8</summary>
+        <ol class="f-terms-list">
+          <li>Ο Εντολέας δηλώνει και αναγνωρίζει πως ήδη για πρώτη φορά και πριν από οποιοδήποτε άλλο μεσίτη, ο Εντολοδόχος του υπέδειξε προς τον σκοπό να προβεί ο Εντολέας σε αγορά ακινήτου ή σε μίσθωση ακινήτου, τα παραπάνω ακίνητα τα οποία στη συνέχεια θα αποκαλούνται χάριν συντομίας έκαστο ή όλα μαζί ως το «Ακίνητο».</li>
+          <li>Ο Εντολέας δηλώνει και αναγνωρίζει πως σε περίπτωση καταρτίσεως προσυμφώνου ή οριστικού συμβολαίου αγοράς ή ανταλλαγής, συμβάσεως εργολαβίας ή συμβάσεως μισθώσεως των άνω ακινήτων, με αυτόν προσωπικά ή για λογ/μό του, ή με συγγενή του, ανεξαρτήτως βαθμού συγγενείας, ή με συνεταίρο του (φυσικό ή νομικό πρόσωπο) πως οφείλει για την άνω υπόδειξη, να καταβάλλει αμοιβή προς τον Εντολοδόχο: <span id="f-term2"></span> Οι ανωτέρω αμοιβές οφείλονται ακόμη και στην περίπτωση κατά την οποία ο Εντολοδόχος απλώς προέβη μόνον στην υπόδειξη του Ακινήτου προς τον Εντολέα δίχως περαιτέρω μεσολάβηση. Ο Εντολέας αναγνωρίζει ακριβώς την ίδια παραπάνω στην κάθε περίπτωση μεσιτική αμοιβή / οφειλή, ανεξάρτητα εάν το ίδιο ακίνητο, υποδείχθηκε εκ των υστέρων, δηλαδή μετά την υπογραφή της παρούσας και από άλλο μεσίτη αστικών συμβάσεων.</li>
+          <li>Ο Εντολέας δηλώνει πως κατά τον χρόνο υποδείξεως έλαβε γνώση ότι τα ανωτέρω ακίνητα δεν έχουν πραγματικά ελαττώματα ή έχουν τα ακόλουθα: <b id="f-term3"></b></li>
+          <li>Ο Εντολέας αναγνωρίζει και αποδέχεται την υποχρέωση του να ανακοινώσει στον Εντολοδόχο την επερχόμενη κατάρτιση κυρίας συμβάσεως ή προσυμφώνου, το αργότερο μία ημέρα πριν την κατάρτιση της/του, διαφορετικά δηλώνει ρητά και ανεπιφύλακτα πως αναγνωρίζει ότι οφείλει πλέον της αναφερόμενης στην κάθε περίπτωση στο όρο 2 του παρόντος και επιπλέον πεντακόσια ευρώ (500€) για αποκατάσταση της φήμης, αξιοπιστίας και ζημίας του Εντολοδόχου. Δηλώνει δε ο Εντολέας ότι η παρούσα εντολή ισχύει επ' αόριστον για τα ακίνητα που του υπόδειξε ο Εντολοδόχος και πως δέχεται ρητά και ανεπιφύλακτα, να χρησιμοποιηθεί κατά την υποβολή προσφοράς αγοράς/ανταλλαγής/αντιπαροχής/μίσθωσης των παραπάνω ακινήτων, αποκλειστικά το επίσημο έντυπο προσφοράς Εντολοδόχου και να συμπράξει στις μεθόδους και πρακτικές ασφαλείας που χρησιμοποιεί ο Εντολοδόχος.</li>
+          <li>Ο Εντολέας δηλώνει ρητά και ανεπιφύλακτα ότι αποδέχεται ο Εντολοδόχος να μπορεί να παρέχει μεσιτικές υπηρεσίες και προς τους πωλητές/εκμισθωτές του Ακινήτου.</li>
+          <li>Συμφωνείται ρητώς πως εάν η εντολή δόθηκε από περισσότερους μεσιτικούς εντολείς, ενεργούντες από κοινού, είτε εάν η εντολή δόθηκε από ένα μόνον πρόσωπο (μεσιτικό εντολέα), που ενήργησε τόσο για τον εαυτό του όσο και ως αντιπρόσωπος άλλου, για την πληρωμή της μεσιτικής αμοιβής ευθύνονται άπαντες και μάλιστα έκαστος αλληλεγγύως και εις ολόκληρον απέναντι στον Εντολοδόχο.</li>
+          <li>Τροποποίηση της παρούσας, είναι δυνατή, μόνο εγγράφως. Συμφωνείται ότι για κάθε διαφορά, είναι αρμόδια τα Δικαστήρια του Πρωτοδικείου Αθηνών και εφαρμοστέο το ελληνικό Δίκαιο.</li>
+          <li>Ο ‘εντολέας’ δηλώνει ρητά και ανεπιφύλακτα ότι αποδέχεται τη συλλογή και τήρηση σε απόρρητο αρχείο των προσωπικών του δεδομένων. Η εταιρεία ΚELLER WILLIAMS ATHENS CENTER ακολουθεί και εναρμονίζεται με τον Γενικό Κανονισμό Προστασίας Δεδομένων (General Data Protection Regulation - GDPR) και το ενιαίο νομικό πλαίσιο που εφαρμόζεται σε όλα τα κράτη μέλη της Ευρωπαϊκής Ένωσης. Σε συμμόρφωση προς τις διατάξεις του Κανονισμού Ε.Ε. 2016/679, δια του παρόντος σας ενημερώνουμε ότι τα δεδομένα προσωπικού χαρακτήρα, που αφορούν στο πρόσωπό σας και τα οποία έχετε δηλώσει / προσκομίσει στην εταιρεία για την μεταξύ μας σύμβαση μεσιτείας / ανάθεσης / αποκλειστικότητας / υπόδειξης, συλλέγονται, υποβάλλονται σε επεξεργασία και σε σύστημα αρχειοθέτησης για την εκπλήρωση της μεταξύ μας συνεργασίας.</li>
+        </ol>
+        <p class="f-note">Πλήρες κείμενο: Σύμβαση μεσιτείας - Εντολή υπόδειξης ακινήτου της KELLER WILLIAMS ATHENS CENTER I.K.E. (Αρ. ΓΕΜΗ 148724203000, ΑΦΜ 801085328).</p>
+      </details>
+    </section>
+
+    <section class="f-card" aria-labelledby="f-sign-h">
+      <h2 class="f-h2" id="f-sign-h">Υπογραφή</h2>
+      <div class="f-choice" role="radiogroup" aria-labelledby="f-sign-h">
+        <button type="button" class="f-opt is-on" role="radio" aria-checked="true" data-mode="sign"><b>Υπογραφή εδώ</b><span>Με το δάχτυλο, στην οθόνη</span></button>
+        <button type="button" class="f-opt" role="radio" aria-checked="false" data-mode="print"><b>Σε χαρτί</b><span>Ο μεσίτης θα το εκτυπώσει</span></button>
+      </div>
+      <div id="f-pad-wrap">
+        <div class="f-pad">
+          <canvas id="f-pad" aria-label="Πλαίσιο υπογραφής"></canvas>
+          <span class="f-pad-hint" id="f-pad-hint">Υπογράψτε εδώ</span>
+        </div>
+        <button type="button" class="link" id="f-pad-clear">Καθαρισμός υπογραφής</button>
+      </div>
+      <p class="f-note" id="f-print-note" hidden>Τα στοιχεία σας μπαίνουν στο έντυπο και ο μεσίτης θα σας το φέρει να το υπογράψετε.</p>
+
+      <label class="f-check"><input type="checkbox" name="consent" id="f-consent"><span>Διάβασα τους όρους της εντολής και αποδέχομαι την επεξεργασία των προσωπικών μου δεδομένων για τη σύμβαση αυτή (όρος 8).</span></label>
+    </section>
+
+    <button type="submit" class="btn primary wide f-send" id="f-send">Υπογραφή και αποστολή</button>
+    <p class="save-hint" id="f-hint" role="alert"></p>
+    <p class="f-foot" id="f-foot"></p>
+  </form>
+</main>
+
+<script src="config.js"></script>
+<script src="form.js"></script>
+</body>
+</html>

@@ -258,7 +258,7 @@ body.has-env .sheet-head{padding-top:.25rem}
   padding-bottom:calc(1rem + env(safe-area-inset-bottom));animation:rise .26s var(--move)}
 .ask h2{margin:0 0 .5rem;font-size:1.5rem;font-weight:800;line-height:1.2}
 .ask p{margin:0 0 1.25rem;font-size:1.0625rem;color:var(--ink-2)}
-.ask .btn+.btn{margin-top:.625rem}
+.ask .btn+.btn,.ask-btns .btn+.btn{margin-top:.625rem}
 @keyframes fade{from{opacity:0}}
 @keyframes rise{from{transform:translateY(100%)}}
 
@@ -498,6 +498,91 @@ html[data-size="xl"] .map-filters{grid-template-columns:1fr}
   border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45);font-weight:800;font-size:1.0625rem}
 .leaflet-touch .leaflet-bar a{width:3rem;height:3rem;line-height:3rem;font-size:1.625rem}
 .leaflet-container .leaflet-control-attribution{font-size:.75rem}
+
+/* ── Σελίδες (1.13) ───────────────────── */
+.list-meta{margin:0;padding:.625rem 1rem;font-size:.9375rem;color:var(--ink-2);background:var(--paper);border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.pager{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.375rem;padding:1.25rem 1rem .5rem}
+.page{width:2.75rem;height:2.75rem;border-radius:50%;border:1.5px solid var(--edge);background:var(--paper);color:var(--ink);
+  font-weight:700;font-size:1.0625rem;font-variant-numeric:tabular-nums;cursor:pointer;padding:0;display:grid;place-items:center;
+  transition:background .18s ease,color .18s ease,transform .1s ease}
+.page:active{transform:scale(.92)}
+.page.is-on{background:var(--red);border-color:var(--red);color:#fff;cursor:default}
+.page-gap{min-width:1rem;text-align:center;color:var(--ink-2);font-weight:700}
+
+/* ── Φίλτρα (1.13) ────────────────────── */
+.search-row{display:flex;align-items:stretch;gap:.5rem;margin-top:.625rem}
+.search-row .search-box{flex:1;min-width:0;margin-top:0}
+.filter-btn{position:relative;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.0625rem;
+  min-width:4.25rem;min-height:3.25rem;padding:.25rem .5rem;border:1.5px solid var(--edge);border-radius:.75rem;background:var(--paper);
+  font-size:.8125rem;font-weight:700;color:var(--ink);cursor:pointer}
+.filter-btn.is-on{background:var(--ink);border-color:var(--ink);color:#fff}
+.filter-btn .badge{top:-.4375rem;right:-.4375rem}
+.filter-panel{margin-top:.625rem;padding:.75rem;background:var(--wash);border-radius:.875rem;animation:fade .18s ease}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem}
+.filter-panel .link{display:block;margin:.5rem auto 0;min-height:2.75rem}
+
+/* ── Ερώτηση με πολλές επιλογές ───────── */
+.ask-btns .btn+.btn{margin-top:.625rem}
+
+/* ── Τιμολόγηση (1.13) ────────────────── */
+.doc-head b small{display:block;font-size:.875rem;font-weight:600;color:var(--ink-2)}
+.doc-slot.opt{border-style:dashed}
+.doc-slot.opt .doc-ico{background:var(--wash);color:var(--ink-2)}
+.doc-file .tag{font-style:normal}
+.doc-note{margin:.5rem 0 0;font-size:.9375rem;color:var(--ink-2)}
+
+/* ── Φόρμα πελάτη (1.14, form.html) ───── */
+.f-page{background:var(--wash)}
+.f-top{display:flex;align-items:center;gap:.625rem;padding:.75rem 1rem;padding-top:calc(.75rem + env(safe-area-inset-top));
+  background:var(--paper);border-bottom:1px solid var(--line);font-weight:700;font-size:1.0625rem}
+.f-mark{width:2.5rem;height:2.5rem;font-size:1rem;border-radius:.375rem}
+.f-wrap{max-width:40rem;margin:0 auto;padding:1rem 1rem calc(2.5rem + env(safe-area-inset-bottom))}
+.f-h1{margin:.5rem 0 .375rem;font-size:1.625rem;font-weight:800;line-height:1.2;letter-spacing:-.02em}
+.f-lead{margin:0 0 1rem;color:var(--ink-2);font-size:1.0625rem}
+.f-card{background:var(--paper);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:.875rem}
+.f-h2{margin:0 0 .75rem;font-size:1.1875rem;font-weight:800}
+.f-note{margin:-.375rem 0 .875rem;font-size:.9375rem;color:var(--ink-2)}
+.f-facts{margin:0}
+.f-row{display:flex;gap:.625rem}
+.f-grow{flex:1;min-width:0}
+.f-num{flex:0 0 6.5rem}
+@media(max-width:359px){.f-row{display:block}.f-num{flex:none}}
+.f-check{display:flex;gap:.75rem;align-items:flex-start;padding:.625rem 0;font-size:1rem;cursor:pointer;line-height:1.4}
+.f-check input{width:1.5rem;height:1.5rem;flex:0 0 auto;margin:.0625rem 0 0;accent-color:var(--red)}
+.f-terms summary{min-height:3rem;display:flex;align-items:center;cursor:pointer;color:var(--red);font-weight:700;font-size:1.0625rem}
+.f-terms-list{margin:.25rem 0 .75rem;padding-left:1.5rem;font-size:.9375rem;line-height:1.5;color:var(--ink)}
+.f-terms-list li{margin-bottom:.625rem}
+.f-choice{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.875rem}
+.f-opt{min-height:4.25rem;padding:.5rem .625rem;border:1.5px solid var(--edge);border-radius:.875rem;background:var(--paper);
+  text-align:left;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;justify-content:center;gap:.125rem}
+.f-opt b{font-size:1.0625rem}
+.f-opt span{font-size:.875rem;color:var(--ink-2)}
+.f-opt.is-on{border-color:var(--ink);background:var(--ink);color:#fff}
+.f-opt.is-on span{color:#d9d9de}
+.f-pad{position:relative;height:11rem;border:1.5px dashed var(--edge);border-radius:.875rem;background:#fff;touch-action:none}
+.f-pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;border-radius:.875rem}
+.f-pad::after{content:'';position:absolute;left:1rem;right:1rem;bottom:2.25rem;border-bottom:1px solid var(--line);pointer-events:none}
+.f-pad-hint{position:absolute;left:0;right:0;bottom:.625rem;text-align:center;color:var(--ink-3);font-size:.9375rem;pointer-events:none}
+.f-pad.is-bad{border-color:var(--red);border-style:solid}
+.f-pad-wrap .link,#f-pad-wrap .link{display:block;margin:.25rem 0 .5rem auto}
+.f-send{margin-top:.5rem;min-height:3.75rem;font-size:1.1875rem}
+.f-foot{font-size:.875rem;color:var(--ink-2);text-align:center;margin:.75rem 0 0}
+.field input.is-bad,.f-check input.is-bad{outline:3px solid var(--red);outline-offset:-1px}
+.f-ok{display:grid;place-items:center;width:4rem;height:4rem;margin:0 auto 1rem;border-radius:50%;background:var(--green);color:#fff;font-size:2rem;font-weight:800}
+#f-closed b,#f-done b{font-size:1.375rem}
+
+/* ── Έντυπο υπόδειξης στην εφαρμογή (1.14) ── */
+.sf-box{border:1.5px solid var(--line);border-radius:.875rem;padding:.875rem;margin:0 0 1.25rem}
+.sf-box.ok{border-color:#cfe3d7;background:#f6fbf8}
+.sf-box.wait{border-color:#f1d9b8;background:#fffaf3}
+.sf-state{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .5rem;font-size:1rem}
+.sf-state b{font-size:1.0625rem}
+.sf-facts{margin:.25rem 0 .75rem}
+.sf-link{display:block;width:100%;margin:.25rem 0 .625rem;padding:.625rem .75rem;border:1px solid var(--line);border-radius:.625rem;
+  background:var(--wash);font-size:.875rem;color:var(--ink-2);word-break:break-all}
+.sf-actions{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.sf-actions .btn{min-height:3.25rem;font-size:1rem}
+.sf-actions .wide2{grid-column:1/-1}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
