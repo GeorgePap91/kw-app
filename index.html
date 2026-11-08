@@ -545,6 +545,7 @@
       <button class="mrow" id="btn-showing"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b id="btn-showing-text">Υπόδειξη</b><span>Ημερομηνία, ώρα, διεύθυνση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-noanswer-row"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b id="btn-noanswer">Δεν απάντησε</b><span>Μπαίνει follow-up στο ημερολόγιο.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-lead-task"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg></span><span class="mrow-body"><b>Εργασία</b><span>Υπενθύμιση για αυτή την κλήση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="mrow" id="btn-lead-present" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg></span><span class="mrow-body"><b>Παρουσίαση ακινήτου</b><span>Φωτογραφίες και στοιχεία, με WhatsApp ή email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-lead-referral"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="mrow-body"><b>Σύσταση ή συνεργασία</b><span>Έντυπο προς άλλο γραφείο KW.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
     </div>
     <label class="field gap-field">
@@ -570,6 +571,24 @@
         </div>
       </details>
     </div>
+  </div>
+</div>
+
+<!-- 1.19: ΠΑΡΟΥΣΙΑΣΗ ΣΤΟΝ ΠΕΛΑΤΗ -->
+<div class="pop" id="present" role="dialog" aria-modal="true" aria-labelledby="present-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="present-title">Στείλε στον πελάτη</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div class="pr-card" id="pr-card"></div>
+    <label class="field"><span>Όνομα πελάτη, για τον χαιρετισμό (προαιρετικό)</span><input id="pr-name" autocomplete="off" maxlength="60"></label>
+    <label class="field"><span>Κινητό πελάτη</span><input id="pr-phone" type="tel" inputmode="tel" autocomplete="off" placeholder="69…"></label>
+    <a class="btn solid-red wide" id="pr-wa" target="_blank" rel="noopener"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg><span>Αποστολή με WhatsApp</span></a>
+    <label class="field gap-top"><span>Email πελάτη</span><input id="pr-email" type="email" inputmode="email" autocomplete="off"></label>
+    <button class="btn wide" id="pr-mail"><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg><span>Αποστολή με email</span></button>
+    <div class="actions gap-top">
+      <button class="btn" id="pr-copy">Αντιγραφή κειμένου</button>
+      <a class="btn" id="pr-preview" target="_blank" rel="noopener">Προεπισκόπηση</a>
+    </div>
+    <p class="field-hint pr-hint" id="pr-hint"></p>
   </div>
 </div>
 
@@ -709,6 +728,7 @@
     <p class="d-sub" id="pd-sub"></p>
     <a class="addr-link" id="pd-addr" target="_blank" rel="noopener" hidden></a>
     <div class="pd-chips" id="pd-chips"></div>
+    <button class="btn solid-red wide pd-present" id="pd-present" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span>Στείλε στον πελάτη</span></button>
     <div class="stats" id="pd-stats"></div>
 
     <div class="subtabs in-sheet four" id="tabs-prop" role="tablist" aria-label="Ακίνητο">

@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.18';
+var APP_VERSION = '1.19';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.18';
+var API_VERSION = '1.19';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -152,7 +152,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['smsbox', 'quick'];
+var POPS = ['present', 'smsbox', 'quick'];
 var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -690,6 +690,7 @@ function wire() {
   wirePullToRefresh();
   wireAdmin();
   wireMedia();
+  wirePresent();
   $('btn-lead-referral').onclick = function () { openReferral(S.lead); };
   wireReferral();
 
@@ -1929,7 +1930,8 @@ function openProp(code) {
   }).join('');
 
   S.prop = p;
-  loadMedia('pd', p);                // 1.18: εξώφυλλο και φωτογραφίες
+  loadMedia('pd', p);
+  $('pd-present').hidden = p.available === false;     // 1.19                // 1.18: εξώφυλλο και φωτογραφίες
   // Το ακίνητο άλλου μέλους δεν έχει έγγραφα εδώ: μόνο Στοιχεία και Κλήσεις.
   $('tab-pd-docs').hidden = !p.mine;
   $('tab-pd-bill').hidden = !p.mine;
@@ -2054,6 +2056,7 @@ function needsOutcome(l) {
 
 function fillDetail(l) {
   S.lead = l;
+  $('btn-lead-present').hidden = !S.props.some(function (x) { return x.available !== false && normCode(x.code) === normCode(l.code); });
   $('d-name').textContent = l.name || 'Χωρίς όνομα';
   $('d-prop').textContent = l.property + (l.code ? ' · ' + l.code : '');
   $('d-deal').textContent = [l.deal, fmtPrice(l.price)].filter(Boolean).join(' · ');
@@ -5075,6 +5078,117 @@ function wireMedia() {
     if (e.key === 'ArrowLeft') galGo(S.gal.i - 1);
     if (e.key === 'Escape') closeGallery();
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ΠΑΡΟΥΣΙΑΣΗ ΣΤΟΝ ΠΕΛΑΤΗ (1.19)
+//  Το link φτιάχνεται μόλις ανοίξει το παράθυρο, ώστε το WhatsApp να είναι
+//  κανονικός σύνδεσμος (το iPhone μπλοκάρει ό,τι ανοίγει μετά από αναμονή).
+//  Κινητό και email του πελάτη ΔΕΝ αποθηκεύονται: χρησιμοποιούνται μόνο για την αποστολή.
+// ─────────────────────────────────────────────────────────────
+
+S.pres = null;
+
+function intlPhone(v) {
+  var d = String(v || '').replace(/[^\d+]/g, '');
+  if (d.indexOf('+') === 0) return d.slice(1);
+  if (d.indexOf('00') === 0) return d.slice(2);
+  if (/^(69|2)\d{8}$/.test(d)) return '30' + d;
+  return d;
+}
+
+function presText() {
+  var pr = S.pres, p = pr && pr.p;
+  if (!pr || !pr.link) return '';
+  var me = S.me || {}, name = $('pr-name').value.trim();
+  return (name ? 'Καλησπέρα ' + name + ', σ' : 'Σ') + 'ας στέλνω την παρουσίαση του ακινήτου «' + (p.title || p.street || p.code) + '»' +
+    (p.price ? ' (' + fmtPrice(p.price) + ')' : '') + ' με όλες τις φωτογραφίες:\n' + pr.link.url + '\n\n' +
+    (me.smsName || me.name || '') + (me.phone ? ' · ' + me.phone : '') + '\n' + ((S.boot && S.boot.office && S.boot.office.name) || 'KW Athens Center');
+}
+
+function presRefresh() {
+  var pr = S.pres, ready = !!(pr && pr.link);
+  ['pr-wa', 'pr-copy', 'pr-preview'].forEach(function (id) { $(id).classList.toggle('is-wait', !ready); });
+  if (!ready) return;
+  var phone = intlPhone($('pr-phone').value);
+  $('pr-wa').href = 'https://wa.me/' + (phone.length >= 10 ? phone : '') + '?text=' + encodeURIComponent(presText());
+  $('pr-preview').href = pr.link.url;
+}
+
+/** p: ακίνητο της λίστας. lead (προαιρετικά): στοιχεία από την κλήση, μόνο για να γεμίσουν τα πεδία. */
+function openPresent(p, lead) {
+  if (!p) return;
+  S.pres = { p: p, leadId: lead ? lead.id : '', link: null };
+  var cover = S.covers[p.code] || (S.media[p.code] && S.imgs[S.media[p.code].cover + ':m']) || '';
+  $('pr-card').innerHTML = (cover ? '<img alt="" src="' + cover + '">' : '<span class="pr-noimg">' + ico('home') + '</span>') +
+    '<span class="pr-card-body"><b>' + esc(p.title || p.street || p.code) + '</b><span>' +
+    esc([fmtPrice(p.price), p.sqm ? p.sqm + ' τ.μ.' : '', p.area].filter(Boolean).join(' · ')) + '</span></span>';
+  $('pr-name').value = lead && lead.name ? String(lead.name).split(' ')[0] : '';
+  $('pr-phone').value = lead && lead.phone || '';
+  $('pr-email').value = lead && lead.email || '';
+  $('pr-hint').textContent = 'Ετοιμάζεται το link…';
+  $('pr-hint').className = 'field-hint';
+  presRefresh();
+  openPop('present');
+  api('presCreate', { code: p.code, leadId: S.pres.leadId }).then(function (r) {
+    if (!S.pres || S.pres.p.code !== p.code) return;
+    S.pres.link = r;
+    $('pr-hint').textContent = 'Ισχύει ' + r.days + ' ημέρες. Θα πάρεις ειδοποίηση μόλις το ανοίξει ο πελάτης.';
+    presRefresh();
+  }).catch(function (e) {
+    $('pr-hint').textContent = 'Δεν φτιάχτηκε το link: ' + e.message;
+    $('pr-hint').className = 'field-hint err';
+  });
+}
+
+function presMark(channel) {
+  if (S.pres && S.pres.link) api('presMark', { id: S.pres.link.id, channel: channel }).catch(function () {});
+}
+
+function presEmail() {
+  var pr = S.pres, btn = $('pr-mail');
+  var email = $('pr-email').value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    $('pr-email').classList.add('is-bad');
+    $('pr-email').focus();
+    toast('Γράψε το email του πελάτη.', true);
+    return;
+  }
+  $('pr-email').classList.remove('is-bad');
+  btn.disabled = true;
+  label(btn, 'mail', 'Αποστέλλεται…');
+  api('presCreate', { code: pr.p.code, leadId: pr.leadId, channel: 'email', email: email, name: $('pr-name').value.trim() })
+    .then(function () {
+      toast('Στάλθηκε στο ' + email);
+      closePop('present');
+    }).catch(function (e) { toast(e.message, true); })
+    .then(function () { btn.disabled = false; label(btn, 'mail', 'Αποστολή με email'); });
+}
+
+function wirePresent() {
+  $('pr-phone').oninput = presRefresh;
+  $('pr-name').oninput = presRefresh;
+  $('pr-wa').onclick = function (e) {
+    if (!S.pres || !S.pres.link) { e.preventDefault(); return; }
+    presMark('whatsapp');
+  };
+  $('pr-copy').onclick = function () {
+    if (!S.pres || !S.pres.link) return;
+    var t = presText();
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () {
+      toast('Αντιγράφηκε. Επικόλλησέ το σε Viber, Messenger ή όπου θέλεις.');
+      presMark('copy');
+    }).catch(function () { toast(S.pres.link.url); });
+  };
+  $('pr-preview').onclick = function (e) { if (!S.pres || !S.pres.link) e.preventDefault(); };
+  $('pr-mail').onclick = presEmail;
+  $('pd-present').onclick = function () { openPresent(S.prop); };
+  $('btn-lead-present').onclick = function () {
+    var l = S.lead;
+    var p = l && S.props.filter(function (x) { return normCode(x.code) === normCode(l.code); })[0];
+    if (!p) return toast('Το ακίνητο της κλήσης δεν είναι στη λίστα.', true);
+    openPresent(p, l);
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
