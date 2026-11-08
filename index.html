@@ -49,6 +49,8 @@
   <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
   <symbol id="i-find" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
 </defs></svg>
 
@@ -695,6 +697,14 @@
     <a class="head-link" id="pd-nav" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-nav"/></svg>Οδηγίες</a>
   </div>
   <div class="sheet-body">
+    <!-- 1.18: εξώφυλλο από τον φάκελο MEDIA -->
+    <div class="hero" id="pd-hero" hidden>
+      <button class="hero-img" id="pd-hero-open" aria-label="Δες όλες τις φωτογραφίες"><img id="pd-hero-img" alt=""><span class="hero-count" id="pd-hero-count"></span></button>
+      <button class="hero-add" id="pd-photo-add" hidden><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Φωτογραφίες</button>
+    </div>
+    <button class="photo-empty" id="pd-photo-empty" hidden><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg><b>Πρόσθεσε φωτογραφίες</b><span>Μπαίνουν στον φάκελο MEDIA του ακινήτου. Η πρώτη γίνεται εξώφυλλο.</span></button>
+    <p class="photo-progress" id="pd-photo-progress" hidden></p>
+    <input type="file" id="media-input" accept="image/*" multiple hidden>
     <h2 id="pd-name"></h2>
     <p class="d-sub" id="pd-sub"></p>
     <a class="addr-link" id="pd-addr" target="_blank" rel="noopener" hidden></a>
@@ -933,6 +943,9 @@
     <span class="sheet-title">Ακίνητο</span>
   </div>
   <div class="sheet-body">
+    <div class="hero" id="ap-hero" hidden>
+      <button class="hero-img" id="ap-hero-open" aria-label="Δες όλες τις φωτογραφίες"><img id="ap-hero-img" alt=""><span class="hero-count" id="ap-hero-count"></span></button>
+    </div>
     <h2 id="ap-name"></h2>
     <p class="d-sub" id="ap-sub"></p>
     <div class="pd-chips" id="ap-chips"></div>
@@ -1011,6 +1024,24 @@
         <p class="save-hint" id="rv-hint"></p>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 1.18: carousel φωτογραφιών -->
+<div class="gallery" id="gallery" role="dialog" aria-modal="true" aria-label="Φωτογραφίες ακινήτου" hidden>
+  <div class="gal-top">
+    <button class="gal-btn" id="gal-close"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg><span>Κλείσιμο</span></button>
+    <span class="gal-count" id="gal-count" aria-live="polite"></span>
+  </div>
+  <div class="gal-stage">
+    <div class="gal-track" id="gal-track"></div>
+    <button class="gal-nav prev" id="gal-prev" aria-label="Προηγούμενη φωτογραφία"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button>
+    <button class="gal-nav next" id="gal-next" aria-label="Επόμενη φωτογραφία"><svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></button>
+  </div>
+  <div class="gal-thumbs" id="gal-thumbs"></div>
+  <div class="gal-actions" id="gal-actions" hidden>
+    <button class="gal-act" id="gal-cover"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><span>Κάνε εξώφυλλο</span></button>
+    <button class="gal-act" id="gal-del"><svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg><span>Διαγραφή</span></button>
   </div>
 </div>
 

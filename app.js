@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.17';
+var APP_VERSION = '1.18';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.17';
+var API_VERSION = '1.18';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -184,6 +184,7 @@ function openSheets() {
 /** Κλείνει ό,τι είναι πιο πάνω (Esc ή «πίσω» του κινητού). */
 function closeTop() {
   if (!$('ask').hidden) { if (askCancel) askCancel(); return true; }
+  if (!$('gallery').hidden) { closeGallery(); return true; }
   var pop = POPS.filter(function (id) { return !$(id).hidden; })[0];
   if (pop) { closePop(pop); return true; }
   var top = openSheets()[0];
@@ -537,6 +538,7 @@ function setupPush() {
     if (m.type === 'open' && m.docs) showMissingDocs();
     else if (m.type === 'open' && m.id) openLead(m.id, { remind: m.remind });
     if (m.type === 'push' && m.data && m.data.type === 'lead') refreshLeads();
+    if (m.type === 'push' && m.data && m.data.type === 'adminreview' && isAdminMode()) pollAdmin();
     if (m.type === 'push' && m.data && m.data.type === 'review') {
       api('bootstrap').then(function (b) { S.boot.reviews = b.reviews || []; if (S.view === 'today') renderToday(); }).catch(function () {});
     }
@@ -687,6 +689,7 @@ function wire() {
   $('d-map').onclick = function (e) { if (!this.getAttribute('href')) e.preventDefault(); };
   wirePullToRefresh();
   wireAdmin();
+  wireMedia();
   $('btn-lead-referral').onclick = function () { openReferral(S.lead); };
   wireReferral();
 
@@ -1529,7 +1532,7 @@ function myLeadsFor(code) {
 function propRow(p, lacking) {
   var open = myLeadsFor(p.code).filter(isOpen).length;
   var sub = [p.type, fmtPrice(p.price), p.code ? 'Κωδικός ' + p.code : ''].filter(Boolean).join(', ');
-  return '<button class="row' + (open ? ' is-pending' : '') + '" data-code="' + esc(p.code) + '">' +
+  return '<button class="row with-thumb' + (open ? ' is-pending' : '') + '" data-code="' + esc(p.code) + '">' + thumbHtml(p.code) +
     '<span class="row-body"><span class="row-name">' + esc(p.street || p.title || p.code) + '</span>' +
     (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
     '<span class="row-meta">' +
@@ -1545,6 +1548,7 @@ function wirePropRows(el) {
   el.querySelectorAll('[data-code]').forEach(function (r) {
     r.onclick = function () { openProp(r.dataset.code); };
   });
+  wireThumbs(el);     // 1.18: μικρή φωτογραφία
 }
 
 // ── Φίλτρα ακινήτων: Κατάσταση, Εντολή, Ισχύς εντολής ─────
@@ -1925,6 +1929,7 @@ function openProp(code) {
   }).join('');
 
   S.prop = p;
+  loadMedia('pd', p);                // 1.18: εξώφυλλο και φωτογραφίες
   // Το ακίνητο άλλου μέλους δεν έχει έγγραφα εδώ: μόνο Στοιχεία και Κλήσεις.
   $('tab-pd-docs').hidden = !p.mine;
   $('tab-pd-bill').hidden = !p.mine;
@@ -2001,6 +2006,11 @@ function routeTo(where) {
   }
   if (where.indexOf('outcome:') === 0) openLead(where.slice(8), { outcome: true });
   if (where.indexOf('review:') === 0) routeReview(where.slice(7));
+  if (where === 'adminreview' && roles().admin) {           // 1.18: «νέα έντυπα για έλεγχο»
+    S.rvTab = 'pending';
+    if (isAdminMode()) { goto('a-review'); loadAdmin(true).catch(function () {}); }
+    else setMode('admin', true);
+  }
 }
 
 function showLead(l, opts) {
@@ -4445,7 +4455,7 @@ function fillApFilters() {
 
 function apRow(p) {
   var sub = [p.type, fmtPrice(p.price), p.code ? 'Κωδικός ' + p.code : ''].filter(Boolean).join(', ');
-  return '<button class="row' + (p.pending ? ' is-noanswer' : '') + '" data-acode="' + esc(p.code) + '">' +
+  return '<button class="row with-thumb' + (p.pending ? ' is-noanswer' : '') + '" data-acode="' + esc(p.code) + '">' + thumbHtml(p.code) +
     '<span class="row-body"><span class="row-name">' + esc(p.street || p.title || p.code) + '</span>' +
     (sub ? '<span class="row-prop">' + esc(sub) + '</span>' : '') +
     '<span class="row-meta">' +
@@ -4470,6 +4480,7 @@ function renderAProps() {
   el.innerHTML = listMeta(list.length, key, 'ακίνητο', 'ακίνητα') + pageOf(list, key).map(apRow).join('') + pagerHtml(list.length, key);
   el.querySelectorAll('[data-acode]').forEach(function (r) { r.onclick = function () { openAProp(r.dataset.acode); }; });
   wirePager(el, key, renderAProps);
+  wireThumbs(el);
 }
 
 function openAProp(code) {
@@ -4504,6 +4515,7 @@ function openAProp(code) {
   setTab('tabs-aprop', 'files');
   showPane('aprop-panes', 'files');
   loadAFiles(p);
+  loadMedia('ap', p);
   $('aprop').querySelector('.sheet-body').scrollTop = 0;
   openSheet('aprop');
 }
@@ -4706,6 +4718,363 @@ function routeReview(id) {
     if (S.view === 'today') renderToday();
     openFix(id);
   }).catch(function (e) { toast(e.message, true); });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ΦΩΤΟΓΡΑΦΙΕΣ ΑΚΙΝΗΤΟΥ (1.18)
+//  Φάκελος MEDIA στο Drive. Εξώφυλλο πάνω στο ακίνητο, μικρή εικόνα στη λίστα,
+//  carousel με όλες. Οι εικόνες έρχονται μέσα από την εφαρμογή (data: URI),
+//  σε μέγεθος s (λίστα), m (εξώφυλλο), l (carousel), και κρατιούνται στη μνήμη.
+// ─────────────────────────────────────────────────────────────
+
+S.media = {};        // κωδικός → { photos, cover, canEdit, … }
+S.imgs = {};         // 'id:s|m|l' → data URI
+S.covers = {};       // κωδικός → data URI ή '' (χωρίς φωτογραφία)
+S.coverReq = {};
+S.gal = null;
+
+function cssq(v) { return window.CSS && CSS.escape ? CSS.escape(v) : String(v).replace(/["\\]/g, '\\$&'); }
+
+// ── Μικρή εικόνα στη λίστα ακινήτων ────────────────────────
+
+function thumbHtml(code) {
+  return '<span class="row-thumb" data-thumb="' + esc(code) + '" aria-hidden="true">' + ico('home') + '</span>';
+}
+
+function paintThumb(el, src) {
+  if (!src) { el.classList.remove('has-img'); return; }
+  if (el.classList.contains('has-img')) return;
+  el.classList.add('has-img');
+  el.innerHTML = '<img alt="" src="' + src + '">';
+}
+
+function wireThumbs(root) {
+  var need = [];
+  root.querySelectorAll('[data-thumb]').forEach(function (t) {
+    var c = t.dataset.thumb;
+    if (S.covers[c] !== undefined) paintThumb(t, S.covers[c]);
+    else if (need.indexOf(c) === -1) need.push(c);
+  });
+  fetchCovers(need);
+}
+
+/** Σε ομάδες των 8, μία-μία, για να μη βαραίνει ο server. Ό,τι δεν πρόλαβε ξαναζητιέται. */
+function fetchCovers(codes) {
+  codes = codes.filter(function (c) { return !S.coverReq[c]; });
+  if (!codes.length) return;
+  codes.forEach(function (c) { S.coverReq[c] = true; });
+  var chunks = [];
+  for (var i = 0; i < codes.length; i += 8) chunks.push(codes.slice(i, i + 8));
+  chunks.reduce(function (pr, chunk) {
+    return pr.then(function () {
+      return api('covers', { codes: chunk }).then(function (r) {
+        Object.keys(r.covers || {}).forEach(function (c) {
+          S.covers[c] = r.covers[c] || '';
+          $$('[data-thumb="' + cssq(c) + '"]').forEach(function (t) { paintThumb(t, S.covers[c]); });
+        });
+        (r.pending || []).forEach(function (c) { S.coverReq[c] = false; });
+        chunk.forEach(function (c) { if (S.covers[c] === undefined) S.covers[c] = ''; });
+      }).catch(function () { chunk.forEach(function (c) { S.coverReq[c] = false; }); });
+    });
+  }, Promise.resolve());
+}
+
+function forgetCover(code) {
+  delete S.covers[code];
+  S.coverReq[code] = false;
+}
+
+// ── Εξώφυλλο μέσα στο ακίνητο ──────────────────────────────
+
+/** prefix: 'pd' (μεσίτης) ή 'ap' (Admin). */
+function resetHero(prefix, code) {
+  var hero = $(prefix + '-hero');
+  var low = S.covers[code];
+  hero.hidden = !low;
+  $(prefix + '-hero-img').src = low || '';
+  $(prefix + '-hero-count').textContent = '';
+  if (prefix === 'pd') { $('pd-photo-empty').hidden = true; $('pd-photo-add').hidden = true; $('pd-photo-progress').hidden = true; }
+}
+
+function loadMedia(prefix, p) {
+  var code = p.code;
+  resetHero(prefix, code);
+  if (S.media[code]) renderHero(prefix, code);
+  api('media', { code: code }).then(function (r) {
+    if (!r || !r.photos) return;     // παλιός server
+    S.media[code] = r;
+    if (r.cover && r.coverData) S.imgs[r.cover + ':m'] = r.coverData;
+    if (heroCode(prefix) === code) renderHero(prefix, code);
+  }).catch(function () { /* χωρίς φωτογραφίες, η οθόνη μένει όπως ήταν */ });
+}
+
+function heroCode(prefix) {
+  var p = prefix === 'pd' ? S.prop : S.aprop;
+  return p ? p.code : null;
+}
+
+function renderHero(prefix, code) {
+  var r = S.media[code];
+  if (!r || !r.photos) return;
+  var n = r.photos.length;
+  var hero = $(prefix + '-hero');
+  hero.hidden = !n;
+  if (prefix === 'pd') {
+    $('pd-photo-empty').hidden = !!n || !r.canEdit || !!S.mediaBusy;
+    $('pd-photo-add').hidden = !n || !r.canEdit;
+  }
+  if (!n) return;
+  $(prefix + '-hero-count').innerHTML = ico('camera') + '<span>' + plural(n, 'φωτογραφία', 'φωτογραφίες') + '</span>';
+  var src = S.imgs[r.cover + ':m'] || S.covers[code] || '';
+  $(prefix + '-hero-img').src = src;
+  if (!S.imgs[r.cover + ':m']) {
+    api('mediaImg', { code: code, id: r.cover, size: 'm' }).then(function (x) {
+      S.imgs[r.cover + ':m'] = x.src;
+      if (heroCode(prefix) === code && S.media[code].cover === r.cover) $(prefix + '-hero-img').src = x.src;
+    }).catch(function () {});
+  }
+}
+
+// ── Ανέβασμα από το κινητό ─────────────────────────────────
+
+function pickPhotos() {
+  $('media-input').value = '';
+  $('media-input').click();
+}
+
+/** Σμίκρυνση στο κινητό (έως 2000px), μετά ανέβασμα μία-μία. Η πρόοδος φαίνεται πάνω στην οθόνη. */
+function onMediaFiles(e) {
+  var files = Array.prototype.slice.call(e.target.files || []);
+  var p = S.prop;
+  if (!files.length || !p) return;
+  var code = p.code, total = files.length, done = 0, failed = [];
+  var prog = $('pd-photo-progress');
+  S.mediaBusy = true;
+  $('pd-photo-empty').hidden = true;
+  var show = function () {
+    prog.hidden = false;
+    prog.innerHTML = '<span class="spin-dot" aria-hidden="true"></span>Ανεβαίνει ' + (done + failed.length + 1) + ' από ' + total + '…';
+  };
+  files.reduce(function (pr, file) {
+    return pr.then(function () {
+      show();
+      return shrinkPhoto(file).then(function (f) {
+        if (f.size > (S.media[code] && S.media[code].max || 15) * 1048576) throw new Error('πολύ μεγάλη');
+        return toBase64(f.blob).then(function (data) {
+          return api('mediaUpload', { code: code, name: f.name, mime: f.type, data: data });
+        });
+      }).then(function (r) {
+        done++;
+        S.media[code] = r;
+        if (r.cover && r.coverData) S.imgs[r.cover + ':m'] = r.coverData;
+        if (heroCode('pd') === code) renderHero('pd', code);
+      }).catch(function () { failed.push(file.name); });
+    });
+  }, Promise.resolve()).then(function () {
+    S.mediaBusy = false;
+    prog.hidden = true;
+    forgetCover(code);
+    if (heroCode('pd') === code) renderHero('pd', code);
+    if (S.view === 'props') renderProps();
+    toast(done ? 'Ανέβηκ' + (done === 1 ? 'ε 1 φωτογραφία' : 'αν ' + done + ' φωτογραφίες') + (failed.length ? '. Δεν ανέβηκαν ' + failed.length + '.' : '')
+               : 'Δεν ανέβηκε καμία φωτογραφία.', !done);
+  });
+}
+
+/** Όπως το shrink των εγγράφων, αλλά πάντα σε JPEG έως 2000px (και τις μικρές). */
+function shrinkPhoto(file) {
+  var keep = { blob: file, name: file.name, type: file.type || 'image/jpeg', size: file.size };
+  return new Promise(function (resolve) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var max = 2000, w = img.naturalWidth, h = img.naturalHeight;
+      var k = Math.min(1, max / Math.max(w, h));
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * k);
+      c.height = Math.round(h * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function (b) {
+        if (!b || (b.size >= file.size && /jpe?g$/i.test(file.type))) return resolve(keep);
+        resolve({ blob: b, name: file.name.replace(/\.[^.]+$/, '') + '.jpg', type: 'image/jpeg', size: b.size });
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); resolve(keep); };   // π.χ. HEIC σε Android: πάει όπως είναι
+    img.src = url;
+  });
+}
+
+// ── Carousel ───────────────────────────────────────────────
+
+function openGallery(code) {
+  var r = S.media[code];
+  if (!r || !r.photos.length) return;
+  var start = Math.max(0, r.photos.map(function (x) { return x.id; }).indexOf(r.cover));
+  S.gal = { code: code, i: -1 };
+  buildGallery(start);
+  $('gallery').hidden = false;
+  document.body.classList.add('gal-open');
+  $('gal-close').focus();
+}
+
+function buildGallery(start) {
+  var r = S.media[S.gal.code];
+  $('gal-track').innerHTML = r.photos.map(function (ph, i) {
+    var src = S.imgs[ph.id + ':l'] || S.imgs[ph.id + ':m'] || S.imgs[ph.id + ':s'] || '';
+    return '<div class="gal-slide" data-i="' + i + '"><img alt="Φωτογραφία ' + (i + 1) + ' από ' + r.photos.length + '"' +
+      (src ? ' src="' + src + '"' : '') + '><span class="gal-load" aria-hidden="true"></span></div>';
+  }).join('');
+  $('gal-thumbs').innerHTML = r.photos.map(function (ph, i) {
+    var src = S.imgs[ph.id + ':s'] || '';
+    return '<button class="gal-thumb" data-i="' + i + '" aria-label="Φωτογραφία ' + (i + 1) + '">' +
+      (src ? '<img alt="" src="' + src + '">' : '') + (ph.id === r.cover ? '<i class="gal-star" aria-hidden="true">★</i>' : '') + '</button>';
+  }).join('');
+  $('gal-thumbs').querySelectorAll('[data-i]').forEach(function (b) {
+    b.onclick = function () { galGo(+b.dataset.i, true); };
+  });
+  $('gal-actions').hidden = !r.canEdit || isAdminMode();     // στο Admin μόνο προβολή
+  $('gal-prev').hidden = $('gal-next').hidden = r.photos.length < 2;
+  S.gal.i = -1;
+  requestAnimationFrame(function () {
+    var t = $('gal-track');
+    t.scrollLeft = start * t.clientWidth;
+    galSet(start);
+  });
+  galThumbs();
+}
+
+function galSet(i) {
+  var r = S.media[S.gal.code];
+  if (!r) return;
+  i = Math.max(0, Math.min(r.photos.length - 1, i));
+  if (S.gal.i === i) return;
+  S.gal.i = i;
+  $('gal-count').textContent = (i + 1) + ' / ' + r.photos.length;
+  $('gal-prev').disabled = i === 0;
+  $('gal-next').disabled = i === r.photos.length - 1;
+  $$('#gal-thumbs .gal-thumb').forEach(function (b, k) {
+    b.classList.toggle('is-on', k === i);
+    if (k === i && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'center' });
+  });
+  var isCover = r.photos[i].id === r.cover;
+  $('gal-cover').disabled = isCover;
+  label($('gal-cover'), 'star', isCover ? 'Εξώφυλλο' : 'Κάνε εξώφυλλο');
+  [i, i + 1, i - 1].forEach(galLoad);
+}
+
+function galLoad(i) {
+  var r = S.media[S.gal.code];
+  var ph = r && r.photos[i];
+  if (!ph) return;
+  var key = ph.id + ':l';
+  var slide = $('gal-track').querySelector('[data-i="' + i + '"]');
+  if (S.imgs[key]) { slide.querySelector('img').src = S.imgs[key]; slide.classList.add('is-ready'); return; }
+  if (S.gal['l' + i]) return;
+  S.gal['l' + i] = true;
+  var code = S.gal.code;
+  api('mediaImg', { code: code, id: ph.id, size: 'l' }).then(function (x) {
+    S.imgs[key] = x.src;
+    if (!S.gal || S.gal.code !== code) return;
+    var s = $('gal-track').querySelector('[data-i="' + i + '"]');
+    if (s) { s.querySelector('img').src = x.src; s.classList.add('is-ready'); }
+  }).catch(function () {
+    if (S.gal) S.gal['l' + i] = false;
+    if (slide) slide.classList.add('is-error');
+  });
+}
+
+/** Οι μικρές εικόνες της λωρίδας, όλες μαζί σε ένα αίτημα. */
+function galThumbs() {
+  var code = S.gal.code, r = S.media[code];
+  var ids = r.photos.map(function (x) { return x.id; }).filter(function (id) { return !S.imgs[id + ':s']; });
+  if (!ids.length) return;
+  api('mediaImg', { code: code, ids: ids, size: 's' }).then(function (x) {
+    (x.items || []).forEach(function (it) {
+      if (!it.src) return;
+      S.imgs[it.id + ':s'] = it.src;
+      if (!S.gal || S.gal.code !== code) return;
+      var k = r.photos.map(function (p) { return p.id; }).indexOf(it.id);
+      var b = $('gal-thumbs').querySelector('[data-i="' + k + '"]');
+      if (b && !b.querySelector('img')) b.insertAdjacentHTML('afterbegin', '<img alt="" src="' + it.src + '">');
+      var sl = $('gal-track').querySelector('[data-i="' + k + '"] img');
+      if (sl && !sl.getAttribute('src')) sl.src = it.src;
+    });
+    if (x.pending && x.pending.length && S.gal && S.gal.code === code) galThumbs();
+  }).catch(function () {});
+}
+
+function galGo(i, jump) {
+  var t = $('gal-track');
+  t.scrollTo({ left: i * t.clientWidth, behavior: jump && reduceMotion() ? 'auto' : 'smooth' });
+  galSet(i);
+}
+
+function reduceMotion() { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+function closeGallery() {
+  $('gallery').hidden = true;
+  document.body.classList.remove('gal-open');
+  $('gal-track').innerHTML = '';
+  S.gal = null;
+}
+
+function galCover() {
+  var g = S.gal, r = g && S.media[g.code];
+  if (!r) return;
+  var at = g.i, id = r.photos[at].id;
+  $('gal-cover').disabled = true;
+  api('mediaCover', { code: g.code, id: id }).then(function (x) {
+    S.media[g.code] = x;
+    if (x.cover && x.coverData) S.imgs[x.cover + ':m'] = x.coverData;
+    forgetCover(g.code);
+    if (heroCode('pd') === g.code) renderHero('pd', g.code);
+    if (S.gal) buildGallery(S.gal.i >= 0 ? S.gal.i : at);   // όπου βρίσκεται τώρα ο μεσίτης
+    toast('Έγινε εξώφυλλο ✓');
+  }).catch(function (e) { toast(e.message, true); $('gal-cover').disabled = false; });
+}
+
+function galDelete() {
+  var g = S.gal, r = g && S.media[g.code];
+  if (!r) return;
+  var at = g.i, ph = r.photos[at];
+  ask('Να διαγραφεί η φωτογραφία;', 'Θα σβηστεί από τον φάκελο MEDIA του ακινήτου. Αν ήταν λάθος, ανακτάται από τον κάδο του Drive για 30 ημέρες.',
+      'Ναι, διαγραφή').then(function (yes) {
+    if (!yes) return;
+    api('mediaDelete', { code: g.code, id: ph.id }).then(function (x) {
+      S.media[g.code] = x;
+      if (x.cover && x.coverData) S.imgs[x.cover + ':m'] = x.coverData;
+      forgetCover(g.code);
+      if (heroCode('pd') === g.code) renderHero('pd', g.code);
+      if (!x.photos.length) closeGallery();
+      else if (S.gal) buildGallery(Math.min(at, x.photos.length - 1));
+      toast('Διαγράφηκε');
+    }).catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function wireMedia() {
+  $('media-input').onchange = onMediaFiles;
+  $('pd-photo-empty').onclick = pickPhotos;
+  $('pd-photo-add').onclick = pickPhotos;
+  $('pd-hero-open').onclick = function () { if (S.prop) openGallery(S.prop.code); };
+  $('ap-hero-open').onclick = function () { if (S.aprop) openGallery(S.aprop.code); };
+  $('gal-close').onclick = closeGallery;
+  $('gal-prev').onclick = function () { galGo(S.gal.i - 1); };
+  $('gal-next').onclick = function () { galGo(S.gal.i + 1); };
+  $('gal-cover').onclick = galCover;
+  $('gal-del').onclick = galDelete;
+  var t = $('gal-track'), timer = null;
+  t.addEventListener('scroll', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (S.gal) galSet(Math.round(t.scrollLeft / Math.max(1, t.clientWidth))); }, 60);
+  }, { passive: true });
+  document.addEventListener('keydown', function (e) {
+    if (!S.gal) return;
+    if (e.key === 'ArrowRight') galGo(S.gal.i + 1);
+    if (e.key === 'ArrowLeft') galGo(S.gal.i - 1);
+    if (e.key === 'Escape') closeGallery();
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
