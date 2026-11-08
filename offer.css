@@ -1,0 +1,93 @@
+/* 1.20 · Έντυπο προσφοράς για τον πελάτη. Χρώματα Keller Williams, μεγάλα γράμματα και κουμπιά. */
+:root{
+  --red:#b40101; --red-dark:#8f0101; --ink:#111; --ink-2:#4a4a4a; --ink-3:#6b6b6b;
+  --line:#dcdcdc; --wash:#f4f4f2; --paper:#fff; --ok:#1e7a46; --warn:#a15c00;
+  --radius:14px; --wrap:680px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--wash);color:var(--ink);font:17px/1.5 var(--font);padding-bottom:env(safe-area-inset-bottom)}
+[hidden]{display:none!important}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:1rem}
+
+/* Πάνω μπάρα */
+.top{background:var(--paper);border-bottom:4px solid var(--red);position:sticky;top:0;z-index:20}
+.top-in{max-width:var(--wrap);margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.625rem 1rem;padding-top:calc(.625rem + env(safe-area-inset-top));min-height:3.75rem}
+.logo{height:2.5rem;width:auto;display:block}
+.wordmark{font-size:1.125rem;letter-spacing:.02em}
+.wordmark b{background:var(--red);color:#fff;padding:.125rem .5rem;margin-right:.375rem;letter-spacing:.06em}
+.top-code{font-size:.9375rem;color:var(--ink-3);font-weight:600;white-space:nowrap}
+
+/* Καταστάσεις */
+.state{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.75rem;min-height:60vh;padding:2rem 1rem}
+.state h1{margin:0;font-size:1.5rem}
+.state p{margin:0;color:var(--ink-2);max-width:28rem}
+.spinner{width:2.5rem;height:2.5rem;border-radius:50%;border:4px solid var(--line);border-top-color:var(--red);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.done-ico{width:4rem;height:4rem;border-radius:50%;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800}
+
+/* Φόρμα */
+.title{margin:.5rem 0 .25rem;font-size:1.625rem;line-height:1.25}
+.lead-in{margin:0 0 1rem;color:var(--ink-2)}
+.i-demo{display:inline-flex;align-items:center;justify-content:center;width:1.375rem;height:1.375rem;border-radius:50%;
+  border:2px solid var(--ink);font:700 .875rem/1 Georgia,serif;font-style:italic;vertical-align:-.125rem}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:1.125rem 1rem 1rem;margin:0 0 1rem}
+.card h2{margin:0 0 .875rem;font-size:1.25rem;padding-bottom:.5rem;border-bottom:3px solid var(--red);display:inline-block}
+.card h3{margin:1.25rem 0 .5rem;font-size:1.125rem}
+.prop{border-left:6px solid var(--red)}
+.facts{margin:0}
+.facts div{display:flex;justify-content:space-between;gap:1rem;padding:.625rem 0;border-bottom:1px solid var(--line)}
+.facts div:last-child{border-bottom:0}
+.facts dt{color:var(--ink-2);flex:0 0 auto}
+.facts dd{margin:0;font-weight:700;text-align:right;overflow-wrap:anywhere}
+.muted{color:var(--ink-3)}
+.small{font-size:.9375rem}
+.center{text-align:center}
+
+.field{margin:0 0 1.125rem}
+.lab{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.375rem}
+.lab label,.lab-t{font-weight:700;font-size:1.0625rem}
+.i{flex:0 0 auto;width:2.75rem;height:2.75rem;border-radius:50%;border:2px solid var(--ink);background:var(--paper);color:var(--ink);
+  font:700 1.125rem/1 Georgia,serif;font-style:italic;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.i[aria-expanded="true"]{background:var(--ink);color:#fff}
+.info{margin:0 0 .5rem;padding:.625rem .75rem;background:#fff7e6;border-left:4px solid #e0a43a;border-radius:.5rem;font-size:1rem;color:var(--ink)}
+input:not([type="checkbox"]){width:100%;min-height:3.25rem;padding:.625rem .75rem;border:1.5px solid #b9b9b9;border-radius:.75rem;font:inherit;font-size:1.125rem;background:var(--paper);color:var(--ink)}
+input:focus{outline:3px solid rgba(180,1,1,.25);border-color:var(--red)}
+.field.bad input:not([type="checkbox"]){border-color:var(--red);background:#fff6f6}
+.money{position:relative}
+.money input{padding-right:2.5rem;font-weight:700;letter-spacing:.01em}
+.money span{position:absolute;right:.875rem;top:50%;transform:translateY(-50%);color:var(--ink-3);font-weight:700}
+.err{margin:.375rem 0 0;color:var(--red);font-weight:600;font-size:1rem}
+.err:empty{display:none}
+.chip{min-height:2.75rem;padding:.375rem 1rem;border:1.5px solid var(--ink);border-radius:1.5rem;background:var(--paper);font:inherit;font-weight:700;margin:0 0 .875rem;cursor:pointer}
+.sum{margin:.25rem 0 0;font-weight:700}
+.sum.ok{color:var(--ok)}
+.sum.warn{color:var(--warn)}
+.check{display:flex;align-items:flex-start;gap:.75rem;margin-top:.625rem;cursor:pointer;font-weight:600}
+.check input{flex:0 0 auto;width:1.5rem;height:1.5rem;margin:.125rem 0 0;accent-color:var(--red)}
+.consent{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:.75rem 1rem}
+.consent .check{margin:0;font-weight:500}
+
+/* Υπογραφή */
+.pad-wrap{position:relative;height:11rem;border:2px dashed #9a9a9a;border-radius:.875rem;background:var(--paper);touch-action:none}
+.pad-wrap canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:.875rem;cursor:crosshair}
+.pad-ph{position:absolute;left:1rem;bottom:.75rem;color:#9a9a9a;pointer-events:none;font-size:1rem}
+.pad-wrap::after{content:'';position:absolute;left:1rem;right:1rem;bottom:2.5rem;border-bottom:1px solid #d0d0d0;pointer-events:none}
+.field.bad .pad-wrap{border-color:var(--red)}
+.btn{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;min-height:3.5rem;border-radius:var(--radius);
+  font:inherit;font-weight:800;font-size:1.125rem;cursor:pointer;border:2px solid var(--ink);background:var(--paper);color:var(--ink)}
+.btn.ghost{width:auto;min-height:2.75rem;margin-top:.5rem;padding:0 1rem;font-size:1rem;font-weight:700}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff;margin:.5rem 0}
+.btn.red:active{background:var(--red-dark)}
+.btn:disabled{opacity:.6;cursor:default}
+.date{margin:.25rem 0 0;color:var(--ink-2)}
+.disclaimer{font-size:.9375rem;color:var(--ink-2);margin:1rem 0}
+.form-err{margin:0 0 .5rem;padding:.75rem;border-radius:.75rem;background:#fff0f0;color:var(--red);font-weight:700}
+
+@media (min-width:700px){
+  .wrap{padding:1.5rem 0}
+  .card{padding:1.5rem}
+}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important} }

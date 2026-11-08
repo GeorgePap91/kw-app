@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '1.19';
+var APP_VERSION = '1.20';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.19';
+var API_VERSION = '1.20';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -152,7 +152,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer'];
 var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -510,12 +510,13 @@ function onBoot(b) {
 
   setInterval(poll, 180000);
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) poll();          // γύρισες από την κλήση → φρέσκια λίστα
+    if (!document.hidden) { poll(); checkPendingCall(); }   // γύρισες από την κλήση → φρέσκια λίστα, σημείωση
   });
 
   setupPush();
   if (LEAD_PARAM) openLead(LEAD_PARAM, { remind: REMIND_PARAM });
   else if (DOCS_PARAM) showMissingDocs();
+  setTimeout(checkPendingCall, 800);       // 1.20: αν η εφαρμογή ξαναφόρτωσε μετά από κλήση
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -723,6 +724,8 @@ function wire() {
     $('showing').querySelector('.sheet-body').scrollTop = 0;
   };
   $('btn-save-showing').onclick = onSaveShowing;
+  $('btn-offer').onclick = function () { if (S.lead) openOffer(S.lead); };   // 1.20
+  wireCallNote();
   $('btn-save-outcome').onclick = onSaveOutcome;
   wireTabs('tabs-contact', 'contact-panes', function (v) {
     showPane('contact-panes', v);
@@ -2029,6 +2032,7 @@ function showLead(l, opts) {
   openSheet('detail');
   $('detail').querySelector('.sheet-body').scrollTop = 0;
   if (opts.outcome) openShowingForm();
+  else if (opts.offer && l.code) openOffer(l);
   else if (opts.form && hasShowing(l)) $('btn-showform').onclick();
   else if (S.smsKind === 'reminder') openSmsBox('reminder');
 
@@ -2104,6 +2108,10 @@ function fillDetail(l) {
   // 1.14.1: το έντυπο υπόδειξης έχει δικό του κουμπί, μόλις υπάρχει υπόδειξη.
   $('btn-showform').hidden = !hasShowing(l);
   $('d-form-sub').textContent = l.form ? 'Κατάσταση: ' + l.form + '.' : 'Link για τον πελάτη, υπογραφή, PDF.';
+  // 1.20: έντυπο προσφοράς, για κάθε κλήση με κωδικό ακινήτου.
+  $('btn-offer').hidden = !l.code;
+  $('d-offer-sub').textContent = l.offer === 'Υπογράφηκε' ? 'Υπογράφηκε · άνοιξε το PDF.' :
+    l.offer === 'Στάλθηκε' ? 'Περιμένει τον πελάτη.' : 'Ο πελάτης γράφει τιμή, τρόπο πληρωμής και υπογράφει.';
 
   renderNext(l);
   renderHist(l);
@@ -2137,7 +2145,10 @@ function renderNext(l) {
   } else if (hasShowing(l) && l.outcome) {
     title = 'Αποτέλεσμα: ' + l.outcome;
     text = (l.outcomeNote ? l.outcomeNote + ' ' : '') + 'Η υπόδειξη έγινε ' + lowerDay(niceDate(l.showingAt)) + formLine + '.';
-    btns = b('form', 'Έντυπο υπόδειξης', 'form', true) + b('showing', 'Υπόδειξη', 'calendar');
+    // 1.20: ενδιαφέρθηκε → η προσφορά είναι το επόμενο βήμα.
+    var keen = l.code && (S.boot.outcomes || [])[0] === l.outcome;
+    btns = keen ? b('offer', l.offer === 'Υπογράφηκε' ? 'Η προσφορά' : 'Έντυπο προσφοράς', 'receipt', true) + b('form', 'Έντυπο υπόδειξης', 'form')
+                : b('form', 'Έντυπο υπόδειξης', 'form', true) + b('showing', 'Υπόδειξη', 'calendar');
   } else if (l.status === ST.PENDING) {
     title = 'Κάλεσε τον πελάτη';
     text = 'Νέα κλήση, ήρθε ' + lowerDay(niceDate(l.date)) + (l.source ? ' από ' + l.source : '') + '.';
@@ -2165,6 +2176,7 @@ function renderNext(l) {
       : act === 'noanswer' ? onNoAnswer
       : act === 'showing' ? openShowingForm
       : act === 'form' ? function () { $('btn-showform').onclick(); }
+      : act === 'offer' ? function () { openOffer(S.lead); }
       : act === 'remind' ? function () { openSmsBox('reminder'); }
       : act === 'task' ? onLeadTask : null;
   });
@@ -2176,14 +2188,14 @@ function renderNext(l) {
 
 function renderHist(l) {
   var ev = [];
-  var add = function (stamp, title, sub, tone) {
+  var add = function (stamp, title, sub, tone, call) {
     var d = typeof stamp === 'number' ? new Date(stamp) : parseStamp(stamp);
-    if (d) ev.push({ d: d, title: title, sub: sub || '', tone: tone || '' });
+    if (d) ev.push({ d: d, title: title, sub: sub || '', tone: tone || '', call: call || null });
   };
   add(l.ts || l.date, 'Ήρθε η κλήση', [l.source, l.repeat && /επαν/i.test(l.repeat) ? 'επανάληψη' : ''].filter(Boolean).join(' · '));
   add(l.opened, 'Την άνοιξες');
   add(l.sms, 'SMS πρώτης επαφής');
-  add(l.called, 'Κάλεσες τον πελάτη', l.status === ST.NO_ANSWER ? 'Δεν απάντησε' : '');
+  addCalls(l, add, 'Κάλεσες τον πελάτη');
   if (l.status === ST.NO_ANSWER) add(l.followUp, 'Follow-up', 'Μπήκε στο ημερολόγιο');
   if (hasShowing(l)) add(l.showingTs, 'Υπόδειξη', l.address || '', 'show');
   add(l.smsRemind, 'SMS υπενθύμισης');
@@ -2191,11 +2203,38 @@ function renderHist(l) {
   ev.sort(function (a, b) { return a.d - b.d; });
 
   var now = Date.now();
-  $('d-hist').innerHTML = ev.map(function (e) {
+  $('d-hist').innerHTML = histHtml(ev, true);
+  $('d-hist').querySelectorAll('[data-cn]').forEach(function (x) {
+    x.onclick = function () {
+      var c = (l.calls || []).filter(function (k) { return k.id === x.dataset.cn; })[0];
+      if (c) openCallNote({ lead: l.id, cid: c.id, at: c.ts, name: l.name }, c);
+    };
+  });
+}
+
+/**
+ * 1.20 · Κάθε κλήση με τη σημείωσή της. Χωρίς ιστορικό κλήσεων (παλιές κλήσεις, πριν την 1.20):
+ * η τελευταία κλήση, όπως πριν.
+ */
+function addCalls(l, add, word) {
+  var calls = l.calls || [];
+  if (!calls.length) { add(l.called, word, l.status === ST.NO_ANSWER ? 'Δεν απάντησε' : ''); return; }
+  calls.forEach(function (c) {
+    add(c.ts, c.result === 'Δεν απάντησε' ? 'Κλήση · δεν απάντησε' : 'Κλήση' + (c.result ? ' · ' + c.result.toLowerCase() : ''), '', 'call', c);
+  });
+}
+
+function histHtml(ev, canEdit) {
+  var now = Date.now();
+  return ev.map(function (e) {
     var future = e.d.getTime() > now;
     var when = niceDate(pad(e.d.getDate()) + '/' + pad(e.d.getMonth() + 1) + '/' + e.d.getFullYear() + ' ' + hhmm(e.d));
+    var c = e.call;
     return '<li class="tl' + (future ? ' future' : '') + (e.tone ? ' ' + e.tone : '') + '"><i aria-hidden="true"></i>' +
-      '<b>' + esc(e.title) + '</b><span>' + esc(when + (future ? ' · προγραμματισμένο' : '') + (e.sub ? ' · ' + e.sub : '')) + '</span></li>';
+      '<b>' + esc(e.title) + '</b><span>' + esc(when + (future ? ' · προγραμματισμένο' : '') + (e.sub ? ' · ' + e.sub : '')) + '</span>' +
+      (c && c.note ? '<p class="tl-note">' + esc(c.note) + '</p>' : '') +
+      (c && canEdit ? '<button class="link tl-add" data-cn="' + esc(c.id) + '">' + (c.note ? 'Αλλαγή σημείωσης' : '＋ Σημείωση για την κλήση') + '</button>' : '') +
+      '</li>';
   }).join('') || '<li class="tl"><i></i><b>Χωρίς ιστορικό</b></li>';
 }
 
@@ -2234,7 +2273,13 @@ function onTelClick(e) {
     l.status = ST.ANSWERED;
     l.followUp = '';
   }
-  beacon('called', { id: l.id });
+  // 1.20: κάθε κλήση με δικό της κλειδί· όταν γυρίσεις, γράφεις σημείωση για ΑΥΤΗ την κλήση.
+  var cid = callId();
+  var at = Date.now();
+  l.calls = (l.calls || []).concat([{ id: cid, at: l.called, ts: at, result: '', note: '' }]);
+  S.pendingCall = { lead: l.id, cid: cid, at: at, name: l.name || '' };
+  store('kw_call', JSON.stringify(S.pendingCall));
+  beacon('called', { id: l.id, cid: cid });
   // Το κουμπί μπορεί να είναι μέσα στην κάρτα «Επόμενο βήμα», που ξαναζωγραφίζεται.
   // Αν σβηστεί πριν ανοίξει το τηλέφωνο, ο browser ακυρώνει την κλήση: περιμένουμε λίγο.
   setTimeout(function () { if (S.lead === l) fillDetail(l); }, 350);
@@ -3461,6 +3506,8 @@ function renderDocs(p, res, loading, set) {
   $(cfg.list).innerHTML = bar + slots.map(function (s) {
     var files = res ? res.docs[s.key] || [] : [];
     var has = (counts[s.key] || 0) > 0;
+    // 1.20: Υπόδειξη / Προσφορά → διάλεξε από τα έντυπα του ακινήτου.
+    var picks = set === 'bill' && s.pick && res && !loading ? (res.picks || {})[s.key] || [] : null;
     var busy = S.uploading[docKey(set, p.code) + ':' + s.key];
     var action = busy ? 'Ανέβασμα…' : has ? 'Νέο αρχείο' : 'Ανέβασμα';
 
@@ -3479,7 +3526,7 @@ function renderDocs(p, res, loading, set) {
       '<div class="doc-head">' +
         '<span class="doc-ico">' + (has ? '✓' : s.optional ? '–' : '!') + '</span>' +
         '<b>' + esc(s.label) + (s.optional ? ' <small>αν υπάρχει</small>' : '') + '</b>' +
-        '<button class="btn small' + (has || s.from || s.optional ? '' : ' primary') + '" data-up="' + s.key + '"' + (busy ? ' disabled' : '') + '>' + action + '</button>' +
+        '<button class="btn small' + (has || s.from || s.optional || (picks && picks.length) ? '' : ' primary') + '" data-up="' + s.key + '"' + (busy ? ' disabled' : '') + '>' + action + '</button>' +
       '</div>' +
       (loading ? '<div class="skel line"><i></i></div>' : files.map(function (f, i) {
         var latest = files.length > 1 && i === files.length - 1 && !s.multi;
@@ -3492,7 +3539,7 @@ function renderDocs(p, res, loading, set) {
         '</div>' +
         (rv && rv.status === RV_ST.FIX && rv.note ? '<p class="doc-fix">' + ico('alert') + '<span><b>Θέλει διόρθωση:</b> ' + esc(rv.note) + '</span></p>'
           : rv ? '<p class="doc-rv ' + (rv.status === RV_ST.OK ? 'ok' : '') + '">' + esc(rv.status === RV_ST.OK ? '✓ Εγκρίθηκε από το γραφείο' : 'Σε έλεγχο από το γραφείο') + '</p>' : '');
-      }).join('')) + copy +
+      }).join('')) + copy + (picks ? pickButton(s, picks, has) : '') +
     '</div>';
   }).join('');
 
@@ -3514,6 +3561,9 @@ function renderDocs(p, res, loading, set) {
   });
   list.querySelectorAll('[data-copy]').forEach(function (b) {
     b.onclick = function () { onCopyMandate(p, b); };
+  });
+  list.querySelectorAll('[data-pick]').forEach(function (b) {
+    b.onclick = function () { openPick(p, b.dataset.pick); };
   });
 }
 
@@ -3990,7 +4040,7 @@ function wirePullToRefresh() {
 
 var RV_ST = { PENDING: 'Σε έλεγχο', OK: 'Εγκρίθηκε', FIX: 'Θέλει διόρθωση' };
 var RV_TAB = { pending: RV_ST.PENDING, fix: RV_ST.FIX, ok: RV_ST.OK };
-var RV_KIND_LABEL = { live: 'Έγγραφα', bill: 'Τιμολόγηση', showform: 'Υπόδειξη', referral: 'Σύσταση', other: 'Άλλο αρχείο' };
+var RV_KIND_LABEL = { live: 'Έγγραφα', bill: 'Τιμολόγηση', showform: 'Υπόδειξη', offerform: 'Προσφορά', referral: 'Σύσταση', other: 'Άλλο αρχείο' };
 
 S.mode = 'agent';
 S.adm = null;
@@ -4093,7 +4143,7 @@ function fillRvFilters() {
 
 function rvRow(i) {
   var tone = i.status === RV_ST.FIX ? 'bad' : i.status === RV_ST.OK ? 'ok' : 'warn';
-  var icon = i.kind === 'showform' || i.kind === 'referral' ? 'form' : i.kind === 'bill' ? 'receipt' : 'upload';
+  var icon = i.kind === 'showform' || i.kind === 'offerform' || i.kind === 'referral' ? 'form' : i.kind === 'bill' ? 'receipt' : 'upload';
   var where = [i.street || (i.code ? 'Κωδικός ' + i.code : ''), i.agent].filter(Boolean).join(' · ');
   var when = i.status === RV_ST.PENDING ? 'Ανέβηκε ' + lowerDay(niceDate(i.date))
     : (i.status === RV_ST.OK ? 'Εγκρίθηκε ' : 'Στάλθηκε πίσω ') + lowerDay(niceDate(i.at)) + (i.by ? ' · ' + i.by : '');
@@ -4406,18 +4456,15 @@ function openALead(id) {
   add(l.ts || l.date, 'Ήρθε η κλήση', l.source);
   add(l.opened, 'Ο μεσίτης την άνοιξε');
   add(l.sms, 'SMS πρώτης επαφής');
-  add(l.called, 'Κάλεσε τον πελάτη', l.status === ST.NO_ANSWER ? 'Δεν απάντησε' : '');
+  addCalls(l, function (stamp, title, sub, tone, call) {
+    var d = typeof stamp === 'number' ? new Date(stamp) : parseStamp(stamp);
+    if (d && stamp) ev.push({ d: d, title: title, sub: sub || '', tone: tone || '', call: call || null });
+  }, 'Κάλεσε τον πελάτη');
   if (l.status === ST.NO_ANSWER) add(l.followUp, 'Follow-up');
   if (hasShowing(l)) add(l.showingTs, 'Υπόδειξη', '', 'show');
   if (l.outcome) add(l.showingTs ? l.showingTs + 60000 : null, 'Αποτέλεσμα: ' + l.outcome, l.outcomeNote, 'done');
   ev.sort(function (a, b) { return a.d - b.d; });
-  var now = Date.now();
-  $('al-hist').innerHTML = ev.map(function (e) {
-    var future = e.d.getTime() > now;
-    var when = niceDate(pad(e.d.getDate()) + '/' + pad(e.d.getMonth() + 1) + '/' + e.d.getFullYear() + ' ' + hhmm(e.d));
-    return '<li class="tl' + (future ? ' future' : '') + (e.tone ? ' ' + e.tone : '') + '"><i aria-hidden="true"></i>' +
-      '<b>' + esc(e.title) + '</b><span>' + esc(when + (future ? ' · προγραμματισμένο' : '') + (e.sub ? ' · ' + e.sub : '')) + '</span></li>';
-  }).join('') || '<li class="tl"><i></i><b>Χωρίς ιστορικό</b></li>';
+  $('al-hist').innerHTML = histHtml(ev, false);
 
   $('al-msg-wrap').hidden = !l.message;
   $('al-msg').textContent = l.message || '';
@@ -4668,7 +4715,7 @@ function wireAdmin() {
 
 function fixGoLabel(r) {
   if (r.kind === 'live' || r.kind === 'bill') return 'Ανέβασε το σωστό αρχείο';
-  if (r.kind === 'showform') return 'Άνοιγμα της κλήσης';
+  if (r.kind === 'showform' || r.kind === 'offerform') return 'Άνοιγμα της κλήσης';
   if (r.kind === 'referral') return 'Οι συστάσεις μου';
   return 'Άνοιγμα';
 }
@@ -4708,6 +4755,7 @@ function goFix(r) {
     return;
   }
   if (r.kind === 'showform' && r.lead) return openLead(r.lead, { form: true });
+  if (r.kind === 'offerform' && r.lead) return openLead(r.lead, { offer: true });
   if (r.kind === 'referral') return goto('referrals');
 }
 
@@ -5468,6 +5516,328 @@ function esc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+
+
+// ─────────────────────────────────────────────────────────────
+//  1.20 · ΣΗΜΕΙΩΣΗ ΓΙΑ ΚΑΘΕ ΚΛΗΣΗ
+//  Πατάς «Κλήση» → η εφαρμογή γράφει την κλήση (beacon με κλειδί cid).
+//  Γυρνάς στην εφαρμογή → ανοίγει «Πώς πήγε η κλήση;» για ΑΥΤΗ την κλήση.
+//  Η εκκρεμότητα κρατιέται και στη συσκευή (kw_call), αν η σελίδα ξαναφορτώσει.
+// ─────────────────────────────────────────────────────────────
+
+function callId() {
+  var a = new Uint8Array(6);
+  try { crypto.getRandomValues(a); } catch (e) { for (var i = 0; i < 6; i++) a[i] = Math.floor(Math.random() * 256); }
+  return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+}
+
+function checkPendingCall() {
+  var cfg = (S.boot && S.boot.callLog) || {};
+  if (cfg.ask === false || isAdminMode()) return;
+  var pc = S.pendingCall;
+  if (!pc) { try { pc = JSON.parse(store('kw_call') || 'null'); } catch (e) { pc = null; } }
+  if (!pc || !pc.cid || !pc.lead) return;
+  var age = Date.now() - pc.at;
+  if (age > (cfg.within || 120) * 60000) { S.pendingCall = null; store('kw_call', null); return; }
+  if (age < 2500 || !$('callnote').hidden) return;     // δεν πρόλαβε να γίνει κλήση, ή είναι ήδη ανοιχτό
+  openCallNote(pc, null);
+}
+
+function cnResult(v) {
+  $$('#cn-result .chip').forEach(function (c) {
+    var on = c.dataset.res === v;
+    c.classList.toggle('is-on', on);
+    c.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  $('cn-noanswer-hint').hidden = v !== 'Δεν απάντησε' || !S.cn || !S.cn.fresh;
+}
+
+/** pc = { lead, cid, at, name }· c = η κλήση από το ιστορικό, όταν αλλάζεις παλιά σημείωση. */
+function openCallNote(pc, c) {
+  S.cn = { lead: pc.lead, cid: pc.cid, at: pc.at, fresh: !c };
+  var d = new Date(pc.at || Date.now());
+  $('cn-who').textContent = (pc.name || 'Πελάτης') + ' · κλήση ' + lowerDay(niceDate(pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + hhmm(d)));
+  $('callnote-title').textContent = c ? 'Σημείωση κλήσης' : 'Πώς πήγε η κλήση;';
+  $('cn-note').value = c ? c.note || '' : '';
+  cnResult(c ? c.result || 'Μιλήσαμε' : 'Μιλήσαμε');
+  $('cn-hint').textContent = '';
+  $('cn-hint').className = 'save-hint';
+  $('cn-save').disabled = false;
+  $('cn-later').textContent = c ? 'Άκυρο' : 'Αργότερα';
+  openPop('callnote');
+}
+
+function clearPendingCall() {
+  if (S.cn && S.cn.fresh) { S.pendingCall = null; store('kw_call', null); }
+}
+
+function wireCallNote() {
+  $$('#cn-result .chip').forEach(function (c) { c.onclick = function () { cnResult(c.dataset.res); }; });
+  $('cn-later').onclick = function () { clearPendingCall(); closePop('callnote'); };
+  $('callnote').querySelector('[data-pop-close]').addEventListener('click', clearPendingCall);
+  $('cn-save').onclick = onSaveCallNote;
+}
+
+function onSaveCallNote() {
+  var cn = S.cn;
+  if (!cn) return;
+  var on = $$('#cn-result .chip.is-on')[0];
+  var result = on ? on.dataset.res : '';
+  var note = $('cn-note').value.trim();
+  var btn = $('cn-save');
+  btn.disabled = true;
+  $('cn-hint').className = 'save-hint';
+  $('cn-hint').textContent = 'Αποθήκευση…';
+  api('callNote', { id: cn.lead, cid: cn.cid, result: result, note: note, at: cn.at }).then(function (res) {
+    merge(res.lead);
+    var noAnswer = cn.fresh && result === 'Δεν απάντησε' && res.lead.status !== ST.NO_ANSWER;
+    clearPendingCall();
+    closePop('callnote');
+    if (S.lead && S.lead.id === res.lead.id) fillDetail(res.lead);
+    if (S.view === 'calls' || S.view === 'today') render();
+    toast(res.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Η σημείωση αποθηκεύτηκε', res.masked);
+    // «Δεν απάντησε» → όπως το κουμπί: κατάσταση και follow-up στο ημερολόγιο.
+    if (noAnswer) {
+      return api('status', { id: res.lead.id, status: ST.NO_ANSWER }).then(function (l) {
+        merge(l);
+        if (S.lead && S.lead.id === l.id) fillDetail(l);
+        if (l.followUp) toast('Σημείωση αποθηκεύτηκε · follow-up ' + l.followUp);
+      });
+    }
+  }).catch(function (e) {
+    btn.disabled = false;
+    $('cn-hint').className = 'save-hint err';
+    $('cn-hint').textContent = 'Δεν αποθηκεύτηκε: ' + e.message;
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  1.20 · ΤΙΜΟΛΟΓΗΣΗ: ΔΙΑΛΕΞΕ ΑΠΟ ΤΑ ΕΝΤΥΠΑ ΤΟΥ ΑΚΙΝΗΤΟΥ
+// ─────────────────────────────────────────────────────────────
+
+var PICK_TXT = {
+  showform: { btn: 'Από τα έντυπα υπόδειξης', title: 'Έντυπα υπόδειξης', none: 'έντυπα υπόδειξης', one: 'Υπόδειξη' },
+  offerform: { btn: 'Από τα έντυπα προσφοράς', title: 'Έντυπα προσφοράς', none: 'έντυπα προσφοράς', one: 'Προσφορά' }
+};
+
+function pickButton(s, picks, has) {
+  var t = PICK_TXT[s.pick];
+  if (!t) return '';
+  if (!picks.length) return '<p class="doc-note">Δεν υπάρχουν ακόμα ' + t.none + ' στον φάκελο του ακινήτου.</p>';
+  var fresh = picks.filter(function (x) { return !x.used; }).length;
+  return '<button class="btn wide gap-top' + (has ? '' : ' primary') + '" data-pick="' + esc(s.key) + '">' + ico('form') +
+    '<span>' + t.btn + ' (' + picks.length + ')' + (has && fresh ? ' · ' + fresh + (fresh === 1 ? ' νέο' : ' νέα') : '') + '</span></button>';
+}
+
+function openPick(p, key) {
+  var res = S.docs[docKey('bill', p.code)] || {};
+  var slot = (S.boot.billSlots || []).filter(function (s) { return s.key === key; })[0];
+  if (!slot) return;
+  var t = PICK_TXT[slot.pick];
+  var list = (res.picks || {})[key] || [];
+  $('pick-title').textContent = t.title;
+  $('pick-hint').textContent = 'Διάλεξε ποιο μπαίνει στην Τιμολόγηση ως «' + slot.label + '». Το πρωτότυπο μένει στον φάκελο του ακινήτου.';
+  $('pick-list').innerHTML = list.map(function (x, i) {
+    var st = x.signed === 'yes' ? '<i class="tag showing">Υπογράφηκε στην οθόνη</i>'
+      : x.signed === 'no' ? '<i class="tag noanswer">Για εκτύπωση · χωρίς υπογραφή</i>' : '';
+    return '<div class="pick-row">' +
+      '<button class="mrow" data-pi="' + i + '"><span class="mrow-ico">' + ico('form') + '</span>' +
+        '<span class="mrow-body"><b>' + esc(x.aa ? t.one + ' ' + x.aa : x.name) + '</b>' +
+        '<span>' + esc(x.date.slice(0, 10)) + '</span>' +
+        (st || x.used ? '<span class="pick-tags">' + st + (x.used ? '<i class="tag closed">✓ Μπήκε ως «' + esc(x.used) + '»</i>' : '') + '</span>' : '') +
+        '</span>' + ico('next', 'ico chev') + '</button>' +
+      '<a class="btn small pick-open" href="' + esc(x.url) + '" target="_blank" rel="noopener" aria-label="Άνοιγμα ' + esc(x.name) + '">' + ico('out') + '<span>Άνοιγμα</span></a>' +
+    '</div>';
+  }).join('');
+  $('pick-list').querySelectorAll('[data-pi]').forEach(function (b) {
+    b.onclick = function () { onPick(p, slot, list[Number(b.dataset.pi)], b); };
+  });
+  openPop('pick');
+}
+
+function onPick(p, slot, x, btn) {
+  var res = S.docs[docKey('bill', p.code)];
+  var old = res && res.docs[slot.key] || [];
+
+  var step = x.signed === 'no'
+    ? choose('Έντυπο χωρίς υπογραφή', 'Αυτό είναι το έντυπο για εκτύπωση. Για την Τιμολόγηση χρειάζεται υπογεγραμμένο: ανέβασε φωτογραφία ή σκαναρισμένο το υπογεγραμμένο χαρτί.',
+        [{ key: 'upload', label: 'Ανέβασμα υπογεγραμμένου', cls: 'solid-red' }, { key: 'go', label: 'Βάλ’ το όπως είναι' }, { key: null, label: 'Άκυρο' }])
+    : x.used ? choose('Έχει μπει ήδη', 'Το έντυπο είναι ήδη στην Τιμολόγηση ως «' + x.used + '». Να μπει ξανά;',
+        [{ key: 'go', label: 'Ναι, ξανά', cls: 'primary' }, { key: null, label: 'Όχι, πίσω' }])
+    : Promise.resolve('go');
+
+  step.then(function (k) {
+    if (k === 'upload') {
+      closePop('pick');
+      S.upSlot = slot.key;
+      S.upSet = 'bill';
+      $('doc-input').value = '';
+      $('doc-input').click();
+      return;
+    }
+    if (k !== 'go') return;
+    var mode = !old.length || slot.multi ? Promise.resolve('keep') : choose(
+      'Υπάρχει ήδη ' + slot.label,
+      'Στην Τιμολόγηση υπάρχει το «' + old[old.length - 1].name + '». Τι να γίνει με το παλιό;',
+      [{ key: 'replace', label: 'Αντικατάσταση (σβήνεται το παλιό)', cls: 'solid-red' },
+       { key: 'keep', label: 'Κράτα και το παλιό', cls: 'primary' }, { key: null, label: 'Άκυρο' }]);
+    return mode.then(function (m) {
+      if (!m) return;
+      btn.disabled = true;
+      btn.querySelector('.mrow-body b').textContent = 'Μπαίνει στην Τιμολόγηση…';
+      return api('billPick', { code: p.code, slot: slot.key, fileId: x.id, mode: m }).then(function (r) {
+        S.docs[docKey('bill', p.code)] = r;
+        if (S.prop && S.prop.code === p.code) renderDocs(p, r, false, 'bill');
+        closePop('pick');
+        var bd = billDone(r.counts);
+        toast('Μπήκε στην Τιμολόγηση: ' + slot.label + (bd.done < bd.total ? ' · ' + bd.done + '/' + bd.total : ' · όλα έτοιμα ✓'));
+      });
+    });
+  }).catch(function (e) {
+    btn.disabled = false;
+    toast(e.message, true);
+    openPick(p, slot.key);
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  1.20 · ΕΝΤΥΠΟ ΠΡΟΣΦΟΡΑΣ
+//  Ίδια λογική με το έντυπο υπόδειξης: link μίας χρήσης, συμπλήρωση στο κινητό του πελάτη
+//  ή εδώ, στην οθόνη του μεσίτη. Η εφαρμογή δεν βλέπει ποτέ ΑΦΜ/Α.Δ.Τ.: μόνο κατάσταση, ποσό, PDF.
+//  Το link μένει μόνο στη μνήμη (S.ofLink).
+// ─────────────────────────────────────────────────────────────
+
+function openOffer(l) {
+  if (!l) return;
+  if (!S.ofLink || S.ofLink.id !== l.id) S.ofLink = null;
+  S.ofLead = l.id;
+  $('of-body').innerHTML = '<p class="cal-status muted">Φόρτωση…</p>';
+  openPop('offer');
+  api('offerStatus', { id: l.id }).then(function (st) {
+    if (S.ofLead === l.id) renderOffer(st);
+  }).catch(function (e) {
+    $('of-body').innerHTML = '<p class="save-hint err">' + esc(e.message) + '</p>';
+  });
+}
+
+function ofSetLead(status) {
+  var l = findLead(S.ofLead);
+  if (l) { l.offer = status; if (S.lead && S.lead.id === l.id) fillDetail(l); }
+}
+
+function renderOffer(st) {
+  S.ofState = st;
+  var el = $('of-body'), l = findLead(S.ofLead) || S.lead || {}, link = S.ofLink;
+  var p = st.prop || {};
+  var rent = (st.deal || p.deal) === 'Ενοικίαση';
+
+  if (!st.ready && st.status !== 'Υπογράφηκε') {
+    el.innerHTML = '<p class="note">Το έντυπο δεν έχει ρυθμιστεί ακόμα: χρειάζεται το Google Doc «Έντυπο προσφοράς - πρότυπο KW App» στο Drive (README, 1.20).</p>';
+    return;
+  }
+
+  if (st.status === 'Υπογράφηκε') {
+    el.innerHTML = '<div class="sf-box ok"><p class="sf-state"><span class="tag showing">Υπογράφηκε</span><b>Α/Α ' + esc(st.aa) + '</b></p>' +
+      '<p class="of-amount">' + esc(st.amount) + (rent ? ' / μήνα' : '') + '</p>' +
+      '<p class="cal-status muted">Υπογράφηκε ' + esc(st.submitted) + '. Το PDF είναι στο «Προσφορές» του ακινήτου και πήγε για έλεγχο στο γραφείο.</p>' +
+      '<a class="btn solid-red wide" href="' + esc(st.fileUrl) + '" target="_blank" rel="noopener">' + ico('out') + '<span>Άνοιγμα PDF</span></a>' +
+      '<button class="btn wide gap-top" id="of-new">Νέα προσφορά από τον ίδιο πελάτη</button></div>';
+    $('of-new').onclick = function () {
+      ask('Νέα προσφορά;', 'Η προηγούμενη μένει στον φάκελο. Θα φτιαχτεί νέο link για τον πελάτη.', 'Ναι, νέα προσφορά')
+        .then(function (yes) { if (yes) { st.status = ''; renderOffer(st); } });
+    };
+    return;
+  }
+
+  if (link && st.status === 'Στάλθηκε') {
+    var phone = l.phoneIntl || '';
+    el.innerHTML = '<div class="sf-box wait"><p class="sf-state"><span class="tag noanswer">Περιμένει τον πελάτη</span><span>λήγει ' + esc(st.expires) + '</span></p>' +
+      '<a class="btn solid-red wide" href="' + esc(link.url) + '" target="_blank" rel="noopener">' + ico('form') + '<span>Συμπλήρωση εδώ, στο κινητό μου</span></a>' +
+      '<p class="cal-status muted of-or">ή στείλε το link στον πελάτη:</p>' +
+      '<div class="sf-actions">' +
+        (link.wa ? '<a class="btn" href="https://wa.me/' + esc(link.wa) + '?text=' + encodeURIComponent(link.sms) + '" target="_blank" rel="noopener">' + ico('sms') + '<span>WhatsApp</span></a>' : '') +
+        (phone ? '<a class="btn" href="' + esc(smsHref(phone, link.sms)) + '">' + ico('sms') + '<span>SMS</span></a>' : '') +
+        (link.email.to ? '<a class="btn" href="mailto:' + esc(link.email.to) + '?subject=' + encodeURIComponent(link.email.subject) +
+          '&body=' + encodeURIComponent(link.email.body) + '">' + ico('mail') + '<span>Email</span></a>' : '') +
+        '<button class="btn" id="of-copy">Αντιγραφή link</button>' +
+      '</div>' +
+      '<button class="link" id="of-cancel">Ακύρωση link</button></div>';
+    $('of-copy').onclick = function () {
+      var done = function () { toast('Το link αντιγράφηκε'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link.url).then(done).catch(function () { copyFallback(link.url, done); });
+      else copyFallback(link.url, done);
+    };
+    $('of-cancel').onclick = onOfCancel;
+    return;
+  }
+
+  if (st.status === 'Στάλθηκε') {
+    el.innerHTML = '<div class="sf-box wait"><p class="sf-state"><span class="tag noanswer">Στάλθηκε ' + esc(st.created) + '</span></p>' +
+      '<p class="cal-status muted">Λήγει ' + esc(st.expires) + (st.opens ? ' · ο πελάτης το άνοιξε ' + st.opens + (st.opens === 1 ? ' φορά' : ' φορές') : ' · δεν έχει ανοιχτεί ακόμα') + '.</p>' +
+      '<div class="sf-actions"><button class="btn" id="of-again">Νέο link</button><button class="btn" id="of-cancel">Ακύρωση link</button></div></div>';
+    $('of-again').onclick = function () {
+      ask('Νέο link;', 'Το παλιό link σταματά να ισχύει.', 'Ναι, νέο link').then(function (yes) { if (yes) onOfCreate(st.deal); });
+    };
+    $('of-cancel').onclick = onOfCancel;
+    return;
+  }
+
+  el.innerHTML = (st.status === 'Έληξε' || st.status === 'Ακυρώθηκε'
+      ? '<p class="cal-status warn">Το προηγούμενο link ' + (st.status === 'Έληξε' ? 'έληξε' : 'ακυρώθηκε') + '.</p>' : '') +
+    '<p class="cal-status muted">Ο πελάτης γράφει ονοματεπώνυμο, διεύθυνση, την τιμή που προτείνει, τρόπο πληρωμής, ΑΦΜ και Α.Δ.Τ., και υπογράφει. Τα στοιχεία του ακινήτου μπαίνουν μόνα τους.</p>' +
+    '<dl class="facts sf-facts">' + sfFact('Κωδικός', p.code) + sfFact('Διεύθυνση', p.address) + sfFact('Περιγραφή', p.description) +
+      sfFact(rent ? 'Ζητούμενο μίσθωμα' : 'Ζητούμενη τιμή', fmtPrice(p.price)) + '</dl>' +
+    (p.deal ? '' : '<label class="field"><span>Συναλλαγή</span><select id="of-deal"><option value="">Διάλεξε…</option>' +
+      '<option>Πώληση</option><option>Ενοικίαση</option></select></label>') +
+    '<button class="btn solid-red wide" id="of-create">' + ico('form') + '<span>Ετοίμασε το έντυπο</span></button>' +
+    '<p class="cal-status muted of-note">ΑΦΜ και Α.Δ.Τ. υπάρχουν μόνο μέσα στο PDF. Δεν τα βλέπει η εφαρμογή.</p>' +
+    '<p class="save-hint" id="of-hint"></p>';
+  $('of-create').onclick = function () {
+    var deal = $('of-deal') ? $('of-deal').value : '';
+    if ($('of-deal') && !deal) {
+      $('of-hint').className = 'save-hint err';
+      $('of-hint').textContent = 'Διάλεξε αν είναι Πώληση ή Ενοικίαση.';
+      return;
+    }
+    onOfCreate(deal);
+  };
+}
+
+function onOfCreate(deal) {
+  var id = S.ofLead;
+  var b = $('of-create') || $('of-again');
+  if (b) { b.disabled = true; b.textContent = 'Ετοιμάζεται…'; }
+  api('offerCreate', { id: id, deal: deal || '' }).then(function (res) {
+    S.ofLink = { id: id, url: res.url, sms: res.sms, wa: res.wa, email: res.email };
+    var st = res.form;
+    st.ready = true;
+    st.prop = (S.ofState || {}).prop;
+    ofSetLead('Στάλθηκε');
+    if (S.ofLead === id) renderOffer(st);
+    toast('Το έντυπο είναι έτοιμο');
+  }).catch(function (e) {
+    if (b) { b.disabled = false; b.textContent = 'Ετοίμασε το έντυπο'; }
+    toast(e.message, true);
+  });
+}
+
+function onOfCancel() {
+  ask('Ακύρωση link;', 'Ο πελάτης δεν θα μπορεί πια να συμπληρώσει την προσφορά από αυτό το link.', 'Ναι, ακύρωση').then(function (yes) {
+    if (!yes) return;
+    var id = S.ofLead;
+    api('offerCancel', { id: id }).then(function (st) {
+      S.ofLink = null;
+      st.ready = true;
+      st.prop = (S.ofState || {}).prop;
+      ofSetLead(st.status);
+      if (S.ofLead === id) renderOffer(st);
+      toast('Το link ακυρώθηκε');
+    }).catch(function (e) { toast(e.message, true); });
+  });
 }
 
 })();

@@ -542,6 +542,7 @@
     <h3 class="sub-head">Άλλες ενέργειες</h3>
     <div class="mlist">
       <button class="mrow" id="btn-showform" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="mrow-body"><b>Έντυπο υπόδειξης</b><span id="d-form-sub">Link για τον πελάτη, υπογραφή, PDF.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="mrow" id="btn-offer" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-receipt"/></svg></span><span class="mrow-body"><b>Έντυπο προσφοράς</b><span id="d-offer-sub">Ο πελάτης γράφει τιμή, τρόπο πληρωμής και υπογράφει.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-showing"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b id="btn-showing-text">Υπόδειξη</b><span>Ημερομηνία, ώρα, διεύθυνση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-noanswer-row"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b id="btn-noanswer">Δεν απάντησε</b><span>Μπαίνει follow-up στο ημερολόγιο.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-lead-task"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg></span><span class="mrow-body"><b>Εργασία</b><span>Υπενθύμιση για αυτή την κλήση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
@@ -589,6 +590,42 @@
       <a class="btn" id="pr-preview" target="_blank" rel="noopener">Προεπισκόπηση</a>
     </div>
     <p class="field-hint pr-hint" id="pr-hint"></p>
+  </div>
+</div>
+
+<!-- 1.20 · ΣΗΜΕΙΩΣΗ ΚΛΗΣΗΣ: ανοίγει όταν γυρίσεις από το τηλέφωνο -->
+<div class="pop" id="callnote" role="dialog" aria-modal="true" aria-labelledby="callnote-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="callnote-title">Πώς πήγε η κλήση;</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <p class="cn-who" id="cn-who"></p>
+    <div class="chips" id="cn-result" role="radiogroup" aria-label="Αποτέλεσμα κλήσης">
+      <button class="chip is-on" data-res="Μιλήσαμε" role="radio" aria-checked="true">Μιλήσαμε</button>
+      <button class="chip" data-res="Δεν απάντησε" role="radio" aria-checked="false">Δεν απάντησε</button>
+    </div>
+    <p class="field-hint" id="cn-noanswer-hint" hidden>Μπαίνει και follow-up στο ημερολόγιο, όπως με το «Δεν απάντησε».</p>
+    <label class="field"><span>Σημείωση για αυτή την κλήση</span>
+      <textarea id="cn-note" rows="4" maxlength="1000" placeholder="Τι είπατε, τι ψάχνει, επόμενο βήμα…"></textarea></label>
+    <p class="field-hint">Μπορείς και να μιλήσεις: πάτα το μικρόφωνο του πληκτρολογίου. Μη γράφεις ΑΦΜ ή αριθμό ταυτότητας.</p>
+    <button class="btn solid-red wide" id="cn-save">Αποθήκευση</button>
+    <button class="btn wide gap-top" id="cn-later">Αργότερα</button>
+    <p class="save-hint" id="cn-hint" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- 1.20 · ΤΙΜΟΛΟΓΗΣΗ: διάλεξε από τα έντυπα του ακινήτου -->
+<div class="pop" id="pick" role="dialog" aria-modal="true" aria-labelledby="pick-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="pick-title">Έντυπα</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <p class="field-hint pick-hint" id="pick-hint"></p>
+    <div class="pick-list" id="pick-list"></div>
+  </div>
+</div>
+
+<!-- 1.20 · ΕΝΤΥΠΟ ΠΡΟΣΦΟΡΑΣ -->
+<div class="pop" id="offer" role="dialog" aria-modal="true" aria-labelledby="offer-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="offer-title">Έντυπο προσφοράς</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="of-body"></div>
   </div>
 </div>
 

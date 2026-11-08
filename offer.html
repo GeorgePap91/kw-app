@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#b40101">
+<!-- 1.20 · Έντυπο προσφοράς για τον πελάτη. Μόνο δικά μας scripts, χωρίς inline JS/CSS. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<title>Προσφορά για ακίνητο · KW Athens Center</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="offer.css">
+<script src="config.js" defer></script>
+<script src="offer.js" defer></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" id="logo" src="logo-kw.png" alt="Keller Williams · KW Athens Center">
+    <span class="wordmark" id="wordmark" hidden><b>KW</b> Athens Center</span>
+    <span class="top-code" id="top-code"></span>
+  </div>
+</header>
+
+<main class="wrap" id="main" aria-busy="true">
+  <div class="state" id="loading">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Φορτώνει το έντυπο…</p>
+  </div>
+
+  <div class="state" id="closed" hidden>
+    <h1 id="closed-title">Το έντυπο δεν είναι διαθέσιμο</h1>
+    <p id="closed-text"></p>
+  </div>
+
+  <div class="state done" id="done" hidden>
+    <span class="done-ico" aria-hidden="true">✓</span>
+    <h1>Ευχαριστούμε!</h1>
+    <p id="done-text"></p>
+  </div>
+
+  <form id="form" novalidate hidden>
+    <h1 class="title">Προσφορά <span id="deal-word">αγοράς</span> ακινήτου</h1>
+    <p class="lead-in">Συμπληρώστε τα στοιχεία σας και υπογράψτε. Το κουμπί <span class="i-demo" aria-hidden="true">i</span> δίπλα σε κάθε πεδίο εξηγεί τι χρειάζεται.</p>
+
+    <section class="card prop">
+      <h2>Το ακίνητο</h2>
+      <dl class="facts">
+        <div><dt>Κωδικός</dt><dd id="p-code"></dd></div>
+        <div><dt>Διεύθυνση</dt><dd id="p-address"></dd></div>
+        <div id="p-desc-wrap"><dt>Περιγραφή</dt><dd id="p-desc"></dd></div>
+        <div id="p-asking-wrap"><dt id="p-asking-k">Ζητούμενη τιμή</dt><dd id="p-asking"></dd></div>
+      </dl>
+      <p class="muted small" id="p-agent"></p>
+    </section>
+
+    <section class="card">
+      <h2>Τα στοιχεία σας</h2>
+      <div class="field" data-f="name">
+        <div class="lab"><label for="f-name">Ονοματεπώνυμο</label><button type="button" class="i" aria-expanded="false" aria-controls="i-name" aria-label="Πληροφορίες για το Ονοματεπώνυμο">i</button></div>
+        <p class="info" id="i-name" hidden>Όπως είναι στην ταυτότητα ή στο διαβατήριό σας. Γράφεται στο έντυπο ως ο αγοραστής ή ο μισθωτής.</p>
+        <input id="f-name" autocomplete="name" maxlength="120">
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="address">
+        <div class="lab"><label for="f-address">Διεύθυνση κατοικίας</label><button type="button" class="i" aria-expanded="false" aria-controls="i-address" aria-label="Πληροφορίες για τη Διεύθυνση κατοικίας">i</button></div>
+        <p class="info" id="i-address" hidden>Η διεύθυνση όπου μένετε: οδός, αριθμός, πόλη, Τ.Κ. Χρειάζεται για να φαίνεται ποιος κάνει την προσφορά.</p>
+        <input id="f-address" autocomplete="street-address" maxlength="160" placeholder="Οδός αριθμός, πόλη, Τ.Κ.">
+        <p class="err" role="alert"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Η προσφορά σας</h2>
+      <div class="field" data-f="price">
+        <div class="lab"><label for="f-price" id="l-price">Τιμή αγοράς που προτείνετε (€)</label><button type="button" class="i" aria-expanded="false" aria-controls="i-price" aria-label="Πληροφορίες για την τιμή">i</button></div>
+        <p class="info" id="i-price" hidden></p>
+        <div class="money"><input id="f-price" inputmode="numeric" autocomplete="off" maxlength="15"><span>€</span></div>
+        <p class="err" role="alert"></p>
+      </div>
+
+      <div id="pay" class="pay">
+        <h3>Τρόπος πληρωμής</h3>
+        <button type="button" class="chip" id="all-cash">Όλα με μετρητά</button>
+        <div class="field" data-f="cash">
+          <div class="lab"><label for="f-cash">Μετρητοίς (€)</label><button type="button" class="i" aria-expanded="false" aria-controls="i-cash" aria-label="Πληροφορίες για τα μετρητά">i</button></div>
+          <p class="info" id="i-cash" hidden>Πόσα από την τιμή θα πληρώσετε με δικά σας χρήματα (μετρητά ή τραπεζική μεταφορά).</p>
+          <div class="money"><input id="f-cash" inputmode="numeric" autocomplete="off" maxlength="15"><span>€</span></div>
+          <p class="err" role="alert"></p>
+        </div>
+        <div class="field" data-f="loan">
+          <div class="lab"><label for="f-loan">Δάνειο (€)</label><button type="button" class="i" aria-expanded="false" aria-controls="i-loan" aria-label="Πληροφορίες για το δάνειο">i</button></div>
+          <p class="info" id="i-loan" hidden>Πόσα θα καλυφθούν από στεγαστικό δάνειο. Αν δεν χρειάζεστε δάνειο, γράψτε 0. Μετρητά και δάνειο μαζί κάνουν την τιμή της προσφοράς.</p>
+          <div class="money"><input id="f-loan" inputmode="numeric" autocomplete="off" maxlength="15"><span>€</span></div>
+          <p class="err" role="alert"></p>
+        </div>
+        <p class="sum" id="sum" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Υπογραφή</h2>
+      <div class="field" data-f="signName">
+        <div class="lab"><label for="f-signname">Ονοματεπώνυμο υπογράφοντος</label><button type="button" class="i" aria-expanded="false" aria-controls="i-signname" aria-label="Πληροφορίες για το Ονοματεπώνυμο υπογράφοντος">i</button></div>
+        <p class="info" id="i-signname" hidden>Το πλήρες όνομα που μπαίνει κάτω από την υπογραφή σας. Συνήθως είναι το ίδιο με το παραπάνω.</p>
+        <input id="f-signname" autocomplete="name" maxlength="120">
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="afm">
+        <div class="lab"><label for="f-afm">ΑΦΜ</label><button type="button" class="i" aria-expanded="false" aria-controls="i-afm" aria-label="Πληροφορίες για τον ΑΦΜ">i</button></div>
+        <p class="info" id="i-afm" hidden>Ο Αριθμός Φορολογικού Μητρώου σας, 9 ψηφία. Γράφεται μόνο μέσα στο υπογεγραμμένο έντυπο: δεν αποθηκεύεται πουθενά αλλού.</p>
+        <input id="f-afm" inputmode="numeric" autocomplete="off" maxlength="12">
+        <label class="check" id="afm-ok-wrap" hidden><input type="checkbox" id="f-afmok"><span>Ο ΑΦΜ μου είναι σωστός</span></label>
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="adt">
+        <div class="lab"><label for="f-adt">Α.Δ.Τ. (αριθμός ταυτότητας)</label><button type="button" class="i" aria-expanded="false" aria-controls="i-adt" aria-label="Πληροφορίες για τον αριθμό ταυτότητας">i</button></div>
+        <p class="info" id="i-adt" hidden>Ο αριθμός της αστυνομικής ταυτότητας (π.χ. ΑΚ 123456) ή του διαβατηρίου σας. Γράφεται μόνο μέσα στο υπογεγραμμένο έντυπο.</p>
+        <input id="f-adt" autocomplete="off" autocapitalize="characters" maxlength="20">
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="email">
+        <div class="lab"><label for="f-email">Email για αντίγραφο (προαιρετικό)</label><button type="button" class="i" aria-expanded="false" aria-controls="i-email" aria-label="Πληροφορίες για το email">i</button></div>
+        <p class="info" id="i-email" hidden>Αν το γράψετε, θα λάβετε αντίγραφο του υπογεγραμμένου εντύπου σε PDF.</p>
+        <input id="f-email" type="email" inputmode="email" autocomplete="email" maxlength="120">
+        <p class="err" role="alert"></p>
+      </div>
+
+      <div class="field" data-f="sig">
+        <div class="lab"><span class="lab-t" id="l-sig">Υπογράψτε με το δάχτυλο</span><button type="button" class="i" aria-expanded="false" aria-controls="i-sig" aria-label="Πληροφορίες για την υπογραφή">i</button></div>
+        <p class="info" id="i-sig" hidden>Υπογράψτε μέσα στο πλαίσιο, όπως σε χαρτί. Αν δεν σας αρέσει, πατήστε «Καθαρισμός» και ξαναυπογράψτε.</p>
+        <div class="pad-wrap"><canvas id="pad" role="img" aria-labelledby="l-sig"></canvas><span class="pad-ph" id="pad-ph">Υπογραφή εδώ</span></div>
+        <button type="button" class="btn ghost" id="pad-clear">Καθαρισμός</button>
+        <p class="err" role="alert"></p>
+      </div>
+
+      <p class="date">Ημερομηνία προσφοράς: <b id="today"></b></p>
+    </section>
+
+    <div class="field consent" data-f="consent">
+      <label class="check"><input type="checkbox" id="f-consent"><span>Συμφωνώ να χρησιμοποιηθούν τα στοιχεία μου για τη σύνταξη της προσφοράς και την ενημέρωση του ιδιοκτήτη, σύμφωνα με τον Κανονισμό (ΕΕ) 2016/679 (GDPR).</span></label>
+      <p class="err" role="alert"></p>
+    </div>
+
+    <p class="disclaimer">Το παρόν έγγραφο δεν αποτελεί αρραβώνα, συμβόλαιο ή οποιασδήποτε μορφής συμφωνητικό. Στόχος του είναι η έγγραφη ενημέρωση του πωλητή ή εκμισθωτή για την τιμή που προτείνετε.</p>
+
+    <p class="form-err" id="form-err" role="alert" hidden></p>
+    <button type="submit" class="btn red" id="submit">Υπογραφή και αποστολή</button>
+    <p class="muted small center" id="expires"></p>
+  </form>
+</main>
+
+</body>
+</html>

@@ -964,3 +964,28 @@ body.gal-open{overflow:hidden}
 #present .actions .btn{flex:1}
 .pr-hint{margin:.875rem 0 0}
 .field-hint.err{color:var(--red)}
+
+/* ── 1.20 · Σημείωση κλήσης ───────────────────────────── */
+.cn-who{margin:0 0 .75rem;font-size:1.0625rem;color:var(--ink-2)}
+#cn-result .chip{flex:1;justify-content:center;font-size:1.0625rem}
+.tl-note{margin:.375rem 0 0;padding:.5rem .75rem;background:var(--wash);border-radius:.625rem;font-size:1rem;line-height:1.45;white-space:pre-line;overflow-wrap:anywhere}
+.tl-add{display:inline-flex;align-items:center;min-height:2.75rem;padding:0;margin-top:.125rem;font-size:1rem}
+.tl.call i{border-color:var(--ink)}
+
+/* ── 1.20 · Τιμολόγηση: έντυπα του ακινήτου ──────────── */
+.pick-hint{margin:0 0 .75rem}
+.pick-row{display:flex;align-items:center;gap:.5rem;border-top:1px solid var(--line)}
+.pick-row:first-child{border-top:0}
+.pick-row .mrow{flex:1;min-width:0;padding-left:0;border-top:0}
+.pick-row .mrow-body>span{display:block;color:var(--ink-2);font-size:.9375rem;overflow-wrap:anywhere}
+.pick-tags{display:flex!important;flex-wrap:wrap;gap:.375rem;margin-top:.375rem}
+.pick-tags .tag{font-style:normal}
+.pick-open{flex:0 0 auto;min-height:2.75rem;padding:0 .75rem}
+.pick-row .mrow-ico{display:none}
+@media (min-width:420px){.pick-row .mrow-ico{display:grid}}
+
+/* ── 1.20 · Έντυπο προσφοράς ─────────────────────────── */
+.of-amount{margin:.25rem 0 .5rem;font-size:1.75rem;font-weight:800;letter-spacing:-.01em}
+.of-or{margin:.875rem 0 .5rem}
+.of-note{margin:.75rem 0 0}
+#of-body .sf-box .btn.wide+.sf-actions{margin-top:.5rem}
