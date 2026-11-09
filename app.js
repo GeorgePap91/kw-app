@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.1';
+var APP_VERSION = '2.2';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -336,13 +336,18 @@ function body(action, data) {
   return JSON.stringify({ t: TOKEN, action: action, data: data || {} });
 }
 
-function api(action, data) {
+function api(action, data, signal) {
   return fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: body(action, data)
+    body: body(action, data),
+    signal: signal
+  }).catch(function (e) {
+    var n = new Error(e && e.name === 'AbortError' ? 'Ο server αργεί να απαντήσει.' : 'Χωρίς σύνδεση στο internet.');
+    n.net = true;
+    throw n;
   }).then(function (r) {
-    if (!r.ok) throw new Error('Σφάλμα δικτύου (' + r.status + ')');
+    if (!r.ok) { var x = new Error('Σφάλμα δικτύου (' + r.status + ')'); x.net = true; throw x; }
     return r.json();
   }).then(function (res) {
     if (!res.ok) {
@@ -357,6 +362,8 @@ function api(action, data) {
 
 /** Στέλνει χωρίς να περιμένει απάντηση· επιβιώνει όταν η σελίδα πάει στο παρασκήνιο. */
 function beacon(action, data) {
+  // 2.2: χωρίς σήμα, ή αν υπάρχει ήδη ουρά, η ενέργεια μπαίνει στην ουρά (με τη σειρά).
+  if (OFF.QUEUED[action] && (S.queue.length || S.netBad || navigator.onLine === false)) { qPush(action, data); return; }
   var payload = body(action, data);
   try {
     if (navigator.sendBeacon &&
@@ -369,8 +376,7 @@ function beacon(action, data) {
 // ─────────────────────────────────────────────────────────────
 //  ΕΚΚΙΝΗΣΗ
 // ─────────────────────────────────────────────────────────────
-
-start();
+// 2.2: η start() καλείται στο τέλος του αρχείου, αφού οριστούν όλα (και το offline κομμάτι).
 
 function start() {
   if (!API || API.indexOf('ΒΑΛΕ') !== -1) return bootFail('Λείπει το API_URL στο config.js.', true);
@@ -378,10 +384,41 @@ function start() {
 
   $('boot-msg').textContent = 'Φόρτωση…';
   $('boot-retry').hidden = true;
+  qLoad();
+  offProfilesLoad();
 
-  api('bootstrap').then(onBoot).catch(function (e) {
+  // 2.2: αν το κινητό έχει τα τελευταία στοιχεία, η εφαρμογή ανοίγει αμέσως, και με σήμα και χωρίς.
+  // Τα φρέσκα έρχονται από πίσω.
+  var cached = offCached();
+  if (cached) {
+    S.bootAt = cached.from;
+    S.bootStale = true;
+    onBoot(cached.b);
+    apiTimed('bootstrap', {}, 20000).then(function (b) {
+      S.bootStale = false;
+      S.bootAt = Date.now();
+      S.boot = b; S.me = b.agent;
+      applyData(b);
+      render();
+      fillSettings();
+      offSnapshot();
+      offBar();
+      offFlushSoon(500);
+    }).catch(function (e) {
+      if (e.code === 'auth') { forgetDevice(); needPairing(true); return; }
+      offBar();
+    });
+    return;
+  }
+
+  api('bootstrap').then(function (b) {
+    S.bootAt = Date.now();
+    onBoot(b);
+    offSnapshot();
+  }).catch(function (e) {
     if (e.code === 'auth') { forgetDevice(); return needPairing(true); }
-    bootFail('Δεν φόρτωσε: ' + e.message, false);
+    bootFail(e.net ? 'Χωρίς σύνδεση. Την πρώτη φορά η εφαρμογή χρειάζεται internet για να φέρει τα στοιχεία σου.'
+                   : 'Δεν φόρτωσε: ' + e.message, false);
   });
 }
 
@@ -400,6 +437,7 @@ function deviceName() {
 }
 
 function forgetDevice() {
+  offForget();                                     // 2.2: σβήνουν και τα στοιχεία πελατών από το κινητό
   TOKEN = '';
   store('kw_token', null);
   store('kw_push_token', null);
@@ -642,6 +680,7 @@ function applyData(b) {
   S.leads = b.leads || [];
   S.props = b.props || [];
   S.tasks = b.tasks || [];
+  offReapply();                                    // 2.2: ό,τι δεν έχει σταλεί ακόμα μένει στην οθόνη
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -681,6 +720,7 @@ function wire() {
   $('alerts-read').onclick = function () { markAlertsRead(currentAlerts()); renderAlerts(); };
   wireLeadPick();
   wireProfile();                                     // 2.1
+  wireOffline();                                     // 2.2
   document.addEventListener('visibilitychange', function () { if (document.hidden) pfSaveNow(true); });
   $$('[data-goto]').forEach(function (b) { b.onclick = function () { goto(b.dataset.goto); }; });
   $$('[data-refresh]').forEach(function (b) { b.onclick = refreshNow; });
@@ -871,6 +911,7 @@ function tabList(list, tab) {
 }
 
 function render() {
+  offSnapshotSoon();                               // 2.2: κρατά τα τελευταία στο κινητό
   setBadge(S.leads.filter(isOpen).length);
   renderCalls();
   renderTasks();
@@ -1149,7 +1190,7 @@ function renderKnown(l) {
 
 function loadContacts() {
   if (!S.contacts) $('contact-list').innerHTML = skel(6);
-  return api('contacts').then(function (list) {
+  return apiRead('contacts').then(function (list) {
     S.contacts = list;
     renderContacts();
     return list;
@@ -2084,8 +2125,9 @@ function openLead(id, opts) {
   var l = findLead(id);
   if (l) return showLead(l, opts || {});
 
-  api('leads').then(function (leads) {
+  apiTimed('leads', {}, 20000).then(function (leads) {
     S.leads = leads;
+    offReapply();
     render();
     var fresh = findLead(id);
     if (fresh) showLead(fresh, opts || {});
@@ -2396,12 +2438,14 @@ function applyStatus(value) {
   sel.value = value;
   sel.disabled = true;
 
-  return api('status', { id: S.lead.id, status: value }).then(function (l) {
+  return send('status', { id: S.lead.id, status: value }).then(function (r) {
+    var l = r.data;
     merge(l);
     if (S.lead && S.lead.id === l.id) fillDetail(l);
     sel.disabled = false;
 
-    if (l.warning) toast(l.warning, true);
+    if (r.queued) toast(value === ST.NO_ANSWER ? 'Δεν απάντησε · το follow-up θα μπει στο ημερολόγιο μόλις έρθει σήμα' : 'Κατάσταση: ' + value + ' · θα σταλεί μόλις έρθει σήμα');
+    else if (l.warning) toast(l.warning, true);
     else if (value === ST.NO_ANSWER && l.followUp) {
       toast('Follow-up ' + l.followUp + (l.invited ? ' · ήρθε ως πρόσκληση' : ''));
     }
@@ -2423,8 +2467,8 @@ function onNoteInput() {
   var id = S.lead.id, text = $('d-notes').value;
 
   S.noteTimer = setTimeout(function () {
-    api('note', { id: id, text: text }).then(function () {
-      hint.textContent = 'Αποθηκεύτηκε';
+    send('note', { id: id, text: text }).then(function (r) {
+      hint.textContent = r.queued ? 'Αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα' : 'Αποθηκεύτηκε';
       var l = findLead(id);
       if (l) l.notes = text;
     }).catch(function (e) {
@@ -3101,12 +3145,13 @@ function onSaveOutcome() {
     return;
   }
   btn.disabled = true;
-  api('outcome', { id: S.lead.id, outcome: S.outcome, note: $('s-outcome-note').value.trim() }).then(function (l) {
+  send('outcome', { id: S.lead.id, outcome: S.outcome, note: $('s-outcome-note').value.trim() }).then(function (r) {
+    var l = r.data;
     merge(l);
     fillDetail(l);
     closeSheet('showing');
     render();
-    toast('Καταχωρήθηκε: ' + l.outcome);
+    toast('Καταχωρήθηκε: ' + l.outcome + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
   }).catch(function (e) {
     hint.className = 'save-hint err';
     hint.textContent = e.message;
@@ -3136,7 +3181,9 @@ function doCancelShowing() {
   b.textContent = 'Ακύρωση…';
   var id = S.lead.id;
 
-  api('cancelShowing', { id: id }).then(function (res) {
+  send('cancelShowing', { id: id }).then(function (rr) {
+    var res = rr.data;
+    if (rr.queued) res.queued = true;
     merge(res.lead);
     S.cancelled = { id: id, date: res.date, time: res.time };
     closeSheet('showing');
@@ -3149,7 +3196,7 @@ function doCancelShowing() {
     $('detail').querySelector('.sheet-body').scrollTop = 0;
     if (S.smsKind === 'cancel') openSmsBox('cancel', true);
 
-    toast('Η υπόδειξη ακυρώθηκε' + (res.eventDeleted ? ' και σβήστηκε από το ημερολόγιο' : '') +
+    toast('Η υπόδειξη ακυρώθηκε' + (res.queued ? ' · θα σβηστεί από το ημερολόγιο μόλις έρθει σήμα' : res.eventDeleted ? ' και σβήστηκε από το ημερολόγιο' : '') +
           (S.smsKind === 'cancel' ? '. Το SMS ακύρωσης είναι έτοιμο.' : '.'));
   }).catch(function (e) {
     resetCancelBtn();
@@ -3172,12 +3219,13 @@ function onSaveShowing() {
   btn.disabled = true;
   btn.textContent = 'Αποθήκευση…';
 
-  api('showing', {
+  send('showing', {
     id: S.lead.id,
     date: $('s-date').value,
     time: $('s-time').value,
     address: $('s-addr').value.trim()
-  }).then(function (res) {
+  }).then(function (rr) {
+    var res = rr.data;
     merge(res.lead);
     if (S.cancelled && S.cancelled.id === res.lead.id) S.cancelled = null;
     btn.disabled = false;
@@ -3185,7 +3233,7 @@ function onSaveShowing() {
     closeSheet('showing');
     closeDetail();
     toast((res.updated ? 'Η υπόδειξη άλλαξε: ' : 'Υπόδειξη ') + res.when +
-          (res.invited ? ' · ήρθε ως πρόσκληση' : ''));
+          (rr.queued ? ' · θα μπει στο ημερολόγιο μόλις έρθει σήμα' : res.invited ? ' · ήρθε ως πρόσκληση' : ''));
   }).catch(function (e) {
     btn.disabled = false;
     btn.textContent = label;
@@ -3401,10 +3449,11 @@ function toggleTask(id) {
   t.doneTs = done ? Date.now() : 0;
   renderTasks();
 
-  api('taskDone', { id: id, done: done }).then(function (fresh) {
+  send('taskDone', { id: id, done: done }).then(function (r) {
+    var fresh = r.data;
     mergeTask(fresh);
     renderTasks();
-    if (done) toast('Ολοκληρώθηκε' + (fresh.date ? ' · βγήκε από το ημερολόγιο' : ''));
+    if (done) toast('Ολοκληρώθηκε' + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : fresh.date ? ' · βγήκε από το ημερολόγιο' : ''));
   }).catch(function (e) {
     t.done = before.done;
     t.doneTs = before.doneTs;
@@ -3478,12 +3527,13 @@ function onSaveTask() {
 
   btn.disabled = true;
   btn.textContent = 'Αποθήκευση…';
-  api('taskSave', data).then(function (t) {
+  send('taskSave', data).then(function (r) {
+    var t = r.data;
     mergeTask(t);
     renderTasks();
     closeSheet('task');
     toast((data.id ? 'Η εργασία άλλαξε' : 'Η εργασία καταχωρήθηκε') +
-          (t.hasEvent ? (t.invited ? ' · ήρθε ως πρόσκληση' : ' · στο ημερολόγιο') : ''));
+          (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : t.hasEvent ? (t.invited ? ' · ήρθε ως πρόσκληση' : ' · στο ημερολόγιο') : ''));
   }).catch(function (e) {
     hint.className = 'save-hint err';
     hint.textContent = e.message;
@@ -3505,11 +3555,14 @@ function onDeleteTask() {
     var b = $('btn-delete-task');
     b.disabled = true;
     var id = S.task.id;
-    api('taskDelete', { id: id }).then(function () {
+    // Εργασία που δεν έχει σταλεί ακόμα: βγαίνει απλώς από την ουρά.
+    var tmp = /^tmp-/.test(id) ? S.queue.filter(function (o) { return o.tmp === id || (o.d && o.d.id === id); }) : null;
+    (tmp ? Promise.resolve((S.queue = S.queue.filter(function (o) { return tmp.indexOf(o) === -1; }), qSave(), { queued: false }))
+         : send('taskDelete', { id: id })).then(function (r) {
       S.tasks = S.tasks.filter(function (t) { return t.id !== id; });
       renderTasks();
       closeSheet('task');
-      toast('Η εργασία διαγράφηκε');
+      toast('Η εργασία διαγράφηκε' + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
     }).catch(function (e) {
       resetDeleteTask();
       toast(e.message, true);
@@ -3972,17 +4025,22 @@ function refreshNow() {
     return loadAdmin(true).then(function () { spin(false); toast('Ανανεώθηκε'); },
                                 function (e) { spin(false); toast(e.message, true); });
   }
-  api('bootstrap').then(function (b) {
+  if (S.queue.length) offFlush(true);
+  apiTimed('bootstrap', {}, 20000).then(function (b) {
     S.boot = b;
     S.me = b.agent;
+    S.bootStale = false;
+    S.bootAt = Date.now();
     applyData(b);
     render();
     fillSettings();
+    offBar();
     spin(false);
     toast('Ανανεώθηκε');
   }).catch(function (e) {
     spin(false);
-    toast(e.message, true);
+    offBar();
+    toast(e.net ? 'Χωρίς σύνδεση. Βλέπεις τα τελευταία στοιχεία· οι αλλαγές σου θα σταλούν μόλις έρθει σήμα.' : e.message, !e.net);
   });
 }
 
@@ -4005,8 +4063,9 @@ function pollAdmin() {
 function refreshLeads() {
   if (polling || document.hidden || !S.boot) return;
   polling = true;
-  api('leads').then(function (leads) {
+  apiTimed('leads', {}, 20000).then(function (leads) {
     S.leads = leads;
+    offReapply();
     render();
   }).catch(function () { /* σιωπηλά */ }).then(function () { polling = false; });
 }
@@ -4054,7 +4113,7 @@ function renderMoreMx() {
 function loadReferrals(force) {
   if (S.refs && !force) return renderReferrals();
   if (!S.refs) $('ref-list').innerHTML = skel(4);
-  api('referrals').then(function (list) {
+  apiRead('referrals').then(function (list) {
     S.refs = list || [];
     renderReferrals();
   }).catch(function (e) {
@@ -5687,17 +5746,20 @@ function onSaveCallNote() {
   btn.disabled = true;
   $('cn-hint').className = 'save-hint';
   $('cn-hint').textContent = 'Αποθήκευση…';
-  api('callNote', { id: cn.lead, cid: cn.cid, result: result, note: note, at: cn.at }).then(function (res) {
+  send('callNote', { id: cn.lead, cid: cn.cid, result: result, note: note, at: cn.at }).then(function (rr) {
+    var res = rr.data;
     merge(res.lead);
     var noAnswer = cn.fresh && result === 'Δεν απάντησε' && res.lead.status !== ST.NO_ANSWER;
     clearPendingCall();
     closePop('callnote');
     if (S.lead && S.lead.id === res.lead.id) fillDetail(res.lead);
     if (S.view === 'calls' || S.view === 'today') render();
-    toast(res.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Η σημείωση αποθηκεύτηκε', res.masked);
+    toast(rr.queued ? 'Η σημείωση αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα'
+      : res.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Η σημείωση αποθηκεύτηκε', res.masked);
     // «Δεν απάντησε» → όπως το κουμπί: κατάσταση και follow-up στο ημερολόγιο.
     if (noAnswer) {
-      return api('status', { id: res.lead.id, status: ST.NO_ANSWER }).then(function (l) {
+      return send('status', { id: res.lead.id, status: ST.NO_ANSWER }).then(function (r2) {
+        var l = r2.data;
         merge(l);
         if (S.lead && S.lead.id === l.id) fillDetail(l);
         if (l.followUp) toast('Σημείωση αποθηκεύτηκε · follow-up ' + l.followUp);
@@ -6397,11 +6459,11 @@ function wireLeadPick() {
     $('lp-save').disabled = true;
     msg.className = 'save-hint';
     msg.textContent = 'Αποθήκευση…';
-    api('note', { id: l.id, text: all }).then(function () {
+    send('note', { id: l.id, text: all }).then(function (r) {
       l.notes = all;
       if (S.lead && S.lead.id === l.id) $('d-notes').value = all;
       closePop('lpick');
-      toast('Η σημείωση μπήκε στον πελάτη · ' + (l.name || ''));
+      toast('Η σημείωση μπήκε στον πελάτη · ' + (l.name || '') + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
     }).catch(function (e) {
       $('lp-save').disabled = false;
       msg.className = 'save-hint err';
@@ -6528,12 +6590,16 @@ function loadProfile(l) {
   if (S.pf && S.pf.id !== l.id) pfSaveNow();
   var id = l.id;
   var have = S.profiles[id];
-  S.pf = { id: id, data: have ? JSON.parse(JSON.stringify(have.p || {})) : {}, loaded: !!have, err: '' };
+  S.pf = { id: id, data: have && have.p ? JSON.parse(JSON.stringify(have.p)) : {}, loaded: !!have, err: '' };
   if (!S.pf.data.deal) S.pf.data.deal = pfDealOf(l) || 'buy';
   renderProfile(l);
-  if (have) return;
-  api('profileGet', { id: id }).then(function (r) {
+  // 2.2: με αλλαγή που δεν έχει σταλεί ακόμα, ισχύει αυτή του κινητού.
+  var pending = S.queue.some(function (o) { return o.a === 'profileSave' && o.d.id === id; });
+  if (pending) return;
+  apiTimed('profileGet', { id: id }, 8000).then(function (r) {
+    if (S.queue.some(function (o) { return o.a === 'profileSave' && o.d.id === id; })) return;
     S.profiles[id] = { p: r.p || null, level: r.level || '', updated: r.updated || '' };
+    offProfilesSave();
     if (S.lead && S.lead.id === id) pfLine(S.lead);
     if (!S.pf || S.pf.id !== id || S.pf.dirty) return;
     S.pf.data = r.p ? JSON.parse(JSON.stringify(r.p)) : {};
@@ -6544,6 +6610,11 @@ function loadProfile(l) {
   }).catch(function (e) {
     if (!S.pf || S.pf.id !== id) return;
     S.pf.loaded = true;
+    if (e.net) {                                    // 2.2: χωρίς σήμα συμπληρώνεται κανονικά
+      renderProfile(l);
+      pfHint(have ? 'Χωρίς σύνδεση · βλέπεις ό,τι είχε το κινητό. Οι αλλαγές θα σταλούν μετά.' : 'Χωρίς σύνδεση · συμπλήρωσε κανονικά, θα σταλεί μόλις έρθει σήμα.');
+      return;
+    }
     S.pf.err = /Άγνωστη ενέργεια/.test(e.message)
       ? 'Ο server δεν έχει ακόμα το Προφίλ: πρόσθεσε το Profile.gs στο Apps Script και κάνε Νέα έκδοση.'
       : 'Δεν φόρτωσε το προφίλ: ' + e.message;
@@ -6570,10 +6641,13 @@ function pfSaveNow(quiet) {
   var sc = l ? pfScore(pf.data, l) : { level: '' };
   var data = JSON.parse(JSON.stringify(pf.data));
   S.profiles[pf.id] = { p: data, level: sc.level, updated: '' };
+  offProfilesSave();
   if (quiet === true) { beacon('profileSave', { id: pf.id, p: data, level: sc.level }); pfHint('Αποθηκεύτηκε'); return; }
-  api('profileSave', { id: pf.id, p: data, level: sc.level }).then(function (r) {
+  send('profileSave', { id: pf.id, p: data, level: sc.level }).then(function (rr) {
+    var r = rr.data;
     S.profiles[pf.id].updated = r.saved;
-    if (S.pf === pf) pfHint(r.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Αποθηκεύτηκε ' + lowerDay(niceDate(r.saved)), r.masked);
+    if (S.pf === pf) pfHint(rr.queued ? 'Αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα'
+      : r.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Αποθηκεύτηκε ' + lowerDay(niceDate(r.saved)), r.masked);
     if (S.lead && S.lead.id === pf.id) pfLine(S.lead);
   }).catch(function (e) {
     pf.dirty = true;
@@ -6793,5 +6867,339 @@ function wireProfile() {
   });
   $('d-pf-line').onclick = showProfileTab;
 }
+
+
+// ═════════════════════════════════════════════════════════════
+//  2.2 · ΧΩΡΙΣ INTERNET (offline-first)
+//
+//  Στην κλήση, χωρίς VoLTE, τα data κόβονται. Γι' αυτό:
+//   1. Τα στοιχεία (κλήσεις, ακίνητα, εργασίες, προφίλ) μένουν στο κινητό,
+//      ώστε η εφαρμογή να ανοίγει και χωρίς σήμα. Σβήνονται με αποσύνδεση,
+//      ανάκληση, ή αν η εφαρμογή δεν ανοίξει 14 ημέρες. Ποτέ ΑΦΜ / Α.Δ.Τ.
+//   2. Κάθε αλλαγή γίνεται αμέσως στην οθόνη και μπαίνει σε ΟΥΡΑ. Η ουρά
+//      στέλνεται μόνη της, με τη σειρά, μόλις έρθει σήμα.
+//   3. Ό,τι θέλει οπωσδήποτε τον server (ανέβασμα αρχείων, link εντύπου,
+//      παρουσίαση) λέει καθαρά «Χρειάζεται σύνδεση».
+// ═════════════════════════════════════════════════════════════
+
+var OFF = {
+  KEEP_DAYS: 14,
+  QUIET: { open: 1, called: 1, sms: 1 },   // καταγραφές στο παρασκήνιο: στέλνονται, δεν μετράνε στη μπάρα
+  TRY_MS: 6000,          // πόσο περιμένουμε τον server πριν πάει η αλλαγή στην ουρά
+  FLUSH_MS: 20000,       // κάθε πόσο ξαναδοκιμάζει όσο υπάρχει ουρά
+  // Οι αλλαγές που δουλεύουν χωρίς σήμα. Όλες είναι «ασφαλείς να ξανασταλούν»:
+  // το ίδιο αίτημα δύο φορές δίνει το ίδιο αποτέλεσμα (π.χ. η υπόδειξη μετακινεί το ίδιο event).
+  QUEUED: { status: 1, note: 1, showing: 1, cancelShowing: 1, outcome: 1, taskDone: 1, taskSave: 1, taskDelete: 1,
+            callNote: 1, profileSave: 1, open: 1, called: 1, sms: 1 }
+};
+S.queue = [];
+S.netBad = false;        // η τελευταία προσπάθεια απέτυχε → οι επόμενες αλλαγές πάνε κατευθείαν στην ουρά
+S.flushing = false;
+
+/** Σφάλμα δικτύου (όχι «λάθος στοιχεία» από τον server): αυτό σημαίνει «δοκίμασε αργότερα». */
+function isNetErr(e) { return !!(e && (e.net || e.name === 'AbortError' || e.name === 'TypeError')); }
+
+/** fetch με όριο χρόνου. Στο 2G ένα αίτημα μπορεί να «κρέμεται» για λεπτά. */
+function apiTimed(action, data, ms) {
+  var ctl = window.AbortController ? new AbortController() : null;
+  var t = ctl ? setTimeout(function () { ctl.abort(); }, ms) : null;
+  return api(action, data, ctl ? ctl.signal : undefined).then(function (d) {
+    clearTimeout(t);
+    S.netBad = false;
+    return d;
+  }, function (e) {
+    clearTimeout(t);
+    if (isNetErr(e)) { e.net = true; S.netBad = true; }
+    throw e;
+  });
+}
+
+// ── Η ουρά ───────────────────────────────────────────────
+
+function qLoad() {
+  try { S.queue = JSON.parse(store('kw_queue') || '[]') || []; } catch (e) { S.queue = []; }
+}
+function qSave() { store('kw_queue', S.queue.length ? JSON.stringify(S.queue) : null); offBar(); }
+
+function qId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+/**
+ * Στέλνει μια αλλαγή. Με σήμα: όπως πριν. Χωρίς σήμα (ή αν υπάρχει ήδη ουρά, για να
+ * μείνει η σειρά): μπαίνει στην ουρά και επιστρέφει ό,τι θα έδινε ο server, από το κινητό.
+ * Απάντηση: { data, queued }.
+ */
+function send(action, data) {
+  if (!OFF.QUEUED[action]) return api(action, data).then(function (d) { return { data: d, queued: false }; });
+  if (S.queue.length || S.netBad || navigator.onLine === false) return Promise.resolve(qPush(action, data));
+  return apiTimed(action, data, OFF.TRY_MS).then(function (d) {
+    return { data: d, queued: false };
+  }, function (e) {
+    if (!e.net) throw e;
+    return qPush(action, data);
+  });
+}
+
+function qPush(action, data) {
+  var op = { id: qId(), a: action, d: data, at: Date.now() };
+  var local = offLocal(op);
+  S.queue.push(op);
+  qSave();
+  offSnapshotSoon();
+  offFlushSoon();
+  return { data: local, queued: true };
+}
+
+/** Στέλνει την ουρά με τη σειρά. Σταματά στο πρώτο σφάλμα δικτύου· ξαναπροσπαθεί αργότερα. */
+function offFlush(manual) {
+  if (S.flushing || !S.queue.length || !S.boot) return Promise.resolve();
+  S.flushing = true;
+  offBar();
+  var sent = 0, failed = [];
+  var step = function () {
+    var op = S.queue[0];
+    if (!op) return Promise.resolve();
+    return apiTimed(op.a, op.d, 15000).then(function (res) {
+      S.queue.shift();
+      if (!OFF.QUIET[op.a]) sent++;
+      offApplyServer(op, res);
+      qSave();
+      return step();
+    }, function (e) {
+      if (e.net) return null;                            // ακόμα χωρίς σήμα
+      if (e.code === 'auth') return null;
+      // Ο server αρνήθηκε (π.χ. η κλήση δεν υπάρχει πια): βγαίνει από την ουρά, το λέμε.
+      S.queue.shift();
+      failed.push(op);
+      qSave();
+      return step();
+    });
+  };
+  return step().then(function () {
+    S.flushing = false;
+    offBar();
+    if (failed.length) toast('Δεν πέρασαν ' + plural(failed.length, 'αλλαγή', 'αλλαγές') + ': ' + failed.map(offLabel).join(', '), true);
+    if (sent && !S.queue.length) {
+      if (!failed.length) toast('✓ ' + (sent === 1 ? 'Στάλθηκε 1 αλλαγή' : 'Στάλθηκαν ' + sent + ' αλλαγές') + ' που έκανες χωρίς σήμα');
+      if (!isAdminMode() && $('detail').hidden && $('showing').hidden) offRefresh();
+    }
+    if (S.queue.length) offFlushSoon();
+  }, function () { S.flushing = false; offBar(); });
+}
+
+var offTimer = null;
+function offFlushSoon(ms) {
+  clearTimeout(offTimer);
+  if (S.queue.length) offTimer = setTimeout(function () { offFlush(); }, ms == null ? OFF.FLUSH_MS : ms);
+}
+
+/** Μετά το στείλσιμο: η απάντηση του server αντικαθιστά την τοπική εκδοχή. */
+function offApplyServer(op, res) {
+  var a = op.a;
+  if (a === 'status' || a === 'outcome') { if (res && res.id) merge(res); }
+  else if ((a === 'showing' || a === 'cancelShowing' || a === 'callNote') && res && res.lead) merge(res.lead);
+  else if (a === 'taskDone' && res && res.id) mergeTask(res);
+  else if (a === 'taskSave' && res && res.id) {
+    // Νέα εργασία: ο server της έδωσε κανονικό ID. Το περνάμε και στις επόμενες αλλαγές της ουράς.
+    var tmp = op.tmp;
+    if (tmp) {
+      S.tasks = S.tasks.filter(function (t) { return t.id !== tmp; });
+      S.queue.forEach(function (o) { if (o.d && o.d.id === tmp) o.d.id = res.id; });
+    }
+    mergeTask(res);
+  }
+  else if (a === 'profileSave' && S.profiles[op.d.id]) S.profiles[op.d.id].updated = (res && res.saved) || '';
+  if (a === 'status' && op.d.status === ST.NO_ANSWER && res && res.followUp) {
+    toast('Follow-up ' + res.followUp + ' · μπήκε στο ημερολόγιο');
+  }
+  if (a === 'showing' && res && res.when) toast('Η υπόδειξη ' + res.when + ' μπήκε στο ημερολόγιο');
+  if (S.lead && $('detail').hidden === false) { var l = findLead(S.lead.id); if (l) fillDetail(l); }
+  render();
+  if (S.view === 'today') renderToday();
+}
+
+function offLabel(op) {
+  var l = op.d && op.d.id ? findLead(op.d.id) : null;
+  var who = l ? ' · ' + (l.name || 'πελάτης') : '';
+  return ({ status: 'Κατάσταση', note: 'Σημείωση', showing: 'Υπόδειξη', cancelShowing: 'Ακύρωση υπόδειξης', outcome: 'Αποτέλεσμα υπόδειξης',
+    taskDone: 'Εργασία', taskSave: 'Εργασία', taskDelete: 'Διαγραφή εργασίας', callNote: 'Σημείωση κλήσης', profileSave: 'Προφίλ',
+    open: 'Άνοιγμα', called: 'Κλήση', sms: 'SMS' }[op.a] || op.a) + who;
+}
+
+// ── Η αλλαγή στο κινητό, ίδια με ό,τι θα έκανε ο server ──
+
+function cloneOf(o) { return JSON.parse(JSON.stringify(o)); }
+function stampOf(d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + hhmm(d); }
+
+/** Εφαρμόζει την αλλαγή στα τοπικά στοιχεία και επιστρέφει ό,τι θα επέστρεφε ο server. */
+function offLocal(op) {
+  var a = op.a, d = op.d || {};
+  var l0 = d.id ? findLead(d.id) : null;
+  var l = l0 ? cloneOf(l0) : null;
+  if (a === 'status' && l) {
+    l.status = d.status;
+    if (d.status === ST.NO_ANSWER) {
+      var fu = new Date(op.at + ((S.boot && S.boot.followupHours) || 2) * 3600000);
+      l.followUp = stampOf(fu);
+    } else l.followUp = '';
+    if (d.status === ST.ANSWERED && !l.called) l.called = stampOf(new Date(op.at));
+    merge(l);
+    return l;
+  }
+  if (a === 'note' && l) { l.notes = d.text; merge(l); return {}; }
+  if (a === 'outcome' && l) { l.outcome = d.outcome; l.outcomeNote = d.note || ''; merge(l); return l; }
+  if (a === 'showing' && l) {
+    var p = d.date.split('-').map(Number), hm = String(d.time).split(':').map(Number);
+    var when = new Date(p[0], p[1] - 1, p[2], hm[0], hm[1]);
+    var updated = hasShowing(l);
+    l.status = ST.SHOWING;
+    l.showingAt = stampOf(when); l.showingDate = d.date; l.showingTime = d.time; l.showingTs = when.getTime();
+    l.hasEvent = true; l.followUp = '';
+    if (d.address) l.address = d.address;
+    merge(l);
+    return { lead: l, updated: updated, when: niceDate(l.showingAt), invited: false };
+  }
+  if (a === 'cancelShowing' && l) {
+    var date = l.showingDate, time = l.showingTime;
+    l.status = ST.ANSWERED; l.showingAt = ''; l.showingDate = ''; l.showingTime = ''; l.showingTs = 0; l.hasEvent = false;
+    merge(l);
+    return { lead: l, date: date, time: time, eventDeleted: false };
+  }
+  if (a === 'callNote' && l) {
+    var found = false;
+    l.calls = (l.calls || []).map(function (c) {
+      if (c.id !== d.cid) return c;
+      found = true;
+      return Object.assign({}, c, { result: d.result, note: d.note });
+    });
+    if (!found) l.calls.push({ id: d.cid, at: stampOf(new Date(d.at || op.at)), ts: d.at || op.at, result: d.result, note: d.note });
+    merge(l);
+    return { lead: l, masked: false };
+  }
+  if (a === 'taskDone') {
+    var t = findTask(d.id);
+    if (!t) return {};
+    t = cloneOf(t);
+    t.done = d.done ? nowStamp() : ''; t.doneTs = d.done ? op.at : 0;
+    mergeTask(t);
+    return t;
+  }
+  if (a === 'taskSave') {
+    var base = d.id ? findTask(d.id) : null;
+    var nt = Object.assign(base ? cloneOf(base) : { done: '', doneTs: 0 }, {
+      id: d.id || (op.tmp = op.tmp || 'tmp-' + op.id), title: d.title, date: d.date, time: d.time, notes: d.notes });
+    if (d.lead) { nt.lead = d.lead; var ll = findLead(d.lead); nt.leadName = ll ? ll.name : nt.leadName; }
+    nt.pending = true;
+    mergeTask(nt);
+    return nt;
+  }
+  if (a === 'taskDelete') { S.tasks = S.tasks.filter(function (x) { return x.id !== d.id; }); return {}; }
+  if (a === 'profileSave') {
+    S.profiles[d.id] = { p: cloneOf(d.p || {}), level: d.level || '', updated: '' };
+    offProfilesSave();
+    return { saved: '', masked: false };
+  }
+  if (a === 'open' && l) { l.opened = l.opened || nowStamp(); merge(l); return {}; }
+  return {};
+}
+
+/** Μετά από κάθε φρέσκια λήψη από τον server, ξαναβάζουμε από πάνω ό,τι δεν έχει σταλεί ακόμα. */
+function offReapply() {
+  S.queue.forEach(function (op) { try { offLocal(op); } catch (e) { /* η κλήση μπορεί να μην υπάρχει πια */ } });
+}
+
+function offRefresh() {
+  apiTimed('bootstrap', {}, 15000).then(function (b) {
+    S.boot = b; S.me = b.agent;
+    S.bootStale = false; S.bootAt = Date.now(); S.netBad = false;
+    applyData(b);
+    offSnapshot();
+    render();
+    fillSettings();
+    offBar();
+  }).catch(function () {});
+}
+
+// ── Τα στοιχεία στο κινητό (για άνοιγμα χωρίς σήμα) ──
+
+function offSnapshot() {
+  if (!S.boot || !TOKEN) return;
+  var b = Object.assign({}, S.boot, { leads: S.leads, props: S.props, tasks: S.tasks });
+  try { localStorage.setItem('kw_boot', JSON.stringify({ at: Date.now(), from: S.bootAt || Date.now(), b: b })); }
+  catch (e) { /* γεμάτος χώρος: απλώς δεν κρατάμε */ }
+}
+var snapTimer = null;
+function offSnapshotSoon() { clearTimeout(snapTimer); snapTimer = setTimeout(offSnapshot, 800); }
+
+function offCached() {
+  try {
+    var c = JSON.parse(localStorage.getItem('kw_boot') || 'null');
+    if (!c || !c.b) return null;
+    if (Date.now() - c.at > OFF.KEEP_DAYS * 86400000) { offForget(); return null; }   // 14 ημέρες χωρίς άνοιγμα
+    return c;
+  } catch (e) { return null; }
+}
+
+function offProfilesSave() {
+  try { localStorage.setItem('kw_prof', JSON.stringify(S.profiles)); } catch (e) { /* χωρίς χώρο */ }
+}
+function offProfilesLoad() {
+  try { S.profiles = JSON.parse(localStorage.getItem('kw_prof') || '{}') || {}; } catch (e) { S.profiles = {}; }
+}
+
+/** Σβήνει ό,τι κρατά το κινητό για τους πελάτες. Αποσύνδεση, ανάκληση, 14 ημέρες. */
+function offForget() {
+  ['kw_boot', 'kw_prof', 'kw_queue', 'kw_cache_contacts', 'kw_cache_referrals', 'kw_cache_metrics', 'kw_call'].forEach(function (k) {
+    try { localStorage.removeItem(k); } catch (e) { /* ιδιωτική περιήγηση */ }
+  });
+  S.queue = [];
+}
+
+/** Ανάγνωση με αντίγραφο: με σήμα φέρνει φρέσκα, χωρίς σήμα δίνει τα τελευταία. */
+function apiRead(action, data) {
+  var key = 'kw_cache_' + action;
+  return apiTimed(action, data, 15000).then(function (d) {
+    try { var s = JSON.stringify({ at: Date.now(), d: d }); if (s.length < 1500000) localStorage.setItem(key, s); } catch (e) { /* χώρος */ }
+    return d;
+  }, function (e) {
+    if (!e.net) throw e;
+    try { var c = JSON.parse(localStorage.getItem(key) || 'null'); if (c) { toast('Χωρίς σύνδεση · δείχνω ό,τι είχε φορτώσει'); return c.d; } } catch (x) { /* τίποτα */ }
+    throw new Error('Χρειάζεται σύνδεση. Θα φορτώσει μόλις έρθει σήμα.');
+  });
+}
+
+// ── Η μπάρα κατάστασης ───────────────────────────────────
+
+function offBar() {
+  var bar = $('offbar');
+  if (!bar || !S.boot) return;
+  var n = S.queue.filter(function (o) { return !OFF.QUIET[o.a]; }).length;
+  var off = S.netBad || navigator.onLine === false;
+  bar.hidden = !n && !off && !S.bootStale;
+  var queued = S.queue.length;
+  if (bar.hidden) { document.body.classList.remove('has-offbar'); return; }
+  document.body.classList.add('has-offbar');
+  bar.className = 'offbar' + (off ? ' off' : '') + (S.flushing ? ' busy' : '');
+  var text = off ? 'Χωρίς σύνδεση' : S.flushing ? 'Αποστολή…' : n ? 'Περιμένουν αποστολή' : 'Ενημέρωση…';
+  if (n) text += ' · ' + plural(n, 'αλλαγή', 'αλλαγές');
+  else if (S.bootStale && S.bootAt) text += ' · στοιχεία από ' + lowerDay(niceDate(stampOf(new Date(S.bootAt))));
+  $('offbar-text').textContent = text;
+  $('offbar-btn').hidden = !queued || S.flushing;
+}
+
+function wireOffline() {
+  $('offbar-btn').onclick = function () { S.netBad = false; offFlush(true); };
+  window.addEventListener('online', function () { S.netBad = false; offBar(); offFlushSoon(300); if (S.bootStale) offRefresh(); });
+  window.addEventListener('offline', function () { S.netBad = true; offBar(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) offFlushSoon(800); });
+  setInterval(function () { if (S.queue.length && !S.flushing) offFlush(); }, OFF.FLUSH_MS);
+  // Ο service worker κρατά την εφαρμογή στο κινητό: γράφεται πάντα, όχι μόνο με ειδοποιήσεις.
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  }
+  offBar();
+}
+
+// ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──
+start();
 
 })();

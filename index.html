@@ -85,6 +85,13 @@
 
 <div id="app" hidden>
 
+  <!-- 2.2: κατάσταση σύνδεσης / αλλαγές που περιμένουν να σταλούν -->
+  <div class="offbar" id="offbar" role="status" aria-live="polite" hidden>
+    <span class="offbar-dot" aria-hidden="true"></span>
+    <span class="offbar-text" id="offbar-text"></span>
+    <button type="button" class="offbar-btn" id="offbar-btn">Αποστολή τώρα</button>
+  </div>
+
   <!-- ΣΗΜΕΡΑ -->
   <section class="view" id="view-today">
     <header class="head">
