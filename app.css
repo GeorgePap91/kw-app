@@ -1241,3 +1241,88 @@ html[data-theme="dark"] .seg-btn.is-on{background:var(--card);box-shadow:inset 0
   .pop{align-items:center}
   .pop-box{border-radius:1.25rem;max-width:36rem}
 }
+
+/* ═════════════════════════════════════════════════════════════
+   2.1 · ΠΡΟΦΙΛ ΠΕΛΑΤΗ (στην οθόνη κλήσης)
+   Μεγάλα κουμπιά επιλογής αντί για μικρά radio, διακόπτες αντί για checkbox:
+   συμπληρώνεται με τον αντίχειρα, ενώ μιλάς.
+   ═════════════════════════════════════════════════════════════ */
+#tabs-detail .subtab{position:relative}
+.pf-dot{position:absolute;top:.375rem;right:.375rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--ink-3)}
+.pf-dot.showing{background:var(--green-solid)}.pf-dot.noanswer{background:var(--amber-solid)}.pf-dot.closed{background:var(--blue-solid)}
+.pf-line{display:flex;align-items:center;gap:.5rem;width:100%;margin-top:.625rem;padding:.5rem .625rem;border:1px solid var(--line);
+  border-radius:.75rem;background:var(--paper);color:var(--ink);font-size:.9375rem;font-weight:600;text-align:left;cursor:pointer;min-height:2.75rem}
+.pf-line>span:not(.tag){flex:1;min-width:0;overflow-wrap:anywhere}
+.pf-line .tag{flex:none}
+
+.pf-top{position:sticky;top:-1.25rem;z-index:3;margin:0 -1rem;padding:.75rem 1rem .5rem;background:var(--bg);border-bottom:1px solid var(--line)}
+.pf-deal{margin:0}
+.pf-deal .seg-btn{min-height:3.25rem;font-size:1.0625rem}
+.pf-meter{display:flex;align-items:center;gap:.625rem;min-height:2rem;margin-top:.5rem}
+.pf-level{font-size:.9375rem}
+.pf-bar{flex:1;height:.5rem;border-radius:.25rem;background:var(--wash);overflow:hidden}
+.pf-bar i{display:block;height:100%;border-radius:.25rem;background:var(--ink);transition:width .3s var(--move)}
+.pf-wait{font-size:.9375rem;color:var(--ink-2)}
+.pf-asktoggle{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;font-size:.9375rem;font-weight:600;color:var(--ink-2);cursor:pointer}
+.pf-asktoggle input{width:1.25rem;height:1.25rem;accent-color:var(--ink)}
+
+.pf-sec{margin-top:1.25rem}
+.pf-sec h4{margin:0 0 .5rem;font-size:.875rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.pf-field{display:block;margin-bottom:1.125rem}
+.pf-label{display:block;margin-bottom:.375rem;font-size:1.0625rem;font-weight:700}
+.pf-label small{font-weight:500;color:var(--ink-2)}
+.pf-ask{display:flex;gap:.5rem;align-items:flex-start;margin:-.125rem 0 .5rem;padding:.5rem .625rem;border-radius:.625rem;
+  background:var(--b-bg2);color:var(--ink);font-size:.9375rem;line-height:1.4;font-style:italic}
+.pf-ask .ico{flex:none;width:1.125rem;height:1.125rem;margin-top:.125rem;color:var(--blue)}
+.pf-field input[type="text"],.pf-field input[type="email"]{width:100%;min-height:3.25rem;padding:.625rem .875rem;font-size:1.0625rem;
+  border:1.5px solid var(--edge);border-radius:.75rem;background:var(--paper)}
+.pf-field input:focus{outline:3px solid var(--red);outline-offset:-1px;border-color:transparent}
+.pf-chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.pf-chips .chip{min-height:3rem;font-size:1rem}
+.pf-stepper{display:flex;align-items:center;gap:.5rem}
+.pf-stepper .icon-btn{font-size:1.5rem;font-weight:700;color:var(--ink)}
+.pf-stepper input{width:5rem!important;text-align:center;font-size:1.25rem!important;font-weight:800}
+.pf-money{position:relative}
+.pf-money input{padding-right:2.5rem!important;font-size:1.25rem!important;font-weight:800;font-variant-numeric:tabular-nums}
+.pf-money span{position:absolute;right:1rem;top:50%;transform:translateY(-50%);font-weight:800;color:var(--ink-2)}
+
+.pf-check{display:flex;align-items:center;gap:.75rem;min-height:3.25rem;margin-bottom:.625rem;padding:.5rem .75rem;border:1.5px solid var(--line);
+  border-radius:.875rem;background:var(--card);cursor:pointer}
+.pf-check input{position:absolute;opacity:0;width:1px;height:1px}
+.pf-switch{flex:none;position:relative;width:3.25rem;height:2rem;border-radius:1rem;background:var(--edge);transition:background .18s ease}
+.pf-switch::after{content:'';position:absolute;left:.25rem;top:.25rem;width:1.5rem;height:1.5rem;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s var(--move)}
+.pf-check input:checked+.pf-switch{background:var(--green-solid)}
+.pf-check input:checked+.pf-switch::after{transform:translateX(1.25rem)}
+.pf-check input:focus-visible+.pf-switch{outline:3px solid var(--red);outline-offset:2px}
+.pf-check-text b{display:block;font-size:1.0625rem}
+.pf-check-text small{display:block;font-size:.875rem;color:var(--ink-2)}
+.pf-check+.pf-ask{margin:-.25rem 0 1rem}
+.pf-note{margin:-.25rem 0 0}
+
+.pf-result:empty{display:none}
+.pf-advice{display:flex;flex-direction:column;gap:.125rem;padding:.875rem 1rem;border-radius:1rem;border-left:.375rem solid}
+.pf-advice b{font-size:1.25rem}
+.pf-advice span{font-size:1rem}
+.pf-advice.showing{background:var(--g-bg);border-color:var(--green-solid);color:var(--green)}
+.pf-advice.noanswer{background:var(--a-bg);border-color:var(--amber-solid);color:var(--amber)}
+.pf-advice.closed{background:var(--b-bg);border-color:var(--blue-solid);color:var(--blue)}
+.pf-advice span{color:var(--ink)}
+.pf-why{list-style:none;margin:.75rem 0;padding:0;display:grid;gap:.375rem}
+.pf-why li{display:flex;align-items:flex-start;gap:.5rem;font-size:1rem}
+.pf-why .ico{flex:none;width:1.25rem;height:1.25rem;margin-top:.0625rem}
+.pf-why .ok .ico{color:var(--green)}.pf-why .mid .ico{color:var(--amber)}.pf-why .no .ico{color:var(--red)}
+.pf-acts{display:flex;flex-wrap:wrap;gap:.5rem}
+.pf-acts .btn{flex:1 1 10rem}
+.pf-low{display:flex;gap:.5rem;align-items:flex-start;margin:.75rem 0 0;padding:.625rem .75rem;border-radius:.75rem;background:var(--a-bg);color:var(--amber);font-weight:600}
+.pf-low .ico{flex:none;width:1.25rem;height:1.25rem}
+.pf-result h4{margin-top:1rem}
+.pf-matches{display:grid;gap:.5rem}
+.pf-match{display:flex;align-items:center;gap:.5rem;padding:.5rem;border:1px solid var(--line);border-radius:.875rem;background:var(--card)}
+.pf-m-main{flex:1;min-width:0;display:flex;align-items:center;gap:.75rem;padding:0;border:0;background:none;color:var(--ink);text-align:left;cursor:pointer}
+.pf-m-main .row-thumb{flex:0 0 3.5rem;width:3.5rem;height:3.5rem}
+.pf-m-main>span:last-child{min-width:0;display:flex;flex-direction:column;font-size:.9375rem}
+.pf-m-main b{font-size:1.0625rem}
+.pf-m-main small{font-size:.875rem;color:var(--ink-2)}
+.pf-hint{text-align:center;margin-top:1.25rem}
+.pf-err{margin-top:.5rem}

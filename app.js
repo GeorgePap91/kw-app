@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.0';
+var APP_VERSION = '2.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -680,6 +680,8 @@ function wire() {
   wireTabs('tabs-alerts', 'alert-list', function (v) { S.alertTab = v; renderAlerts(); window.scrollTo(0, 0); });
   $('alerts-read').onclick = function () { markAlertsRead(currentAlerts()); renderAlerts(); };
   wireLeadPick();
+  wireProfile();                                     // 2.1
+  document.addEventListener('visibilitychange', function () { if (document.hidden) pfSaveNow(true); });
   $$('[data-goto]').forEach(function (b) { b.onclick = function () { goto(b.dataset.goto); }; });
   $$('[data-refresh]').forEach(function (b) { b.onclick = refreshNow; });
   $('map-deal').onchange = function () { MAP.deal = this.value; drawMap(true); };
@@ -2119,8 +2121,9 @@ function showLead(l, opts) {
   S.smsLang = 'el';
   S.smsKind = opts.remind && upcoming(l) ? 'reminder' : 'intro';
   fillDetail(l);
-  setTab('tabs-detail', 'hist');
-  showPane('detail-panes', 'hist');
+  loadProfile(l);                                    // 2.1
+  setTab('tabs-detail', opts.profile ? 'profile' : 'hist');
+  showPane('detail-panes', opts.profile ? 'profile' : 'hist');
   openSheet('detail');
   $('detail').querySelector('.sheet-body').scrollTop = 0;
   if (opts.outcome) openShowingForm();
@@ -2135,6 +2138,7 @@ function showLead(l, opts) {
 }
 
 function closeDetail() {
+  pfSaveNow();
   closeSheet('detail');
   S.lead = null;
   render();
@@ -2208,6 +2212,7 @@ function fillDetail(l) {
   renderNext(l);
   renderHist(l);
   prepareSms(l);
+  pfLine(l);                                         // 2.1
 }
 
 // ── Επόμενο βήμα (1.16) ───────────────────────────────────
@@ -2374,7 +2379,7 @@ function onTelClick(e) {
   beacon('called', { id: l.id, cid: cid });
   // Το κουμπί μπορεί να είναι μέσα στην κάρτα «Επόμενο βήμα», που ξαναζωγραφίζεται.
   // Αν σβηστεί πριν ανοίξει το τηλέφωνο, ο browser ακυρώνει την κλήση: περιμένουμε λίγο.
-  setTimeout(function () { if (S.lead === l) fillDetail(l); }, 350);
+  setTimeout(function () { if (S.lead === l) { fillDetail(l); showProfileTab(); } }, 350);   // 2.1: όταν γυρίσεις, είσαι στο Προφίλ
 }
 
 function onNoAnswer() {
@@ -6403,6 +6408,390 @@ function wireLeadPick() {
       msg.textContent = 'Δεν αποθηκεύτηκε: ' + e.message;
     });
   };
+}
+
+
+// ═════════════════════════════════════════════════════════════
+//  2.1 · ΠΡΟΦΙΛ ΠΕΛΑΤΗ
+//  Συμπληρώνεται την ώρα της κλήσης. Οι ερωτήσεις αλλάζουν με Αγορά / Ενοικίαση.
+//  Κάθε αλλαγή αποθηκεύεται μόνη της (server: Profile.gs → φύλλο «Προφίλ πελατών»).
+//  ΑΦΜ / Α.Δ.Τ. δεν ζητούνται εδώ: υπάρχουν μόνο μέσα στο PDF του εντύπου υπόδειξης.
+// ═════════════════════════════════════════════════════════════
+
+var PF = {
+  buy: [
+    { k: 'fin', label: 'Πώς θα πληρώσει', type: 'chips',
+      opts: [['cash', 'Ιδία κεφάλαια / μετρητά'], ['loan', 'Στεγαστικό δάνειο'], ['sale', 'Πώληση άλλου ακινήτου']],
+      ask: 'Έχετε εξασφαλίσει το κεφάλαιο ή θα προχωρήσετε με στεγαστικό δάνειο;' },
+    { k: 'preapproval', label: 'Έχει προέγκριση από τράπεζα', type: 'check', show: { fin: 'loan' } },
+    { k: 'when', label: 'Πότε θέλει να αγοράσει', type: 'chips',
+      opts: [['now', 'Άμεσα · 0–1 μήνας'], ['soon', 'Σύντομα · 1–3 μήνες'], ['explore', 'Ψάχνει · πάνω από 3 μήνες']],
+      ask: 'Πότε υπολογίζετε να ολοκληρώσετε την αγορά; Υπάρχει κάποια διορία που σας πιέζει;' },
+    { k: 'decider', label: 'Αποφασίζει ο ίδιος', type: 'check',
+      ask: 'Θα είστε εσείς ο τελικός αγοραστής ή θα έρθει και κάποιο άλλο μέλος της οικογένειας στο ραντεβού;' },
+    { k: 'companions', label: 'Ποιοι θα έρθουν στο ραντεβού', type: 'text', ph: 'π.χ. σύζυγος, μηχανικός' },
+    { k: 'budgetBuy', label: 'Ανώτατο budget', type: 'money',
+      ask: 'Το ακίνητο είναι στα {τιμή}. Είναι αυτό το ανώτατο όριό σας ή έχετε υπολογίσει και τα έξοδα μεταβίβασης;' },
+    { k: 'costs', label: 'Ξέρει τα έξοδα μεταβίβασης (~8–10%)', type: 'check', hint: 'Συμβολαιογράφος, φόρος, μεσιτικά.' },
+    { k: 'areasBuy', label: 'Άλλες περιοχές που τον ενδιαφέρουν', type: 'text', ph: 'π.χ. Παγκράτι, Βύρωνας',
+      ask: 'Αν δεν σας κάνει αυτό, σε ποιες άλλες περιοχές θα κοιτάζατε;' }
+  ],
+  rent: [
+    { k: 'people', label: 'Πόσα άτομα θα μείνουν', type: 'num', ask: 'Για πόσα άτομα προορίζεται το σπίτι;' },
+    { k: 'household', label: 'Ποιοι θα μείνουν', type: 'text', ph: 'π.χ. ζευγάρι, 3μελής οικογένεια, φοιτητής' },
+    { k: 'jobType', label: 'Εργασία', type: 'chips',
+      opts: [['private', 'Ιδιωτικός υπάλληλος'], ['public', 'Δημόσιος'], ['free', 'Ελεύθερος επαγγελματίας'], ['retired', 'Συνταξιούχος'], ['student', 'Φοιτητής']],
+      ask: 'Για να ενημερώσω τον ιδιοκτήτη, σε τι τομέα εργάζεστε;' },
+    { k: 'jobField', label: 'Τομέας εργασίας', type: 'text', ph: 'π.χ. τράπεζα, πληροφορική' },
+    { k: 'pet', label: 'Κατοικίδιο', type: 'chips', opts: [['yes', 'Ναι'], ['no', 'Όχι']],
+      ask: 'Έχετε κάποιο ζωάκι συντροφιάς που θα μείνει μαζί σας;' },
+    { k: 'petKind', label: 'Είδος και μέγεθος', type: 'text', ph: 'π.χ. μικρός σκύλος', show: { pet: 'yes' } },
+    { k: 'moveIn', label: 'Πότε θέλει να μπει', type: 'chips',
+      opts: [['now', 'Άμεσα'], ['30', 'Μέσα σε 30 ημέρες'], ['60', 'Σε 1–2 μήνες']], ask: 'Πότε θέλετε να μπείτε στο σπίτι;' },
+    { k: 'budgetRent', label: 'Ανώτατο ενοίκιο τον μήνα', type: 'money', ask: 'Μέχρι πόσο ενοίκιο σας βολεύει;' },
+    { k: 'areasRent', label: 'Άλλες περιοχές που τον ενδιαφέρουν', type: 'text', ph: 'π.χ. Κουκάκι, Πετράλωνα',
+      ask: 'Αν δεν σας κάνει αυτό, σε ποιες άλλες περιοχές θα κοιτάζατε;' }
+  ]
+};
+S.profiles = {};
+
+function pfPropOf(l) {
+  return S.props.filter(function (x) { return normCode(x.code) === normCode(l.code); })[0] || null;
+}
+
+/** Αγορά ή Ενοικίαση από το ακίνητο. Κενό αν δεν φαίνεται. */
+function pfDealOf(l) {
+  var p = pfPropOf(l);
+  var t = fold((p && p.deal) || l.deal || '');
+  return /ΕΝΟΙΚ|ΜΙΣΘ/.test(t) ? 'rent' : /ΠΩΛ|ΑΓΟΡ/.test(t) ? 'buy' : '';
+}
+
+function pfPrice(l) {
+  var p = pfPropOf(l);
+  var n = Number(String((p && p.price) || l.price || '').replace(/[^\d.]/g, ''));
+  return n || 0;
+}
+
+/** Αξιολόγηση: πόσο έτοιμος είναι. Ίδιοι κανόνες για όλους, γραμμένοι σε απλά λόγια. */
+function pfScore(d, l) {
+  var why = [], pts = 0, max = 0, asked = 0;
+  var add = function (n, of, text) { pts += n; max += of; if (text) why.push([n >= of ? 'ok' : n > 0 ? 'mid' : 'no', text]); };
+  var price = pfPrice(l);
+  if (d.deal === 'buy') {
+    if (d.fin) { asked++; add(d.fin === 'cash' || (d.fin === 'loan' && d.preapproval) ? 2 : 1, 2,
+      d.fin === 'cash' ? 'Έχει τα χρήματα' : d.fin === 'loan' ? (d.preapproval ? 'Δάνειο με προέγκριση' : 'Δάνειο χωρίς προέγκριση ακόμα') : 'Πρέπει πρώτα να πουλήσει'); }
+    if (d.when) { asked++; add(d.when === 'now' ? 2 : d.when === 'soon' ? 1 : 0, 2,
+      d.when === 'now' ? 'Θέλει να αγοράσει άμεσα' : d.when === 'soon' ? 'Αγοράζει σε 1–3 μήνες' : 'Ακόμα ψάχνει'); }
+    if (d.decider !== undefined) { asked++; add(d.decider ? 1 : 0, 1, d.decider ? 'Αποφασίζει ο ίδιος' : 'Αποφασίζει και άλλος'); }
+    if (d.costs !== undefined) { asked++; add(d.costs ? 1 : 0, 1, d.costs ? 'Ξέρει τα έξοδα μεταβίβασης' : 'Δεν ξέρει τα έξοδα μεταβίβασης'); }
+    if (d.budgetBuy && price) { asked++; add(d.budgetBuy >= price ? 1 : 0, 1,
+      d.budgetBuy >= price ? 'Το budget καλύπτει την τιμή' : 'Budget κάτω από την τιμή (' + fmtPrice(d.budgetBuy) + ')'); }
+  } else if (d.deal === 'rent') {
+    if (d.moveIn) { asked++; add(d.moveIn === 'now' ? 2 : d.moveIn === '30' ? 1 : 0, 2,
+      d.moveIn === 'now' ? 'Θέλει να μπει άμεσα' : d.moveIn === '30' ? 'Μπαίνει σε 30 ημέρες' : 'Μπαίνει σε 1–2 μήνες'); }
+    if (d.jobType) { asked++; add(d.jobType === 'student' ? 0 : 1, 1, d.jobType === 'student' ? 'Φοιτητής: ρώτα για εγγυητή' : 'Σταθερό εισόδημα'); }
+    if (d.people) { asked++; add(1, 1, d.people + (d.people == 1 ? ' άτομο' : ' άτομα')); }
+    if (d.pet) { asked++; add(1, 1, d.pet === 'yes' ? 'Έχει κατοικίδιο: έλεγξε με τον ιδιοκτήτη' : 'Χωρίς κατοικίδιο'); }
+    if (d.budgetRent && price) { asked++; add(d.budgetRent >= price ? 1 : 0, 1,
+      d.budgetRent >= price ? 'Το ενοίκιο τον καλύπτει' : 'Budget κάτω από το ενοίκιο (' + fmtPrice(d.budgetRent) + ')'); }
+  }
+  if (asked < 2) return { level: '', why: why, need: 2 - asked };
+  var r = pts / max;
+  return { level: r >= 0.75 ? 'Θερμός' : r >= 0.45 ? 'Χλιαρός' : 'Κρύος', why: why, pct: Math.round(r * 100) };
+}
+
+var PF_TONE = { 'Θερμός': 'showing', 'Χλιαρός': 'noanswer', 'Κρύος': 'closed' };
+
+/** Αντιπρόταση: άλλα διαθέσιμα ακίνητα, ίδια συναλλαγή, μέσα στο budget (ή κοντά στην τιμή). */
+function pfMatches(d, l) {
+  var deal = d.deal === 'rent' ? 'Ενοικίαση' : 'Πώληση';
+  var budget = d.deal === 'rent' ? d.budgetRent : d.budgetBuy;
+  var price = pfPrice(l);
+  var areas = searchWords(d.deal === 'rent' ? d.areasRent : d.areasBuy);
+  var home = pfPropOf(l);
+  return S.props.filter(function (p) {
+    if (p.available === false || normCode(p.code) === normCode(l.code) || (p.deal && p.deal !== deal)) return false;
+    var n = Number(String(p.price || '').replace(/[^\d.]/g, ''));
+    if (budget) return n && n <= budget * 1.05;
+    return price && n && Math.abs(n - price) <= price * 0.2;
+  }).map(function (p) {
+    var area = fold(p.area);
+    var near = (home && home.area && fold(home.area) === area ? 2 : 0) +
+      (areas.some(function (w) { return area.indexOf(w) !== -1; }) ? 3 : 0) + (p.mine ? 1 : 0);
+    return { p: p, near: near };
+  }).sort(function (a, b) { return b.near - a.near; }).slice(0, 3).map(function (x) { return x.p; });
+}
+
+// ── Φόρτωση / αποθήκευση ──
+
+function loadProfile(l) {
+  if (S.pf && S.pf.id !== l.id) pfSaveNow();
+  var id = l.id;
+  var have = S.profiles[id];
+  S.pf = { id: id, data: have ? JSON.parse(JSON.stringify(have.p || {})) : {}, loaded: !!have, err: '' };
+  if (!S.pf.data.deal) S.pf.data.deal = pfDealOf(l) || 'buy';
+  renderProfile(l);
+  if (have) return;
+  api('profileGet', { id: id }).then(function (r) {
+    S.profiles[id] = { p: r.p || null, level: r.level || '', updated: r.updated || '' };
+    if (S.lead && S.lead.id === id) pfLine(S.lead);
+    if (!S.pf || S.pf.id !== id || S.pf.dirty) return;
+    S.pf.data = r.p ? JSON.parse(JSON.stringify(r.p)) : {};
+    if (!S.pf.data.deal) S.pf.data.deal = pfDealOf(l) || 'buy';
+    S.pf.loaded = true;
+    S.pf.updated = r.updated || '';
+    renderProfile(l);
+  }).catch(function (e) {
+    if (!S.pf || S.pf.id !== id) return;
+    S.pf.loaded = true;
+    S.pf.err = /Άγνωστη ενέργεια/.test(e.message)
+      ? 'Ο server δεν έχει ακόμα το Προφίλ: πρόσθεσε το Profile.gs στο Apps Script και κάνε Νέα έκδοση.'
+      : 'Δεν φόρτωσε το προφίλ: ' + e.message;
+    renderProfile(l);
+  });
+}
+
+function pfSaveSoon() {
+  var pf = S.pf;
+  if (!pf) return;
+  pf.dirty = true;
+  pfHint('Αποθήκευση…');
+  clearTimeout(pf.timer);
+  pf.timer = setTimeout(pfSaveNow, 900);
+}
+
+/** quiet: η εφαρμογή πάει στο παρασκήνιο (π.χ. πάτησες Κλήση) → sendBeacon, που φτάνει ακόμα κι αν «παγώσει». */
+function pfSaveNow(quiet) {
+  var pf = S.pf;
+  if (!pf || !pf.dirty) return;
+  clearTimeout(pf.timer);
+  pf.dirty = false;
+  var l = findLead(pf.id);
+  var sc = l ? pfScore(pf.data, l) : { level: '' };
+  var data = JSON.parse(JSON.stringify(pf.data));
+  S.profiles[pf.id] = { p: data, level: sc.level, updated: '' };
+  if (quiet === true) { beacon('profileSave', { id: pf.id, p: data, level: sc.level }); pfHint('Αποθηκεύτηκε'); return; }
+  api('profileSave', { id: pf.id, p: data, level: sc.level }).then(function (r) {
+    S.profiles[pf.id].updated = r.saved;
+    if (S.pf === pf) pfHint(r.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Αποθηκεύτηκε ' + lowerDay(niceDate(r.saved)), r.masked);
+    if (S.lead && S.lead.id === pf.id) pfLine(S.lead);
+  }).catch(function (e) {
+    pf.dirty = true;
+    if (S.pf === pf) pfHint(/Άγνωστη ενέργεια/.test(e.message)
+      ? 'Δεν αποθηκεύτηκε: λείπει το Profile.gs στον server.' : 'Δεν αποθηκεύτηκε: ' + e.message + ' · ξαναδοκιμάζω με την επόμενη αλλαγή.', true);
+  });
+}
+
+function pfHint(text, bad) {
+  var h = $('pf-hint');
+  if (!h) return;
+  h.textContent = text;
+  h.className = 'save-hint pf-hint' + (bad ? ' err' : '');
+}
+
+// ── Εμφάνιση ──
+
+function pfAskOn() { return store('kw_pf_ask') !== 'off'; }
+
+function pfField(f, d, l) {
+  var v = d[f.k];
+  var ask = f.ask && pfAskOn() ? '<p class="pf-ask">' + ico('sms') + '<span>«' + esc(f.ask.replace('{τιμή}', fmtPrice(pfPrice(l)) || 'Χ €')) + '»</span></p>' : '';
+  var body = '';
+  if (f.type === 'chips') {
+    body = '<div class="pf-chips" role="radiogroup" aria-label="' + esc(f.label) + '">' + f.opts.map(function (o) {
+      var on = v === o[0];
+      return '<button type="button" class="chip' + (on ? ' is-on' : '') + '" role="radio" aria-checked="' + on + '" data-pf-k="' + f.k + '" data-pf-v="' + o[0] + '">' + esc(o[1]) + '</button>';
+    }).join('') + '</div>';
+  } else if (f.type === 'check') {
+    return '<label class="pf-check" data-pf-row="' + f.k + '"><input type="checkbox" data-pf-k="' + f.k + '"' + (v ? ' checked' : '') + '>' +
+      '<span class="pf-switch" aria-hidden="true"></span><span class="pf-check-text"><b>' + esc(f.label) + '</b>' +
+      (f.hint ? '<small>' + esc(f.hint) + '</small>' : '') + '</span></label>' + ask;
+  } else if (f.type === 'num') {
+    body = '<div class="pf-stepper"><button type="button" class="icon-btn ring" data-pf-step="' + f.k + '" data-d="-1" aria-label="Λιγότερα">−</button>' +
+      '<input type="text" inputmode="numeric" data-pf-k="' + f.k + '" value="' + esc(v || '') + '" aria-label="' + esc(f.label) + '" placeholder="—">' +
+      '<button type="button" class="icon-btn ring" data-pf-step="' + f.k + '" data-d="1" aria-label="Περισσότερα">+</button></div>';
+  } else if (f.type === 'money') {
+    body = '<div class="pf-money"><input type="text" inputmode="numeric" data-pf-k="' + f.k + '" value="' + esc(v ? String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '') +
+      '" aria-label="' + esc(f.label) + '" placeholder="π.χ. ' + (f.k === 'budgetRent' ? '900' : '250.000') + '"><span>€</span></div>';
+  } else {
+    body = '<input type="text" data-pf-k="' + f.k + '" value="' + esc(v || '') + '" maxlength="200" placeholder="' + esc(f.ph || '') + '" aria-label="' + esc(f.label) + '">';
+  }
+  return '<div class="pf-field" data-pf-row="' + f.k + '"><span class="pf-label">' + esc(f.label) + '</span>' + ask + body + '</div>';
+}
+
+function renderProfile(l) {
+  var el = $('pf-body');
+  if (!el || !S.pf) return;
+  var d = S.pf.data;
+  if (S.pf.err) {
+    el.innerHTML = '<p class="card-note pf-err">' + esc(S.pf.err) + '</p>';
+    return;
+  }
+  var deal = d.deal || 'buy';
+  var html = '<div class="pf-top">' +
+    '<div class="seg pf-deal" role="radiogroup" aria-label="Τι ψάχνει">' +
+      '<button type="button" class="seg-btn' + (deal === 'buy' ? ' is-on' : '') + '" role="radio" aria-checked="' + (deal === 'buy') + '" data-pf-deal="buy">' + ico('home') + 'Αγορά</button>' +
+      '<button type="button" class="seg-btn' + (deal === 'rent' ? ' is-on' : '') + '" role="radio" aria-checked="' + (deal === 'rent') + '" data-pf-deal="rent">' + ico('key') + 'Ενοικίαση</button>' +
+    '</div>' +
+    '<div class="pf-meter" id="pf-meter"></div>' +
+  '</div>' +
+  '<label class="pf-asktoggle"><input type="checkbox" id="pf-ask-on"' + (pfAskOn() ? ' checked' : '') + '> Δείξε τι να ρωτήσω</label>' +
+  (S.pf.loaded ? '' : '<p class="field-hint">Φόρτωση προφίλ…</p>') +
+  '<section class="pf-sec"><h4>Πελάτης</h4>' +
+    '<div class="pf-field"><span class="pf-label">Ονοματεπώνυμο</span><input type="text" data-pf-k="name" value="' + esc(d.name || l.name || '') + '" maxlength="80" autocomplete="off"></div>' +
+    '<div class="pf-field"><span class="pf-label">Email <small>(προαιρετικό)</small></span><input type="email" inputmode="email" data-pf-k="email" value="' + esc(d.email || l.email || '') + '" autocomplete="off"></div>' +
+    '<p class="field-hint pf-note">ΑΦΜ και ταυτότητα δεν χρειάζονται τώρα. Τα γράφει ο πελάτης μόνος του στο έντυπο υπόδειξης.</p>' +
+  '</section>' +
+  '<section class="pf-sec"><h4>' + (deal === 'rent' ? 'Ενοικίαση' : 'Αγορά') + '</h4>' +
+    PF[deal].map(function (f) { return pfField(f, d, l); }).join('') + '</section>' +
+  '<section class="pf-sec pf-result" id="pf-result"></section>' +
+  '<p class="save-hint pf-hint" id="pf-hint" aria-live="polite">' + (S.pf.updated ? 'Τελευταία αλλαγή ' + esc(lowerDay(niceDate(S.pf.updated))) : '') + '</p>';
+  el.innerHTML = html;
+  pfConditional();
+  pfRefresh(l);
+}
+
+/** Πεδία που φαίνονται μόνο με κάποια απάντηση (π.χ. «προέγκριση» μόνο με δάνειο). */
+function pfConditional() {
+  var d = S.pf.data, deal = d.deal || 'buy';
+  PF[deal].forEach(function (f) {
+    if (!f.show) return;
+    var k = Object.keys(f.show)[0];
+    var row = $('pf-body').querySelector('[data-pf-row="' + f.k + '"]');
+    if (row) row.hidden = d[k] !== f.show[k];
+  });
+}
+
+/** Ξαναγράφει μόνο την αξιολόγηση και το «τι κάνω τώρα», χωρίς να χάνεται το πεδίο που γράφεις. */
+function pfRefresh(l) {
+  var d = S.pf.data, sc = pfScore(d, l);
+  var meter = $('pf-meter'), res = $('pf-result');
+  if (!meter || !res) return;
+  meter.innerHTML = sc.level
+    ? '<span class="tag ' + PF_TONE[sc.level] + ' pf-level">' + esc(sc.level) + '</span><span class="pf-bar"><i style="width:' + sc.pct + '%"></i></span>'
+    : '<span class="pf-wait">Απάντησε ' + sc.need + (sc.need === 1 ? ' ακόμα ερώτηση' : ' ερωτήσεις') + ' για αξιολόγηση</span>';
+  $('pf-tab-dot').hidden = !sc.level;
+  $('pf-tab-dot').className = 'pf-dot ' + (sc.level ? PF_TONE[sc.level] : '');
+
+  if (!sc.level) { res.innerHTML = ''; return; }
+  var budget = d.deal === 'rent' ? d.budgetRent : d.budgetBuy, price = pfPrice(l);
+  var low = budget && price && budget < price;
+  var matches = (sc.level === 'Κρύος' || low) ? pfMatches(d, l) : [];
+  var advice = sc.level === 'Θερμός' ? ['Κλείσε υπόδειξη τώρα, όσο είναι στο τηλέφωνο.', 'showing']
+    : sc.level === 'Χλιαρός' ? ['Πρότεινε υπόδειξη. Αν διστάζει, στείλε του την παρουσίαση.', 'showing']
+    : ['Μάλλον όχι αυτό το ακίνητο. Δες αν του ταιριάζει κάποιο άλλο.', ''];
+  res.innerHTML = '<h4>Τι κάνω τώρα</h4>' +
+    '<div class="pf-advice ' + PF_TONE[sc.level] + '"><b>' + esc(sc.level) + '</b><span>' + esc(advice[0]) + '</span></div>' +
+    '<ul class="pf-why">' + sc.why.map(function (w) {
+      return '<li class="' + w[0] + '">' + ico(w[0] === 'ok' ? 'check' : w[0] === 'mid' ? 'next' : 'alert') + '<span>' + esc(w[1]) + '</span></li>';
+    }).join('') + '</ul>' +
+    '<div class="pf-acts">' +
+      (advice[1] && !hasShowing(l) ? '<button type="button" class="btn solid-red" data-pf-act="showing">' + ico('calendar') + '<span>Κλείσε υπόδειξη</span></button>' : '') +
+      (pfPropOf(l) && pfPropOf(l).available !== false ? '<button type="button" class="btn" data-pf-act="present">' + ico('out') + '<span>Στείλε παρουσίαση</span></button>' : '') +
+    '</div>' +
+    (low ? '<p class="pf-low">' + ico('alert') + 'Το budget είναι κάτω από την τιμή του ακινήτου (' + esc(fmtPrice(price)) + ').</p>' : '') +
+    (matches.length ? '<h4>Αντιπρόταση · ταιριάζουν στο budget</h4><div class="pf-matches">' + matches.map(function (p) {
+      return '<div class="pf-match"><button type="button" class="pf-m-main" data-pf-open="' + esc(p.code) + '">' +
+        thumbHtml(p.code) + '<span><b>' + esc(fmtPrice(p.price)) + '</b>' + esc(p.street || p.title || p.code) +
+        '<small>' + esc([p.sqm ? p.sqm + ' τ.μ.' : '', p.area, p.mine ? 'δικό σου' : p.partner].filter(Boolean).join(' · ')) + '</small></span></button>' +
+        '<button type="button" class="btn small" data-pf-send="' + esc(p.code) + '">Στείλε</button></div>';
+    }).join('') + '</div>' : (sc.level === 'Κρύος' || low ? '<p class="field-hint">Κανένα άλλο διαθέσιμο ακίνητο της ομάδας δεν ταιριάζει. Γράψε περιοχές για να ψάξω πιο ευρύτερα.</p>' : ''));
+  wireThumbs(res);
+}
+
+/** Η γραμμή κάτω από το όνομα στην κάρτα πελάτη: «Θερμός · Αγορά · Δάνειο με προέγκριση · έως 250.000 €». */
+function pfLine(l) {
+  var b = $('d-pf-line'), rec = S.profiles[l.id];
+  if (!rec || !rec.p) { b.hidden = true; return; }
+  var d = rec.p, sc = pfScore(d, l), parts = [];
+  if (d.deal === 'buy') {
+    parts.push('Αγορά');
+    if (d.fin) parts.push({ cash: 'Μετρητά', loan: d.preapproval ? 'Δάνειο με προέγκριση' : 'Δάνειο', sale: 'Με πώληση ακινήτου' }[d.fin]);
+    if (d.when) parts.push({ now: 'Άμεσα', soon: '1–3 μήνες', explore: 'Ψάχνει' }[d.when]);
+    if (d.budgetBuy) parts.push('έως ' + fmtPrice(d.budgetBuy));
+  } else {
+    parts.push('Ενοικίαση');
+    if (d.people) parts.push(d.people + (d.people == 1 ? ' άτομο' : ' άτομα'));
+    if (d.pet) parts.push(d.pet === 'yes' ? 'κατοικίδιο' : 'χωρίς κατοικίδιο');
+    if (d.moveIn) parts.push({ now: 'άμεσα', '30': 'σε 30 ημέρες', '60': 'σε 1–2 μήνες' }[d.moveIn]);
+  }
+  b.innerHTML = (sc.level ? '<span class="tag ' + PF_TONE[sc.level] + '">' + esc(sc.level) + '</span>' : '') +
+    '<span>' + esc(parts.join(' · ')) + '</span>' + ico('next', 'ico chev');
+  b.hidden = false;
+}
+
+function showProfileTab() {
+  setTab('tabs-detail', 'profile');
+  showPane('detail-panes', 'profile');
+}
+
+function wireProfile() {
+  var root = $('pf-body');
+  var val = function (k, v) {
+    if (v === '' || v == null) delete S.pf.data[k]; else S.pf.data[k] = v;
+    pfConditional();
+    pfRefresh(findLead(S.pf.id));
+    pfSaveSoon();
+  };
+  root.addEventListener('click', function (e) {
+    var t = e.target.closest('button, input');
+    if (!t || !S.pf) return;
+    var l = findLead(S.pf.id);
+    if (t.dataset.pfDeal) {
+      if (S.pf.data.deal === t.dataset.pfDeal) return;
+      S.pf.data.deal = t.dataset.pfDeal;
+      renderProfile(l);
+      pfSaveSoon();
+    } else if (t.dataset.pfV) {
+      var k = t.dataset.pfK, on = S.pf.data[k] !== t.dataset.pfV;      // ξανά πάτημα = ακύρωση
+      t.parentNode.querySelectorAll('.chip').forEach(function (c) {
+        var me = c === t && on;
+        c.classList.toggle('is-on', me);
+        c.setAttribute('aria-checked', me ? 'true' : 'false');
+      });
+      val(k, on ? t.dataset.pfV : '');
+    } else if (t.dataset.pfStep) {
+      var key = t.dataset.pfStep, n = Math.max(0, Math.min(20, (Number(S.pf.data[key]) || 0) + Number(t.dataset.d)));
+      root.querySelector('input[data-pf-k="' + key + '"]').value = n || '';
+      val(key, n || '');
+    } else if (t.dataset.pfAct === 'showing') {
+      pfSaveNow();
+      openShowingForm();
+    } else if (t.dataset.pfAct === 'present') {
+      pfSaveNow();
+      openPresent(pfPropOf(l), l);
+    } else if (t.dataset.pfOpen) {
+      pfSaveNow();
+      openProp(t.dataset.pfOpen);
+    } else if (t.dataset.pfSend) {
+      pfSaveNow();
+      openPresent(S.props.filter(function (p) { return p.code === t.dataset.pfSend; })[0], l);
+    } else if (t.id === 'pf-ask-on') {
+      store('kw_pf_ask', t.checked ? null : 'off');
+      renderProfile(l);
+    }
+  });
+  root.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.type === 'checkbox' && t.dataset.pfK) val(t.dataset.pfK, t.checked ? true : false);
+  });
+  root.addEventListener('input', function (e) {
+    var t = e.target, k = t.dataset.pfK;
+    if (!k || t.type === 'checkbox') return;
+    var f = PF.buy.concat(PF.rent).filter(function (x) { return x.k === k; })[0];
+    if (f && f.type === 'money') {
+      var digits = t.value.replace(/\D/g, '').slice(0, 9);
+      t.value = digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+      val(k, digits ? Number(digits) : '');
+    } else if (f && f.type === 'num') {
+      var nn = t.value.replace(/\D/g, '').slice(0, 2);
+      t.value = nn;
+      val(k, nn ? Number(nn) : '');
+    } else {
+      val(k, t.value.trim() ? t.value : '');
+    }
+  });
+  $('d-pf-line').onclick = showProfileTab;
 }
 
 })();

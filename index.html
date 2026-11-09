@@ -528,6 +528,7 @@
         </div>
       </div>
       <a class="addr-link" id="d-addr" target="_blank" rel="noopener" hidden></a>
+      <button class="pf-line" id="d-pf-line" hidden></button>
       <div class="round-btns">
         <a class="round red" id="d-tel"><i><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></i><span>Κλήση</span></a>
         <button class="round" id="d-sms-btn"><i><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg></i><span>SMS</span></button>
@@ -539,14 +540,18 @@
 
     <section class="next-step" id="d-next" aria-label="Επόμενο βήμα"></section>
 
-    <div class="subtabs in-sheet" id="tabs-detail" role="tablist" aria-label="Κλήση">
+    <div class="subtabs in-sheet four" id="tabs-detail" role="tablist" aria-label="Κλήση">
       <button class="subtab is-on" role="tab" data-tab="hist"><span>Ιστορικό</span></button>
+      <button class="subtab" role="tab" data-tab="profile" id="tab-d-profile"><span>Προφίλ</span><i class="pf-dot" id="pf-tab-dot" hidden></i></button>
       <button class="subtab" role="tab" data-tab="info"><span>Στοιχεία</span></button>
       <button class="subtab" role="tab" data-tab="notes"><span>Σημειώσεις</span></button>
     </div>
 
     <div id="detail-panes">
       <div data-pane="hist"><ol class="timeline" id="d-hist"></ol></div>
+
+      <!-- 2.1 · ΠΡΟΦΙΛ ΠΕΛΑΤΗ: συμπληρώνεται την ώρα της κλήσης, αποθηκεύεται μόνο του -->
+      <div data-pane="profile" hidden><div class="pf" id="pf-body"></div></div>
 
       <div data-pane="info" hidden>
         <div class="message" id="d-message-wrap" hidden>
