@@ -1,0 +1,67 @@
+# Ανεβάζει τον κώδικα του φακέλου apps-script/ στο Google Apps Script με clasp.
+#  - branch feat/**  → DEV project (δοκιμές, test δεδομένα)
+#  - branch main     → PROD project + νέα αριθμημένη έκδοση + ενημέρωση της
+#                       υπάρχουσας ανάπτυξης (το /exec URL ΔΕΝ αλλάζει)
+# Χρειάζεται GitHub Secrets: CLASPRC_JSON, SCRIPT_ID_DEV, SCRIPT_ID_PROD, DEPLOYMENT_ID_PROD
+# Αν λείπουν τα secrets, το job απλώς παραλείπεται (δεν «σπάει» τίποτα).
+name: Deploy — Apps Script
+on:
+  push:
+    branches: [main, 'feat/**']
+    paths: ['apps-script/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apps-script-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm test
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      TARGET: ${{ github.ref_name == 'main' && 'PROD' || 'DEV' }}
+      SCRIPT_ID: ${{ github.ref_name == 'main' && secrets.SCRIPT_ID_PROD || secrets.SCRIPT_ID_DEV }}
+      DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID_PROD }}
+    steps:
+      - name: Έλεγχος ρυθμίσεων
+        id: cfg
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then
+            echo "::warning::Λείπουν τα GitHub Secrets για $TARGET — παραλείπεται το deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with: { node-version: 22 }
+      - name: Ρύθμιση clasp
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          npm i -g @google/clasp@2.4.2
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"apps-script"}' "$SCRIPT_ID" > .clasp.json
+      - name: Push κώδικα ($TARGET)
+        if: steps.cfg.outputs.ready == 'true'
+        run: clasp push --force
+      - name: Νέα έκδοση + ενημέρωση ανάπτυξης (μόνο PROD)
+        if: steps.cfg.outputs.ready == 'true' && env.TARGET == 'PROD' && env.DEPLOYMENT_ID != ''
+        run: |
+          DESC="$(git log -1 --pretty=%s | cut -c1-90)"
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "$DESC"
+      - name: Καθαρισμός credentials
+        if: always()
+        run: rm -f ~/.clasprc.json .clasp.json

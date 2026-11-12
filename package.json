@@ -1,0 +1,9 @@
+{
+  "name": "kw-app",
+  "private": true,
+  "description": "KW App — PWA (GitHub Pages) + Apps Script backend",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

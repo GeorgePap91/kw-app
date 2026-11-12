@@ -1,0 +1,19 @@
+# Τρέχει τα tests σε κάθε Pull Request και σε κάθε push.
+# Αν αποτύχουν, το PR δεν πρέπει να γίνει merge.
+name: CI — Tests
+on:
+  pull_request:
+  push:
+    branches: [main, 'feat/**', 'chore/**']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
