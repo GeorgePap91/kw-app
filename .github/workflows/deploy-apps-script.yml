@@ -45,20 +45,32 @@ jobs:
           fi
       - uses: actions/checkout@v4
         if: steps.cfg.outputs.ready == 'true'
-      - uses: actions/setup-node@v4
+      - name: Έλεγχος ότι υπάρχει κώδικας (προστασία από άδειο push)
+        id: code
         if: steps.cfg.outputs.ready == 'true'
+        run: |
+          N=$(find apps-script -maxdepth 2 -type f \( -name '*.gs' -o -name '*.js' \) | wc -l)
+          if [ ! -f apps-script/appsscript.json ] || [ "$N" -lt 1 ]; then
+            echo "::warning::Δεν βρέθηκε appsscript.json ή αρχεία .gs στο apps-script/ — ΔΕΝ γίνεται deploy (θα έσβηνε τον κώδικα)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Βρέθηκαν $N αρχεία κώδικα."
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.code.outputs.ok == 'true'
         with: { node-version: 22 }
       - name: Ρύθμιση clasp
-        if: steps.cfg.outputs.ready == 'true'
+        if: steps.code.outputs.ok == 'true'
         run: |
           npm i -g @google/clasp@2.4.2
           printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
           printf '{"scriptId":"%s","rootDir":"apps-script"}' "$SCRIPT_ID" > .clasp.json
       - name: Push κώδικα ($TARGET)
-        if: steps.cfg.outputs.ready == 'true'
+        if: steps.code.outputs.ok == 'true'
         run: clasp push --force
       - name: Νέα έκδοση + ενημέρωση ανάπτυξης (μόνο PROD)
-        if: steps.cfg.outputs.ready == 'true' && env.TARGET == 'PROD' && env.DEPLOYMENT_ID != ''
+        if: steps.code.outputs.ok == 'true' && env.TARGET == 'PROD' && env.DEPLOYMENT_ID != ''
         run: |
           DESC="$(git log -1 --pretty=%s | cut -c1-90)"
           clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "$DESC"
