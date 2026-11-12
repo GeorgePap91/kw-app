@@ -540,6 +540,7 @@ function bootFail(msg, final) {
 function onBoot(b) {
   S.boot = b;
   S.me = b.agent;
+  S.flags = b.flags || {};                         // 2.3: feature flags (Ιδιότητα σεναρίου FEATURES)
   applyData(b);
 
   $('env').hidden = b.env === 'prod';
@@ -6690,7 +6691,8 @@ function pfField(f, d, l) {
   } else {
     body = '<input type="text" data-pf-k="' + f.k + '" value="' + esc(v || '') + '" maxlength="200" placeholder="' + esc(f.ph || '') + '" aria-label="' + esc(f.label) + '">';
   }
-  return '<div class="pf-field" data-pf-row="' + f.k + '"><span class="pf-label">' + esc(f.label) + '</span>' + ask + body + '</div>';
+  var mem = typeof memChips === 'function' ? memChips(f.k, d) : '';    // 2.3 · FEAT-9 Smart Form Memory
+  return '<div class="pf-field" data-pf-row="' + f.k + '"><span class="pf-label">' + esc(f.label) + '</span>' + ask + body + mem + '</div>';
 }
 
 function renderProfile(l) {
@@ -6824,6 +6826,8 @@ function wireProfile() {
         c.setAttribute('aria-checked', me ? 'true' : 'false');
       });
       val(k, on ? t.dataset.pfV : '');
+    } else if (t.dataset.pfMemk) {                                  // 2.3 · chip «Συχνά:»
+      memPick(t, val);
     } else if (t.dataset.pfStep) {
       var key = t.dataset.pfStep, n = Math.max(0, Math.min(20, (Number(S.pf.data[key]) || 0) + Number(t.dataset.d)));
       root.querySelector('input[data-pf-k="' + key + '"]').value = n || '';
@@ -6848,6 +6852,8 @@ function wireProfile() {
   root.addEventListener('change', function (e) {
     var t = e.target;
     if (t.type === 'checkbox' && t.dataset.pfK) val(t.dataset.pfK, t.checked ? true : false);
+    // 2.3 · μαθαίνει όταν φεύγεις από το πεδίο, όχι σε κάθε πλήκτρο
+    if (t.dataset.pfK && typeof memLearn === 'function' && memKind(t.dataset.pfK)) memLearn(S.pf.id, t.dataset.pfK, S.pf.data[t.dataset.pfK]);
   });
   root.addEventListener('input', function (e) {
     var t = e.target, k = t.dataset.pfK;
@@ -7148,7 +7154,7 @@ function offProfilesLoad() {
 
 /** Σβήνει ό,τι κρατά το κινητό για τους πελάτες. Αποσύνδεση, ανάκληση, 14 ημέρες. */
 function offForget() {
-  ['kw_boot', 'kw_prof', 'kw_queue', 'kw_cache_contacts', 'kw_cache_referrals', 'kw_cache_metrics', 'kw_call'].forEach(function (k) {
+  ['kw_boot', 'kw_prof', 'kw_queue', 'kw_cache_contacts', 'kw_cache_referrals', 'kw_cache_metrics', 'kw_call', 'kw_mem'].forEach(function (k) {
     try { localStorage.removeItem(k); } catch (e) { /* ιδιωτική περιήγηση */ }
   });
   S.queue = [];
