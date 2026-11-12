@@ -1348,3 +1348,8 @@ body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off
   .offbar{left:var(--side-w);bottom:0}
   body.has-offbar .view{padding-bottom:calc(var(--off-h) + 1rem)}
 }
+
+/* 2.3 · FEAT-9 Smart Form Memory: chips «Συχνά:» κάτω από περιοχές / budget */
+.pf-mem{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
+.pf-mem-l{font-size:.875rem;font-weight:700;color:var(--ink-2)}
+.pf-mem .chip.small{min-height:2.75rem}

@@ -63,3 +63,17 @@ test('backend: το Demo σταματά πάνω σε παραγωγικό workb
   assert.match(s, /PROD_SPREADSHEET_IDS/);
   assert.match(s, /CONFIG\.ENV === 'prod'/);
 });
+
+test('backend: feature flags (all / admin / off / λίστα email)', { skip: !has }, () => {
+  const props = { FEATURES: JSON.stringify({ a: 'all', b: 'admin', c: 'off', d: 'me@x.gr, other@x.gr', e: 'other@x.gr' }) };
+  const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+  const ctx = { console, PropertiesService: { getScriptProperties: () => ({ getProperties: () => props }) } };
+  for (const k of ['SpreadsheetApp', 'DriveApp', 'Utilities', 'CacheService', 'ScriptApp', 'Session', 'HtmlService', 'ContentService', 'MailApp', 'CalendarApp', 'LockService', 'UrlFetchApp']) ctx[k] = noop;
+  vm.createContext(ctx);
+  vm.runInContext(src('Code.js'), ctx);
+  const agent = { email: 'me@x.gr', roles: { agent: true, admin: false } };
+  const admin = { email: 'boss@x.gr', roles: { agent: true, admin: true } };
+  ctx.A = agent; ctx.B = admin;
+  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(A))', ctx), JSON.stringify({ a: true, b: false, c: false, d: true, e: false }));
+  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(B))', ctx), JSON.stringify({ a: true, b: true, c: false, d: false, e: false }));
+});

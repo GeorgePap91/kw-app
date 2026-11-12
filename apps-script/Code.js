@@ -1553,8 +1553,28 @@ function actBootstrap_(agent, d, sess) {
     statuses: STATUS_LIST,
     leads: agentRole ? myLeads_(agent).map(l => serialize_(l)) : [],
     props: agentRole ? teamProps_(agent) : [],
-    reviews: agentRole ? myReviews_(agent) : []
+    reviews: agentRole ? myReviews_(agent) : [],
+    flags: featureFlags_(agent)
   };
+}
+
+/**
+ * 2.3 · Feature flags. Ιδιότητα σεναρίου FEATURES (JSON), π.χ. {"smartMemory":"admin"}.
+ * Τιμή ανά feature: "all" = όλοι · "admin" = μόνο admins · "off" = κανείς ·
+ * ή λίστα email με κόμμα (π.χ. "a@x.gr, b@x.gr"). Χωρίς FEATURES = όλα κλειστά.
+ */
+function featureFlags_(agent) {
+  let cfg = {};
+  try { cfg = JSON.parse(prop_('FEATURES', '{}')) || {}; } catch (e) { cfg = {}; }
+  const email = String((agent && agent.email) || '').toLowerCase();
+  const admin = isAdmin_(agent);
+  const out = {};
+  Object.keys(cfg).forEach(k => {
+    const v = String(cfg[k] == null ? '' : cfg[k]).trim().toLowerCase();
+    out[k] = v === 'all' || (v === 'admin' && admin) ||
+      (!!email && v !== 'off' && v.split(',').map(s => s.trim()).indexOf(email) !== -1);
+  });
+  return out;
 }
 
 /** Πρώτη φορά που ο μεσίτης ανοίγει την κλήση. */
