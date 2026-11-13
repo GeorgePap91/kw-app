@@ -1353,3 +1353,13 @@ body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off
 .pf-mem{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
 .pf-mem-l{font-size:.875rem;font-weight:700;color:var(--ink-2)}
 .pf-mem .chip.small{min-height:2.75rem}
+
+/* 2.3 · FEAT-2 σύρσιμο / FEAT-6 παρατεταμένο πάτημα στη λίστα κλήσεων */
+.row.lead.gst{position:relative;touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.gst-hint{position:absolute;top:0;bottom:0;z-index:2;display:flex;align-items:center;padding:0 1rem;overflow:hidden;
+  white-space:nowrap;font-size:1.0625rem;font-weight:800;color:#fff;border-radius:inherit;pointer-events:none;opacity:.85}
+.gst-hint.is-right{left:0;justify-content:flex-start;background:var(--green-solid)}
+.gst-hint.is-left{right:0;justify-content:flex-end;background:var(--amber-solid)}
+.gst-hint.is-armed{opacity:1}
+.toast.gst-toast:not([hidden]){display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.gst-undo{flex:none;min-height:2.75rem;padding:0 1rem;border:0;border-radius:1.375rem;background:#fff;color:#111;font-weight:800;font-size:1rem}
