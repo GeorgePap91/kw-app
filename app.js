@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.2';
+var APP_VERSION = '2.3.3';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -3316,6 +3316,11 @@ function fillSettings() {
   v.textContent = 'Εφαρμογή ' + APP_VERSION + ' · Server ' + server +
     (server !== API_VERSION ? ' — δεν ταιριάζουν, ολοκλήρωσε την εγκατάσταση' : '');
   v.className = 'version' + (server !== API_VERSION ? ' warn' : '');
+  // 2.3.3: ποια νέα features είναι ανοιχτά σε αυτό το κινητό (για έλεγχο μετά από κάθε εγκατάσταση)
+  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα' };
+  var on = Object.keys(S.flags || {}).filter(function (k) { return S.flags[k]; })
+    .map(function (k) { return FEAT_NAMES[k] || k; });
+  v.textContent += ' · Νέα: ' + (on.length ? on.join(', ') : 'κανένα ανοιχτό');
 }
 
 function openSettings() {

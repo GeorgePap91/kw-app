@@ -6,7 +6,7 @@
  *  3. Όταν πατηθεί, ανοίγει την εφαρμογή απευθείας στη συγκεκριμένη κλήση.
  */
 
-var SHELL = 'kw-shell-2.3.2';
+var SHELL = 'kw-shell-2.3.3';
 var SHELL_FILES = ['./', 'index.html', 'app.js', 'app.css', 'config.js', 'push.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js', 'gestures.js'];
@@ -45,7 +45,10 @@ self.addEventListener('fetch', function (e) {
     var timer = setTimeout(function () {
       fromCache().then(function (hit) { if (hit && !done) { done = true; resolve(hit); } });
     }, NET_WAIT);
-    fetch(req).then(function (r) {
+    // 2.3.3: ρωτά πάντα το GitHub αν άλλαξε (304 αν όχι), αντί να κρατά παλιό αρχείο έως 10'
+    // (Η σελίδα «navigate» δεν δέχεται ρυθμίσεις πάνω στο ίδιο αίτημα: ζητάμε τη διεύθυνσή της.)
+    (req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+                             : fetch(req, { cache: 'no-cache' })).then(function (r) {
       if (r.ok && r.type === 'basic') {
         var copy = r.clone();
         caches.open(SHELL).then(function (c) { c.put(req.mode === 'navigate' ? 'index.html' : req, copy); });
