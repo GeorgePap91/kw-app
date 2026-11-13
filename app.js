@@ -398,7 +398,7 @@ function start() {
     apiTimed('bootstrap', {}, 20000).then(function (b) {
       S.bootStale = false;
       S.bootAt = Date.now();
-      S.boot = b; S.me = b.agent;
+      S.boot = b; S.me = b.agent; S.flags = b.flags || {};   // 2.3.2: και τα feature flags
       applyData(b);
       render();
       fillSettings();
@@ -4058,6 +4058,7 @@ function refreshNow() {
   apiTimed('bootstrap', {}, 20000).then(function (b) {
     S.boot = b;
     S.me = b.agent;
+    S.flags = b.flags || {};                         // 2.3.2: και τα feature flags
     S.bootStale = false;
     S.bootAt = Date.now();
     applyData(b);
@@ -7143,7 +7144,7 @@ function offReapply() {
 
 function offRefresh() {
   apiTimed('bootstrap', {}, 15000).then(function (b) {
-    S.boot = b; S.me = b.agent;
+    S.boot = b; S.me = b.agent; S.flags = b.flags || {};   // 2.3.2: και τα feature flags
     S.bootStale = false; S.bootAt = Date.now(); S.netBad = false;
     applyData(b);
     offSnapshot();
