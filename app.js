@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.3.3';
+var APP_VERSION = '2.3.4';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -7238,6 +7238,16 @@ function wireOffline() {
   }
   offBar();
 }
+
+// ── 2.3.4 · Γέφυρα προς τα πρόσθετα αρχεία (memory.js, gestures.js) ──
+// Το app.js τρέχει κλειστό (IIFE), οπότε τα πρόσθετα δεν βλέπουν τις μεταβλητές του.
+// Εκθέτουμε ΜΟΝΟ ό,τι χρειάζονται. Το S είναι το ίδιο αντικείμενο, άρα βλέπουν πάντα τα τρέχοντα.
+window.S = S;
+window.ST = ST;
+window.store = store; window.fold = fold; window.esc = esc; window.fmtPrice = fmtPrice; window.$ = $;
+window.normCode = normCode; window.findLead = findLead; window.hasShowing = hasShowing;
+window.showLead = showLead; window.openShowingForm = openShowingForm; window.openProp = openProp;
+window.send = send; window.merge = merge; window.render = render; window.toast = toast;
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──
 start();

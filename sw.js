@@ -6,7 +6,7 @@
  *  3. Όταν πατηθεί, ανοίγει την εφαρμογή απευθείας στη συγκεκριμένη κλήση.
  */
 
-var SHELL = 'kw-shell-2.3.3';
+var SHELL = 'kw-shell-2.3.4';
 var SHELL_FILES = ['./', 'index.html', 'app.js', 'app.css', 'config.js', 'push.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js', 'gestures.js'];
