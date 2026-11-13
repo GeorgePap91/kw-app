@@ -77,3 +77,18 @@ test('backend: feature flags (all / admin / off / λίστα email)', { skip: !h
   assert.equal(vm.runInContext('JSON.stringify(featureFlags_(A))', ctx), JSON.stringify({ a: true, b: false, c: false, d: true, e: false }));
   assert.equal(vm.runInContext('JSON.stringify(featureFlags_(B))', ctx), JSON.stringify({ a: true, b: true, c: false, d: false, e: false }));
 });
+
+test('backend: κουμπιά «Πώς πήγε;» = 2 έγκυρα αποτελέσματα', { skip: !has }, () => {
+  const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+  const ctx = { console, PropertiesService: { getScriptProperties: () => ({ getProperties: () => ({}) }) } };
+  for (const k of ['SpreadsheetApp', 'DriveApp', 'Utilities', 'CacheService', 'ScriptApp', 'Session', 'HtmlService', 'ContentService', 'MailApp', 'CalendarApp', 'LockService', 'UrlFetchApp']) ctx[k] = noop;
+  vm.createContext(ctx);
+  vm.runInContext(src('Code.js'), ctx);
+  const acts = JSON.parse(vm.runInContext('outcomeActions_()', ctx));
+  const outs = vm.runInContext('CONFIG.OUTCOMES', ctx);
+  assert.equal(acts.length, 2);
+  acts.forEach((a) => {
+    assert.match(a.action, /^o\d$/);
+    assert.ok(a.title.indexOf(outs[Number(a.action.slice(1))]) !== -1);
+  });
+});

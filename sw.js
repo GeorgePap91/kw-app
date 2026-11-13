@@ -6,7 +6,7 @@
  *  3. Όταν πατηθεί, ανοίγει την εφαρμογή απευθείας στη συγκεκριμένη κλήση.
  */
 
-var SHELL = 'kw-shell-2.3';
+var SHELL = 'kw-shell-2.3.1';
 var SHELL_FILES = ['./', 'index.html', 'app.js', 'app.css', 'config.js', 'push.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js'];
@@ -69,6 +69,8 @@ self.addEventListener('push', function (e) {
   var d = payload.data || payload;          // το Firebase βάζει τα δεδομένα μας κάτω από το «data»
 
   var url = new URL(d.url || './', self.registration.scope).href;
+  var actions = [];                          // 2.3 · FEAT-3: κουμπιά (μόνο όπου υποστηρίζονται)
+  try { actions = d.acts ? JSON.parse(d.acts).slice(0, 2) : []; } catch (err) { actions = []; }
 
   e.waitUntil(Promise.all([
     self.registration.showNotification(d.title || 'KW App', {
@@ -77,6 +79,7 @@ self.addEventListener('push', function (e) {
       badge: 'badge-96.png',
       tag: d.tag || d.id || 'kw',
       renotify: true,
+      actions: actions,
       data: { url: url, id: d.id || '', type: d.type || '' }
     }),
     // Αν η εφαρμογή είναι ανοιχτή, ανανεώνει τη λίστα αμέσως.
@@ -90,6 +93,8 @@ self.addEventListener('notificationclick', function (e) {
   e.notification.close();
   var data = e.notification.data || {};
   var url = data.url || self.registration.scope;
+  var act = /^o\d$/.test(e.action || '') ? e.action : '';   // 2.3 · FEAT-3: πατήθηκε κουμπί
+  if (act) url += (url.indexOf('?') === -1 ? '?' : '&') + 'do=' + act;
   var remind = /[?&]remind=1/.test(url);
   var docs = /[?&]docs=1/.test(url);
 
@@ -99,7 +104,7 @@ self.addEventListener('notificationclick', function (e) {
         var c = list[i];
         if (c.url.indexOf(self.registration.scope) === 0 && 'focus' in c) {
           return c.focus().then(function (fc) {
-            (fc || c).postMessage({ type: 'open', id: data.id, remind: remind, docs: docs });
+            (fc || c).postMessage({ type: 'open', id: data.id, remind: remind, docs: docs, act: act });
           });
         }
       }

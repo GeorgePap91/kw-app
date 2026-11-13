@@ -39,6 +39,7 @@ store('kw_key', null);                     // καθαρίζει ό,τι κρα�
 var LEAD_PARAM = params.get('lead') || '';
 var REMIND_PARAM = params.get('remind') === '1';
 var DOCS_PARAM = params.get('docs') === '1';
+var ACT_PARAM = /^o\d$/.test(params.get('do') || '') ? params.get('do') : '';   // 2.3 · FEAT-3
 var Push = window.KWPush;
 
 // Το ?lead / ?remind χρησιμοποιούνται μία φορά. Τα βγάζουμε από τη διεύθυνση,
@@ -577,7 +578,7 @@ function onBoot(b) {
   });
 
   setupPush();
-  if (LEAD_PARAM) openLead(LEAD_PARAM, { remind: REMIND_PARAM });
+  if (LEAD_PARAM) openLead(LEAD_PARAM, { remind: REMIND_PARAM, act: ACT_PARAM });
   else if (DOCS_PARAM) showMissingDocs();
   setTimeout(checkPendingCall, 800);       // 1.20: αν η εφαρμογή ξαναφόρτωσε μετά από κλήση
 }
@@ -600,7 +601,7 @@ function setupPush() {
 
   Push.onMessage(function (m) {
     if (m.type === 'open' && m.docs) showMissingDocs();
-    else if (m.type === 'open' && m.id) openLead(m.id, { remind: m.remind });
+    else if (m.type === 'open' && m.id) openLead(m.id, { remind: m.remind, act: m.act });
     if (m.type === 'push' && m.data && m.data.type === 'lead') refreshLeads();
     if (m.type === 'push' && m.data && m.data.type === 'adminreview' && isAdminMode()) pollAdmin();
     if (m.type === 'push' && m.data && m.data.type === 'review') {
@@ -2121,7 +2122,7 @@ function findLead(id) {
  */
 function openLead(id, opts) {
   var go = /^go:(.*)$/.exec(String(id));
-  if (go) return routeTo(go[1]);
+  if (go) return routeTo(go[1], opts || {});
   if (isAdminMode() && roles().agent) setMode('agent', true);   // ειδοποίηση μεσίτη ενώ ήσουν στο Admin
   var l = findLead(id);
   if (l) return showLead(l, opts || {});
@@ -2137,7 +2138,7 @@ function openLead(id, opts) {
 }
 
 /** Ειδοποιήσεις που δεν ανοίγουν κλήση, αλλά μια οθόνη: go:today, go:form, go:prop:…, go:outcome:… */
-function routeTo(where) {
+function routeTo(where, opts) {
   while (closeTop()) { /* κλείνουμε ό,τι είναι ανοιχτό */ }
   if (where === 'today') return goto('today');
   if (where === 'form') return goto('metrics');
@@ -2146,7 +2147,10 @@ function routeTo(where) {
     goto('props');
     return openProp(where.slice(5));
   }
-  if (where.indexOf('outcome:') === 0) openLead(where.slice(8), { outcome: true });
+  if (where.indexOf('outcome:') === 0) {
+    if (opts && opts.act) return quickOutcome(where.slice(8), opts.act);   // 2.3 · FEAT-3: 1 πάτημα από την ειδοποίηση
+    openLead(where.slice(8), { outcome: true });
+  }
   if (where.indexOf('review:') === 0) routeReview(where.slice(7));
   if (where === 'adminreview' && roles().admin) {           // 1.18: «νέα έντυπα για έλεγχο»
     S.rvTab = 'pending';
@@ -3157,6 +3161,29 @@ function onSaveOutcome() {
     hint.className = 'save-hint err';
     hint.textContent = e.message;
   }).then(function () { btn.disabled = false; });
+}
+
+/**
+ * 2.3 · FEAT-3 · Αποτέλεσμα υπόδειξης κατευθείαν από το κουμπί της ειδοποίησης.
+ * act 'o0' = 1η επιλογή των OUTCOMES. Δουλεύει και χωρίς σήμα (μπαίνει στην ουρά).
+ * Ανοίγει μετά την κλήση, ώστε να προσθέσει σημείωση αν θέλει.
+ */
+function quickOutcome(id, act) {
+  var outcomes = (S.boot && S.boot.outcomes) || [];
+  var outcome = outcomes[Number(String(act).slice(1))];
+  var l = findLead(id);
+  if (!outcome || !l) return openLead(id, { outcome: true });            // άγνωστο → η κανονική φόρμα
+  if (l.outcome === outcome) { showLead(l, {}); return toast('Ήταν ήδη καταχωρημένο: ' + outcome); }
+  send('outcome', { id: l.id, outcome: outcome, note: '' }).then(function (r) {
+    var x = r.data || l;
+    merge(x);
+    render();
+    showLead(findLead(id) || x, {});
+    toast('Καταχωρήθηκε: ' + outcome + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : '') + ' · γράψε σημείωση αν θες');
+  }).catch(function (e) {
+    toast(e.message, true);
+    openLead(id, { outcome: true });                                   // αποτυχία → η κανονική φόρμα
+  });
 }
 
 // ── Ακύρωση υπόδειξης ─────────────────────────────────────
