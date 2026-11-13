@@ -8,7 +8,7 @@
 | (αυτόματα) | GitHub Actions | `CI — Tests` · `Deploy — Apps Script` → **DEV** |
 | **In Review** | εσύ | Δοκιμάζεις στο DEV |
 | **Approved** | εσύ | Μου λες «ξεκίνα» → merge στο `main` |
-| (αυτόματα) | GitHub Actions | Deploy **PROD** (νέα έκδοση, ίδιο /exec URL) · GitHub Pages ανανεώνει την PWA |
+| (αυτόματα) | GitHub Actions | Tests + **E2E σε πραγματικό Chrome** → μόνο αν περάσουν: Deploy **PROD** (νέα έκδοση, ίδιο /exec URL) και Deploy εφαρμογής στο GitHub Pages |
 | **Released** | Claude | Φάκελος Drive, Release Notes, ενημέρωση κάρτας |
 | **Blocked** | Claude | Λείπει πληροφορία ή απέτυχαν tests — δες το σχόλιο στην κάρτα |
 
@@ -22,6 +22,12 @@
    - `SCRIPT_ID_DEV`, `SCRIPT_ID_PROD` — Apps Script → ⚙ Ρυθμίσεις έργου → Αναγνωριστικό σεναρίου
    - `DEPLOYMENT_ID_PROD` — Ανάπτυξη → Διαχείριση αναπτύξεων → Αναγνωριστικό ανάπτυξης της τρέχουσας web app
 6. **Κώδικας backend στο repo**: οδηγίες στο `apps-script/README.md`.
+
+## Φράγμα πριν από κάθε deploy (2.3.5)
+Τίποτα δεν φτάνει στα κινητά αν δεν περάσουν όλα τα tests:
+- `npm test`: γρήγορα tests ανά αρχείο
+- `npm run e2e`: ολόκληρη η εφαρμογή σε πραγματικό Chrome με αφή κινητού
+Ρύθμιση μίας φοράς: **Settings → Pages → Build and deployment → Source = GitHub Actions**.
 
 ## Rollback
 - Apps Script: Ανάπτυξη → Διαχείριση αναπτύξεων → επιλογή προηγούμενης έκδοσης.

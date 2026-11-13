@@ -1,0 +1,57 @@
+# Ανεβάζει την εφαρμογή (PWA) στο GitHub Pages ΜΟΝΟ αν περάσουν ΟΛΑ τα tests:
+# τα γρήγορα (npm test) και η εφαρμογή σε πραγματικό Chrome κινητού (npm run e2e).
+# Αν κάτι αποτύχει, οι agents συνεχίζουν με την προηγούμενη, δουλεμένη έκδοση.
+# Απαιτεί: Settings → Pages → Source = «GitHub Actions» (μία φορά).
+name: Deploy — App (GitHub Pages)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i --no-save playwright-core@1.63.0
+      - run: CHROME_PATH="$(which google-chrome)" npm run e2e
+
+  deploy:
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Μόνο τα αρχεία της εφαρμογής (χωρίς tests, backend, οδηγίες)
+        run: |
+          mkdir _site
+          git ls-files | grep -vE '^(\.github|tests|apps-script|docs)/|^package(-lock)?\.json$|^\.gitignore$' \
+            | while read -r f; do mkdir -p "_site/$(dirname "$f")"; cp "$f" "_site/$f"; done
+          touch _site/.nojekyll
+          ls _site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+      - id: pages
+        uses: actions/deploy-pages@v4
