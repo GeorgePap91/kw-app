@@ -90,3 +90,19 @@ test('η εφαρμογή δέχεται μόνο do=o<αριθμός>', () => {
   assert.match(app, /var ACT_PARAM = \/\^o\\d\$\/\.test/);
   assert.match(app, /function quickOutcome\(id, act\)/);
 });
+
+test('2.3.3 · ο service worker ζητά πάντα φρέσκα αρχεία, και η σελίδα με σκέτη διεύθυνση', async () => {
+  const calls = [];
+  const ctx = {
+    self: { registration: { scope: 'https://x.github.io/kw-app/' }, location: { origin: 'https://x.github.io' }, addEventListener: (n, f) => { ctx['on_' + n] = f; } },
+    caches: { open: () => Promise.resolve({ put() {} }), match: () => Promise.resolve(null), keys: () => Promise.resolve([]) },
+    fetch: (a, o) => { calls.push([typeof a === 'string' ? 'url' : 'request', o && o.cache]); return Promise.resolve({ ok: true, type: 'basic', clone() { return this; } }); },
+    URL, Promise, setTimeout, clearTimeout, console, Response: function () {}
+  };
+  vm.createContext(ctx);
+  vm.runInContext(SW, ctx);
+  const ev = (mode, path) => ({ request: { method: 'GET', mode, url: 'https://x.github.io/kw-app/' + path }, respondWith: (p) => p });
+  await ctx.on_fetch(ev('navigate', ''));
+  await ctx.on_fetch(ev('no-cors', 'app.js'));
+  assert.deepEqual(calls, [['url', 'no-cache'], ['request', 'no-cache']]);
+});
