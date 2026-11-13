@@ -1563,6 +1563,17 @@ function actBootstrap_(agent, d, sess) {
  * Τιμή ανά feature: "all" = όλοι · "admin" = μόνο admins · "off" = κανείς ·
  * ή λίστα email με κόμμα (π.χ. "a@x.gr, b@x.gr"). Χωρίς FEATURES = όλα κλειστά.
  */
+/**
+ * 2.3 · FEAT-3 · Κουμπιά μέσα στην ειδοποίηση «Πώς πήγε η υπόδειξη;».
+ * Τα Android δείχνουν έως 2 κουμπιά· τα iPhone δεν δείχνουν κουμπιά (περιορισμός
+ * της Apple) και η ειδοποίηση ανοίγει την εφαρμογή όπως πάντα.
+ * action 'o<N>' = CONFIG.OUTCOMES[N]. Το FCM δέχεται μόνο κείμενο, άρα JSON.
+ */
+function outcomeActions_() {
+  const pick = [['o0', '👍 '], ['o2', '👎 ']];
+  return JSON.stringify(pick.map(p => ({ action: p[0], title: p[1] + CONFIG.OUTCOMES[Number(p[0].slice(1))] })));
+}
+
 function featureFlags_(agent) {
   let cfg = {};
   try { cfg = JSON.parse(prop_('FEATURES', '{}')) || {}; } catch (e) { cfg = {}; }
@@ -1904,10 +1915,12 @@ function askOutcome_(sh, row, v, t, now) {
   const where = String(v[ACOL.ADDRESS - 1] || 'Το ακίνητο');
   const go = 'go:outcome:' + id;
   try {
-    const sent = pushToAgent_(agent, {
+    const msg = {
       type: 'outcome', id: go, tag: 'outcome-' + id, url: '?lead=' + encodeURIComponent(go),
       title: 'Πώς πήγε η υπόδειξη;', body: where + ' · ' + fmtTime_(new Date(t))
-    });
+    };
+    if (featureFlags_(agent).oneTapPush) msg.acts = outcomeActions_();   // 2.3 · FEAT-3
+    const sent = pushToAgent_(agent, msg);
     if (!sent && agent.email) {
       MailApp.sendEmail({ to: agent.email, subject: 'Πώς πήγε η υπόδειξη;', name: 'KW App',
         body: where + ', ' + fmtTime_(new Date(t)) + '\n\nΚαταχώρησε το αποτέλεσμα: ' +
