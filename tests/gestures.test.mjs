@@ -34,7 +34,7 @@ function setup({ flags = { swipeRows: true, peekProp: true }, lead = { id: 'L1',
     send: (a, d) => { calls.push(['send', a, d.status]); return Promise.resolve({ data: { id: d.id }, queued: false }); },
     $: (id) => (id === 'toast' ? toastEl : null),
     document: { createElement: el, createTextNode: (t) => ({ text: t }) },
-    navigator: {},
+    navigator: {}, store: () => '1',          // «💡 Νέο» ήδη εμφανίστηκε
     setTimeout: (f, ms) => { timers.push({ at: now + ms, f }); return timers.length; },
     clearTimeout: (i) => { if (timers[i - 1]) timers[i - 1].f = null; }
   };

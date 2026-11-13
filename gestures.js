@@ -30,7 +30,24 @@ var GST = {
 function wireGestures(el) {
   var swipe = feat('swipeRows'), peek = feat('peekProp');
   if (!swipe && !peek) return;
-  el.querySelectorAll('.row.lead[data-id]').forEach(function (r) { gstRow(r, swipe, peek); });
+  var rows = el.querySelectorAll('.row.lead[data-id]');
+  rows.forEach(function (r) { gstRow(r, swipe, peek); });
+  if (rows.length) gstTip(swipe, peek);
+}
+
+/** 2.3.4 · Μία φορά: «💡 Νέο» για να ξέρει ο μεσίτης ότι υπάρχουν οι κινήσεις. */
+function gstTip(swipe, peek) {
+  if (store('kw_gst_tip') === '1') return;
+  store('kw_gst_tip', '1');
+  var parts = [];
+  if (swipe) parts.push('σύρε μια κλήση δεξιά για υπόδειξη, αριστερά για «Δεν απάντησε»');
+  if (peek) parts.push('κράτα την πατημένη για το ακίνητο');
+  setTimeout(function () {
+    var t = $('toast');
+    toast('💡 Νέο: ' + parts.join(' · '));
+    clearTimeout(t._x);
+    t._x = setTimeout(function () { t.hidden = true; }, 9000);   // λίγο περισσότερο για να διαβαστεί
+  }, 700);
 }
 
 /** Ποιες κινήσεις επιτρέπονται σε αυτή την κλήση. */
