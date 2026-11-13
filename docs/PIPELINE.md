@@ -35,3 +35,9 @@
 
 ## Κόστος
 GitHub Actions (public repo): δωρεάν απεριόριστα. clasp / Apps Script API: δωρεάν, δεν τρώνε από τα quotas της εφαρμογής.
+
+## DEV + Preview links (2.4 · FEAT-21, FEAT-16)
+- **DEV workbook:** «Κλήσεις DEV (KW App — δοκιμές)» στο Drive. Το DEV Apps Script δείχνει εκεί (SPREADSHEET_ID).
+- **DEV ανάπτυξη:** μία web app ανάπτυξη στο DEV project. Το /exec της μπαίνει στο `config.js` → `DEV_API_URL`. Κάθε push σε `feat/**` την ανανεώνει.
+- **Preview:** Cloudflare Pages συνδεδεμένο με το repo. Κάθε branch → `https://<branch>.kw-app.pages.dev`. Εκεί η εφαρμογή μιλάει ΜΟΝΟ με το DEV (έλεγχος στο `config.js`, test στο `tests/config.test.mjs`).
+- **Flags στο DEV:** Script property `FEATURES` με `"all"` σε όλα, ώστε στο preview να φαίνονται όλα.

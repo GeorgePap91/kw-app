@@ -50,7 +50,8 @@ test('τα τοπικά scripts/styles που φορτώνουν οι σελίδ
 
 test('το config.js δείχνει σε Apps Script /exec και δεν περιέχει μυστικά', () => {
   const cfg = read('config.js');
-  assert.match(cfg, /API_URL:\s*'https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec'/);
+  assert.match(cfg, /PROD_API_URL = 'https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec'/);
+  assert.match(cfg, /DEV_API_URL = '(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec)?'/);
   assert.doesNotMatch(cfg, /private_key|client_secret|refresh_token/i);
 });
 

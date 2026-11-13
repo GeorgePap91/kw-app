@@ -80,6 +80,13 @@ jobs:
       - name: Push κώδικα ($TARGET)
         if: steps.code.outputs.ok == 'true'
         run: clasp push --force
+      - name: Ενημέρωση της DEV ανάπτυξης (preview links)
+        if: steps.code.outputs.ok == 'true' && env.TARGET == 'DEV'
+        run: |
+          # Το DEV /exec βρίσκεται στο config.js (DEV_API_URL). Κενό = δεν έχει στηθεί ακόμα.
+          DEV_ID=$(grep -oP "DEV_API_URL = 'https://script.google.com/macros/s/\K[\w-]+(?=/exec')" config.js || true)
+          if [ -z "$DEV_ID" ]; then echo "::notice::Δεν υπάρχει ακόμα DEV ανάπτυξη στο config.js."; exit 0; fi
+          clasp deploy --deploymentId "$DEV_ID" --description "DEV $(git rev-parse --short HEAD)"
       - name: Νέα έκδοση + ενημέρωση ανάπτυξης (μόνο PROD)
         if: steps.code.outputs.ok == 'true' && env.TARGET == 'PROD' && env.DEPLOYMENT_ID != ''
         run: |
