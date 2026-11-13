@@ -92,3 +92,23 @@ test('backend: κουμπιά «Πώς πήγε;» = 2 έγκυρα αποτελ
     assert.ok(a.title.indexOf(outs[Number(a.action.slice(1))]) !== -1);
   });
 });
+
+test('FEAT-14: σκάλα follow-up (2 ώρες → αύριο άλλη ώρα → +SMS → τέλος)', { skip: !has }, () => {
+  const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+  const ctx = { console, Date, PropertiesService: { getScriptProperties: () => ({ getProperties: () => ({}) }) } };
+  for (const k of ['SpreadsheetApp', 'DriveApp', 'Utilities', 'CacheService', 'ScriptApp', 'Session', 'HtmlService', 'ContentService', 'MailApp', 'CalendarApp', 'LockService', 'UrlFetchApp']) ctx[k] = noop;
+  vm.createContext(ctx);
+  vm.runInContext(src('Code.js'), ctx);
+  const step = (tries, iso) => vm.runInContext(`(function(){ const r = ladderStep_(${tries}, new Date('${iso}')); return { at: r.at ? r.at.getTime() : null, h: r.at ? r.at.getHours() : null, d: r.at ? r.at.getDate() : null, sms: r.sms, done: r.done }; })()`, ctx);
+  const morning = '2026-11-13T10:00:00', evening = '2026-11-13T17:00:00';
+  const s1 = step(1, morning);
+  assert.equal(s1.at - new Date(morning).getTime(), 2 * 3600e3);
+  assert.equal(s1.sms, false);
+  const s2m = step(2, morning), s2e = step(2, evening);
+  assert.deepEqual([s2m.d, s2m.h, s2m.sms], [14, 18, false]);   // πρωί → αύριο απόγευμα
+  assert.deepEqual([s2e.d, s2e.h], [14, 10]);                    // απόγευμα → αύριο πρωί
+  const s3 = step(3, morning);
+  assert.deepEqual([s3.d, s3.sms, s3.done], [14, true, false]);
+  const s4 = step(4, morning);
+  assert.deepEqual([s4.at, s4.sms, s4.done], [null, true, true]);
+});

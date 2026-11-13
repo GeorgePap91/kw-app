@@ -35,14 +35,14 @@ function bootData(flags) {
   };
 }
 
-async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }) {
+async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply) {
   const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR', serviceWorkers: 'block' });
   const sent = [], errors = [];
   await ctx.route(/script\.google\.com/, async (r) => {
     const b = JSON.parse(r.request().postData() || '{}');
     sent.push(b.action);
     const data = b.action === 'bootstrap' ? bootData(flags)
-      : b.action === 'status' ? { ...lead(b.data.id, 'x', b.data.status, 'A-12') } : {};
+      : b.action === 'status' ? (statusReply ? statusReply(b.data) : { ...lead(b.data.id, 'x', b.data.status, 'A-12') }) : {};
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
   });
   await ctx.route(/gstatic|googleapis|firebase/, (r) => r.abort());
@@ -154,5 +154,20 @@ test('«💡 Νέο» εμφανίζεται μία φορά', { skip }, async (
   await a.page.waitForTimeout(900);
   assert.match(await a.page.locator('#toast').innerText(), /Νέο: σύρε/);
   assert.equal(await a.page.evaluate(() => localStorage.getItem('kw_gst_tip')), '1');
+  await a.ctx.close();
+});
+
+test('FEAT-14: σύρσιμο «Δεν απάντησε» με σκάλα → «2η προσπάθεια» και (2/4) στη λίστα', { skip }, async () => {
+  const a = await openApp({ swipeRows: true, callLadder: true }, (d) => ({
+    ...lead(d.id, 'Μαρία Π.', d.status, 'A-12'), tries: 2, followUp: '14/11/2026 18:00',
+    ladder: { tries: 2, max: 4, sms: false, done: false }
+  }));
+  await a.page.waitForTimeout(900);
+  await a.swipe(-220);
+  await a.page.waitForTimeout(4400);
+  assert.match(await a.page.locator('#toast').innerText(), /2η προσπάθεια/);
+  await a.page.locator('#tabs-calls [data-tab="followup"]').click();
+  await a.page.waitForTimeout(300);
+  assert.match(await a.page.locator('#call-list').innerText(), /Δεν απάντησε \(2\/4\)/);
   await a.ctx.close();
 });

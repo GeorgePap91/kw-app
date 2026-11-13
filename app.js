@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.3.4';
+var APP_VERSION = '2.4.0';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -1106,9 +1106,16 @@ function leadRow(l, when) {
 function lowerDay(t) { return String(t || '').replace(/^(Σήμερα|Χθες|Αύριο)/, function (m) { return m.toLowerCase(); }); }
 
 /** Τι ισχύει τώρα για την κλήση, σε μία σύντομη φράση. */
+var LADDER_MAX = 4;                                // 2.4 · FEAT-14 (ίδιο με CONFIG.LADDER.MAX)
+
 function statusLine(l) {
   if (l.status === ST.PENDING) return 'Νέα κλήση' + (l.source ? ' · ' + l.source : '');
-  if (l.status === ST.NO_ANSWER) return 'Δεν απάντησε' + (l.followUp ? ' · ξανά ' + lowerDay(niceDate(l.followUp)) : '');
+  if (l.status === ST.NO_ANSWER) {
+    var lad = S.flags && S.flags.callLadder && l.tries;                  // 2.4 · FEAT-14
+    if (lad && l.tries >= LADDER_MAX) return 'Δεν απάντησε ' + l.tries + ' φορές · σταμάτησε';
+    return 'Δεν απάντησε' + (lad ? ' (' + l.tries + '/' + LADDER_MAX + ')' : '') +
+      (l.followUp ? ' · ξανά ' + lowerDay(niceDate(l.followUp)) : '');
+  }
   if (l.status === ST.SHOWING) {
     if (upcoming(l)) return 'Υπόδειξη ' + lowerDay(niceDate(l.showingAt));
     if (needsOutcome(l)) return 'Η υπόδειξη έγινε · πώς πήγε;';
@@ -2438,6 +2445,20 @@ function onNoAnswer() {
     .then(function () { btn.disabled = false; });
 }
 
+/**
+ * 2.4 · FEAT-14 · Μήνυμα μετά από «Δεν απάντησε» με τη σκάλα: τι γίνεται μετά.
+ * open = ο πελάτης είναι ανοιχτός → στην 3η/4η προσπάθεια ανοίγει και το έτοιμο SMS.
+ */
+function ladderToast(l, open) {
+  var g = l.ladder;
+  var when = l.followUp ? 'ξανά ' + lowerDay(niceDate(l.followUp)) : '';
+  if (g.done) toast('Δεν απάντησε ' + g.tries + ' φορές · σταματάμε τις κλήσεις' + (open ? ' · στείλε του ένα SMS' : ''));
+  else if (g.sms) toast(g.tries + 'η προσπάθεια · ' + when + (open ? ' · έτοιμο SMS' : ' · άνοιξε τον πελάτη για έτοιμο SMS'));
+  else toast(g.tries + 'η προσπάθεια · ' + when);
+  if (open && g.sms && S.lead && S.lead.id === l.id) openSmsBox('intro');
+}
+window.ladderToast = ladderToast;
+
 function applyStatus(value) {
   var sel = $('d-status-select');
   var previous = S.lead.status;
@@ -2452,6 +2473,7 @@ function applyStatus(value) {
 
     if (r.queued) toast(value === ST.NO_ANSWER ? 'Δεν απάντησε · το follow-up θα μπει στο ημερολόγιο μόλις έρθει σήμα' : 'Κατάσταση: ' + value + ' · θα σταλεί μόλις έρθει σήμα');
     else if (l.warning) toast(l.warning, true);
+    else if (value === ST.NO_ANSWER && l.ladder) ladderToast(l, true);      // 2.4 · FEAT-14
     else if (value === ST.NO_ANSWER && l.followUp) {
       toast('Follow-up ' + l.followUp + (l.invited ? ' · ήρθε ως πρόσκληση' : ''));
     }
@@ -3317,7 +3339,7 @@ function fillSettings() {
     (server !== API_VERSION ? ' — δεν ταιριάζουν, ολοκλήρωσε την εγκατάσταση' : '');
   v.className = 'version' + (server !== API_VERSION ? ' warn' : '');
   // 2.3.3: ποια νέα features είναι ανοιχτά σε αυτό το κινητό (για έλεγχο μετά από κάθε εγκατάσταση)
-  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα' };
+  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up' };
   var on = Object.keys(S.flags || {}).filter(function (k) { return S.flags[k]; })
     .map(function (k) { return FEAT_NAMES[k] || k; });
   v.textContent += ' · Νέα: ' + (on.length ? on.join(', ') : 'κανένα ανοιχτό');

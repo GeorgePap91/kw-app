@@ -89,6 +89,9 @@ const CONFIG = {
   SHOWING_DURATION_MIN: 45,
   FOLLOWUP_HOURS: 2,            // «Δεν απάντησε» → follow-up σε τόσες ώρες
   FOLLOWUP_DURATION_MIN: 15,
+  // 2.4 · FEAT-14 · Σκάλα follow-up (flag callLadder). Προσπάθεια → πότε ξανά.
+  //  1η: +FOLLOWUP_HOURS · 2η: αύριο στο «άλλο» μέρος της μέρας · 3η: αύριο + έτοιμο SMS · 4η: σταματά.
+  LADDER: { MAX: 4, MORNING: [10, 30], EVENING: [18, 0], SWITCH_HOUR: 14 },
 
   // Ειδοποίηση νέας κλήσης: κάθε πόσα λεπτά ελέγχει τα μηνιαία φύλλα (1, 5, 10).
   NEW_LEAD_CHECK_MIN: 1,
@@ -348,14 +351,16 @@ const ROLE_VALUES = ['Μεσίτης', 'Admin', 'Μεσίτης + Admin'];
 const APP_HEADERS = ['ID', 'Μεσίτης', 'Κατάσταση', 'Σημειώσεις', 'Άνοιξε', 'Κάλεσε', 'SMS',
   'Follow-up', 'Follow-up ID', 'Υπόδειξη', 'Event ID', 'Διεύθυνση',
   'Πελάτης', 'Email πελάτη', 'Ακίνητο', 'Υπενθύμιση', 'Ενημέρωση',
-  'Τηλέφωνο πελάτη', 'SMS υπενθύμισης', 'Αποτέλεσμα υπόδειξης', 'Σχόλιο αποτελέσματος', 'Ρωτήθηκε αποτέλεσμα'];
+  'Τηλέφωνο πελάτη', 'SMS υπενθύμισης', 'Αποτέλεσμα υπόδειξης', 'Σχόλιο αποτελέσματος', 'Ρωτήθηκε αποτέλεσμα',
+  'Προσπάθειες'];
 
 const ACOL = {
   ID: 1, AGENT: 2, STATUS: 3, NOTES: 4, OPENED: 5, CALLED: 6, SMS: 7,
   FU_AT: 8, FU_ID: 9, SHOW_AT: 10, SHOW_ID: 11, ADDRESS: 12,
   CLIENT: 13, CLIENT_EMAIL: 14, PROPERTY: 15, REMINDED: 16, UPDATED: 17,
   CLIENT_PHONE: 18, SMS_REMIND: 19, OUTCOME: 20, OUTCOME_NOTE: 21, OUTCOME_ASKED: 22,
-  WIDTH: 22
+  TRIES: 23,                         // 2.4 · FEAT-14: συνεχόμενα «Δεν απάντησε»
+  WIDTH: 23
 };
 
 const STATUS = {
@@ -1374,6 +1379,7 @@ function serialize_(l) {
     called: stamp_(g(ACOL.CALLED)),
     sms: stamp_(g(ACOL.SMS)),
     followUp: stamp_(g(ACOL.FU_AT)),
+    tries: Number(g(ACOL.TRIES)) || 0,               // 2.4 · FEAT-14
     showingAt: stamp_(showAt),
     showingDate: showAt && ts_(showAt) ? fmtIso_(showAt) : '',
     showingTime: showAt && ts_(showAt) ? fmtTime_(showAt) : '',
@@ -1483,10 +1489,10 @@ function description_(l, address, intro) {
 
 // ── Follow-up («Δεν απάντησε») ─────────────────────────────
 
-function createFollowUp_(agent, l) {
+function createFollowUp_(agent, l, at) {
   clearFollowUp_(agent, l);
 
-  const start = new Date(Date.now() + CONFIG.FOLLOWUP_HOURS * 3600000);
+  const start = at ? new Date(at) : new Date(Date.now() + CONFIG.FOLLOWUP_HOURS * 3600000);
   start.setSeconds(0, 0);
   const end = new Date(start.getTime() + CONFIG.FOLLOWUP_DURATION_MIN * 60000);
   const p = readProps_()[normCode_(l.code)] || null;
@@ -1574,6 +1580,28 @@ function outcomeActions_() {
   return JSON.stringify(pick.map(p => ({ action: p[0], title: p[1] + CONFIG.OUTCOMES[Number(p[0].slice(1))] })));
 }
 
+/**
+ * 2.4 · FEAT-14 · Το επόμενο σκαλί μετά από «Δεν απάντησε».
+ * tries = πόσες φορές συνεχόμενα δεν απάντησε (μαζί με αυτή). Επιστρέφει:
+ *  at   πότε ξανά (Date) ή null = καμία νέα κλήση
+ *  sms  true = πρότεινε στον μεσίτη έτοιμο SMS
+ *  done true = τέλος σκάλας (ο πελάτης «κρύωσε»)
+ */
+function ladderStep_(tries, now) {
+  const L = CONFIG.LADDER;
+  const nextDay = (hm) => {
+    const d = new Date(now.getTime());
+    d.setDate(d.getDate() + 1);
+    d.setHours(hm[0], hm[1], 0, 0);
+    return d;
+  };
+  const opposite = now.getHours() < L.SWITCH_HOUR ? L.EVENING : L.MORNING;
+  if (tries <= 1) return { tries: tries, at: new Date(now.getTime() + CONFIG.FOLLOWUP_HOURS * 3600000), sms: false, done: false };
+  if (tries === 2) return { tries: tries, at: nextDay(opposite), sms: false, done: false };
+  if (tries < L.MAX) return { tries: tries, at: nextDay(opposite), sms: true, done: false };
+  return { tries: tries, at: null, sms: true, done: true };
+}
+
 function featureFlags_(agent) {
   let cfg = {};
   try { cfg = JSON.parse(prop_('FEATURES', '{}')) || {}; } catch (e) { cfg = {}; }
@@ -1627,20 +1655,28 @@ function actStatus_(agent, d) {
   if (!appGet_(l.id, ACOL.CALLED) && status !== STATUS.PENDING) v[ACOL.CALLED] = new Date();
   appSet_(agent, l.id, v);
 
-  let warning = '', invited = false;
+  let warning = '', invited = false, ladder = null;
+  const useLadder = !!featureFlags_(agent).callLadder;                 // 2.4 · FEAT-14
   if (status === STATUS.NO_ANSWER) {
+    const tries = (Number(appGet_(l.id, ACOL.TRIES)) || 0) + 1;
+    ladder = useLadder ? ladderStep_(tries, new Date()) : null;
+    if (useLadder) { const t = {}; t[ACOL.TRIES] = tries; appSet_(agent, l.id, t); }
     try {
-      invited = createFollowUp_(agent, l).invited;
+      if (!ladder) invited = createFollowUp_(agent, l).invited;
+      else if (ladder.at) invited = createFollowUp_(agent, l, ladder.at).invited;
+      else clearFollowUp_(agent, l);                                     // τέλος σκάλας: χωρίς νέο follow-up
     } catch (err) {
       warning = 'Η κατάσταση άλλαξε, αλλά το follow-up δεν μπήκε στο ημερολόγιο: ' + err.message;
     }
-  } else if (prev === STATUS.NO_ANSWER) {
-    clearFollowUp_(agent, l);
+  } else {
+    if (prev === STATUS.NO_ANSWER) clearFollowUp_(agent, l);
+    if (appGet_(l.id, ACOL.TRIES)) { const t = {}; t[ACOL.TRIES] = ''; appSet_(agent, l.id, t); }  // απάντησε → από την αρχή
   }
 
   const out = serialize_(l);
   out.warning = warning;
   out.invited = invited;
+  if (ladder) out.ladder = { tries: ladder.tries, max: CONFIG.LADDER.MAX, sms: ladder.sms, done: ladder.done };
   return out;
 }
 
