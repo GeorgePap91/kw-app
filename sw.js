@@ -9,7 +9,7 @@
 var SHELL = 'kw-shell-2.3';
 var SHELL_FILES = ['./', 'index.html', 'app.js', 'app.css', 'config.js', 'push.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js'];
+  'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js', 'gestures.js'];
 var NET_WAIT = 4000;                         // μετά από 4" χωρίς απάντηση ανοίγει από το αντίγραφο
 
 self.addEventListener('install', function (e) {

@@ -1168,6 +1168,7 @@ function wireLeadRows(el) {
   el.querySelectorAll('[data-id]:not(.pc)').forEach(function (r) {
     r.onclick = function () { openLead(r.dataset.id); };
   });
+  if (typeof wireGestures === 'function') wireGestures(el);   // 2.3 · FEAT-2 σύρσιμο · FEAT-6 παρατεταμένο πάτημα
 }
 
 // ─────────────────────────────────────────────────────────────
