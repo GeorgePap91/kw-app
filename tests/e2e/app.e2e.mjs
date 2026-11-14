@@ -20,7 +20,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 let server, base, browser;
 
 const now = Date.now();
-const lead = (id, name, status, code) => ({ id, name, status, property: 'Διαμέρισμα 80τμ', code, phone: '6900000000', date: '13/11/2026 07:00', dateTs: now - 3600e3, source: 'Spitogatos', history: [] });
+const lead = (id, name, status, code) => ({ id, name, status, property: 'Διαμέρισμα 80τμ', code, phone: '6900000000', phoneIntl: '+306900000000', date: '13/11/2026 07:00', dateTs: now - 3600e3, source: 'Spitogatos', history: [] });
 function bootData(flags) {
   return {
     session: { device: 'Android · εφαρμογή', since: '' }, roles: { agent: true, admin: true }, env: 'test', version: '1.20',
@@ -287,5 +287,92 @@ test('2.6: με κλειστά flags δεν φαίνεται τίποτα από
   await a.page.evaluate(() => window.openProp('A-12'));
   await a.page.waitForTimeout(300);
   assert.equal(await a.page.locator('#pd-report').isVisible(), false);
+  await a.ctx.close();
+});
+
+// ── 2.7 ──
+test('2.7: SMS — επιλογή από τα έτοιμα μηνύματα', { skip }, async () => {
+  const a = await openApp({});
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  await a.page.locator('#d-sms-btn').click();
+  await a.page.waitForTimeout(300);
+  const chips = await a.page.locator('#sms-kinds .chip').allInnerTexts();
+  assert.deepEqual(chips, ['Πρώτη επαφή', 'Δεν σας βρήκα', 'Ψάχνετε ακόμα;']);
+  await a.page.locator('#sms-kinds .chip', { hasText: 'Δεν σας βρήκα' }).click();
+  await a.page.waitForTimeout(200);
+  assert.match(await a.page.locator('#sms-text').inputValue(), /Γεια σας Μαρία, σας κάλεσα για το ακίνητο A-12 αλλά δεν σας βρήκα/);
+  assert.match(decodeURIComponent(await a.page.locator('#sms-link').getAttribute('href')), /δεν σας βρήκα/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.7: υπόδειξη που έγινε — ούτε αλλαγή ούτε ακύρωση, μόνο «Κλείσε νέα» (νέο event)', { skip }, async () => {
+  const past = now - 2 * 3600e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const done = { ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), phoneIntl: '+306900000000', hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: p2(d.getHours()) + ':' + p2(d.getMinutes()),
+    showingAt: p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()), outcome: 'Ενδιαφέρθηκε' };
+  let sentShowing = null;
+  const a = await openApp({}, null, { leads: [done] }, {
+    formStatus: () => ({ ready: true, status: '' }),
+    showing: (dd) => { sentShowing = dd; return { lead: { ...done, showingTs: now + 864e5, outcome: '' }, updated: false, when: 'αύριο', invited: false }; }
+  });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#btn-showing-text').innerText(), 'Η υπόδειξη έγινε · κλείσε νέα');
+  await a.page.locator('#btn-showing').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#s-when').isVisible(), false, 'όχι αλλαγή ώρας');
+  assert.equal(await a.page.locator('#btn-cancel-showing').isVisible(), false, 'όχι ακύρωση');
+  assert.equal(await a.page.locator('#s-outcome').isVisible(), true);
+  await a.page.locator('#s-new').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#s-title').innerText(), 'Νέα υπόδειξη');
+  assert.equal(await a.page.locator('#s-when').isVisible(), true);
+  await a.page.locator('#btn-save-showing').click();
+  await a.page.waitForTimeout(600);
+  assert.equal(sentShowing && sentShowing.fresh, true);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.7: διόρθωση ακινήτου από τον μεσίτη του', { skip }, async () => {
+  let got = null;
+  const a = await openApp({}, null, {}, { propSave: (d) => { got = d; return { code: 'A-12', price: 240000, sqm: 80, street: 'Ερατοσθένους 5', area: 'Παγκράτι' }; } });
+  await a.page.evaluate(() => window.openProp('A-12'));
+  await a.page.waitForTimeout(400);
+  await a.page.locator('#pd-edit').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#pe-price').inputValue(), '250000');
+  await a.page.locator('#pe-price').fill('240000');
+  await a.page.locator('#pe-save').click();
+  await a.page.waitForTimeout(600);
+  assert.equal(JSON.stringify(got), JSON.stringify({ code: 'A-12', price: '240000' }), 'στέλνει μόνο ό,τι άλλαξε');
+  assert.match(await a.page.locator('#pd-facts').innerText(), /240\.000/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.7: μετρήσεις χρήσης — χρόνος και πατήματα ανά ενέργεια, αποστολή ομαδικά, αναφορά', { skip }, async () => {
+  let rows = null;
+  const a = await openApp({}, null, {}, {
+    usage: (d) => { rows = d.rows; return { ok: true }; },
+    usageReport: () => ({ month: '2026-11', team: false, people: 1, canTeam: true, actions: 12, savedSec: 500,
+      rows: [{ key: 'sms', label: 'SMS', n: 10, avgSec: 10, avgClicks: 3, baseSec: 60, savedSec: 500 }] })
+  });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(1200);
+  await a.page.locator('#d-sms-btn').click();
+  await a.page.waitForTimeout(300);
+  await a.page.evaluate(() => { window.kwUsage.track('sms'); window.kwUsage.track('sms'); window.kwUsage.track('bootstrap'); });
+  const m = await a.page.evaluate(() => window.kwUsage._peek());
+  assert.equal(m.sms[0], 1, 'διπλό πάτημα μετράει μία φορά');
+  assert.ok(m.sms[1] >= 1 && m.sms[2] >= 1, JSON.stringify(m));
+  assert.equal(m.bootstrap, undefined);
+  await a.page.evaluate(() => { window.closePop('smsbox'); window.kwUsage.open(); });
+  await a.page.waitForTimeout(1200);
+  assert.ok(rows && rows.sms, 'στάλθηκαν στον server');
+  assert.match(await a.page.locator('#usagebox').innerText(), /Γλίτωσες περίπου[\s\S]*8′[\s\S]*SMS[\s\S]*10 φορές · 10″ και 3 πατήματα/);
+  assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });

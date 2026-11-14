@@ -633,6 +633,31 @@
   </div>
 </div>
 
+<!-- 2.7 · ΔΙΟΡΘΩΣΗ ΑΚΙΝΗΤΟΥ -->
+<div class="pop" id="propedit" role="dialog" aria-modal="true" aria-labelledby="propedit-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="propedit-title">Διόρθωση ακινήτου</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <p class="d-sub gap-sub" id="pe-name"></p>
+    <div class="field-row">
+      <label class="field"><span>Τιμή (€)</span><input id="pe-price" inputmode="decimal" autocomplete="off"></label>
+      <label class="field"><span>Εμβαδόν (τ.μ.)</span><input id="pe-sqm" inputmode="decimal" autocomplete="off"></label>
+    </div>
+    <label class="field"><span>Οδός και αριθμός</span><input id="pe-street" maxlength="120" autocomplete="off"></label>
+    <label class="field"><span>Περιοχή</span><input id="pe-area" maxlength="120" autocomplete="off"></label>
+    <p class="field-hint">Αλλάζει στο φύλλο «Διαθέσιμα ακίνητα». Αν το φύλλο ξαναγεμίσει από το CRM, ισχύει ό,τι έχει το CRM.</p>
+    <button class="btn primary wide" id="pe-save">Αποθήκευση</button>
+    <p class="save-hint" id="pe-hint"></p>
+  </div>
+</div>
+
+<!-- 2.7 · ΧΡΟΝΟΣ ΠΟΥ ΓΛΙΤΩΝΕΙΣ -->
+<div class="pop" id="usagebox" role="dialog" aria-modal="true" aria-labelledby="usagebox-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="usagebox-title">Χρόνος που γλιτώνεις</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="us-body"></div>
+  </div>
+</div>
+
 <!-- 2.6 · FEAT-12: ΜΕΙΩΣΗ ΤΙΜΗΣ -->
 <div class="pop" id="dropbox" role="dialog" aria-modal="true" aria-labelledby="dropbox-title" hidden>
   <div class="pop-box">
@@ -825,9 +850,10 @@
         <textarea id="s-outcome-note" rows="3" placeholder="Τι είπε ο πελάτης, τι του άρεσε, τι όχι…"></textarea></label>
       <button class="btn primary wide" id="btn-save-outcome">Καταχώρηση αποτελέσματος</button>
       <p class="save-hint" id="s-outcome-hint"></p>
-      <h3 class="sub-head">Αλλαγή ώρας</h3>
     </section>
+    <button class="btn wide" id="s-new" hidden>＋ Κλείσε νέα υπόδειξη</button>
 
+    <div id="s-when">
     <div class="field-row">
       <label class="field"><span>Ημερομηνία</span><input type="date" id="s-date"></label>
       <label class="field"><span>Ώρα</span><input type="time" id="s-time" step="900"></label>
@@ -840,6 +866,7 @@
 
     <button class="btn primary wide" id="btn-save-showing">Καταχώρηση υπόδειξης</button>
     <p class="save-hint" id="s-hint"></p>
+    </div>
 
     <button class="btn danger wide" id="btn-cancel-showing" hidden>Ακύρωση υπόδειξης</button>
   </div>
@@ -866,6 +893,7 @@
     <div class="pd-chips" id="pd-chips"></div>
     <button class="btn solid-red wide pd-present" id="pd-present" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span>Στείλε στον πελάτη</span></button>
     <button class="btn wide pd-present" id="pd-report" hidden><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg><span>Αναφορά ιδιοκτήτη</span></button>
+    <button class="btn wide pd-present" id="pd-edit" hidden><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg><span>Διόρθωση στοιχείων</span></button>
     <div class="stats" id="pd-stats"></div>
 
     <div class="subtabs in-sheet four" id="tabs-prop" role="tablist" aria-label="Ακίνητο">
@@ -913,7 +941,8 @@
         <button class="mrow" data-sub="me"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="mrow-body"><b>Στοιχεία, γράμματα, θέμα</b><span id="sub-me">Όνομα και κινητό στο SMS, μέγεθος γραμμάτων, φωτεινό ή σκούρο.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-sub="push"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b>Ειδοποιήσεις</b><span id="sub-push"></span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-sub="cal" id="set-cal"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b>Ημερολόγιο</b><span id="sub-cal"></span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
-        <button class="mrow" id="btn-templates"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg></span><span class="mrow-body"><b>Μηνύματα SMS</b><span>Πρώτη επαφή, υπενθύμιση, ακύρωση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="mrow" id="btn-templates"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-sms"/></svg></span><span class="mrow-body"><b>Μηνύματα SMS</b><span>Τα έτοιμα μηνύματα: πρώτη επαφή, δεν σας βρήκα, υπενθύμιση…</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="mrow" id="btn-usage"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="mrow-body"><b>Χρόνος που γλιτώνεις</b><span>Πόσες ενέργειες, πόσα πατήματα, πόσος χρόνος.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-sub="sec"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></span><span class="mrow-body"><b>Ασφάλεια</b><span>Αυτή η συσκευή, αποσύνδεση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
       <p class="version" id="version"></p>
@@ -1012,7 +1041,7 @@
     <span class="sheet-title" id="ce-head">Νέα επαφή</span>
   </div>
   <div class="sheet-body">
-    <p class="note" id="ce-crm-note" hidden>Τα στοιχεία της επαφής αλλάζουν στο CRM. Εδώ γράφεις σημειώσεις που μένουν μόνο στην εφαρμογή.</p>
+    <p class="note" id="ce-crm-note" hidden>Η επαφή ήρθε από το CRM. Ό,τι αλλάξεις εδώ ισχύει στην εφαρμογή· το CRM δεν αλλάζει.</p>
     <div id="ce-fields">
       <label class="field"><span>Όνομα</span><input type="text" id="ce-name" maxlength="120"></label>
       <label class="field"><span>Τηλέφωνο</span><input type="tel" id="ce-phone" inputmode="tel" placeholder="69XXXXXXXX"></label>
@@ -1227,5 +1256,6 @@
 <script src="gestures.js"></script>
 <script src="match.js"></script>
 <script src="auto.js"></script>
+<script src="usage.js"></script>
 </body>
 </html>

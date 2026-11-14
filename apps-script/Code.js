@@ -391,6 +391,25 @@ const DEFAULT_TEMPLATES = {
   cancel: {
     el: 'Το ραντεβού μας {ημέρα} στις {ώρα} ακυρώνεται. Καλέστε με για νέο ραντεβού. {όνομά μου}',
     en: 'Our appointment {ημέρα} at {ώρα} is cancelled. Call me to arrange a new one. {όνομά μου}'
+  },
+  // 2.7: έτοιμα μηνύματα που διαλέγει ο μεσίτης από το «SMS»
+  noanswer: {
+    el: 'Γεια σας[ {πελάτης}], σας κάλεσα[ για το ακίνητο {κωδικός}] αλλά δεν σας βρήκα. ' +
+        'Καλέστε με όποτε μπορείτε[ στο {κινητό μου}]. {όνομά μου}, {γραφείο}',
+    en: 'Hello[ {πελάτης}], I tried to call you[ about property {κωδικός}]. ' +
+        'Please call me back[ at {κινητό μου}]. {όνομά μου}, {γραφείο}'
+  },
+  after: {
+    el: 'Γεια σας[ {πελάτης}], ευχαριστώ για τη σημερινή υπόδειξη. Πώς σας φάνηκε το ακίνητο; ' +
+        'Είμαι στη διάθεσή σας για ό,τι χρειαστείτε. {όνομά μου}',
+    en: 'Hello[ {πελάτης}], thank you for today\'s viewing. What did you think of the property? ' +
+        'I am at your disposal. {όνομά μου}'
+  },
+  still: {
+    el: 'Γεια σας[ {πελάτης}], ψάχνετε ακόμα ακίνητο; Έχω νέες επιλογές που ίσως σας ταιριάζουν. ' +
+        'Να σας στείλω;[ {κινητό μου}.] {όνομά μου}',
+    en: 'Hello[ {πελάτης}], are you still looking for a property? I have new options that may suit you. ' +
+        'Shall I send them?[ {κινητό μου}.] {όνομά μου}'
   }
 };
 
@@ -1736,7 +1755,10 @@ function actShowing_(agent, d) {
 
   let ref = String(appGet_(l.id, ACOL.SHOW_ID) || '');
   let invited = false;
-  const existing = ref ? eventByRef_(ref) : null;
+  // 2.7: «Νέα υπόδειξη» μετά από μία που έγινε → ΝΕΟ event. Η παλιά μένει στο ημερολόγιο ως ιστορικό.
+  const prevAt = ts_(appGet_(l.id, ACOL.SHOW_AT));
+  const fresh = !!d.fresh && prevAt && prevAt <= Date.now();
+  const existing = ref && !fresh ? eventByRef_(ref) : null;
   const updated = !!existing;
 
   try {
@@ -2649,7 +2671,8 @@ const CONTACT_COLS = [
   ['CODES', 'Ενδιαφερόμενος για', /^ενδιαφερομενος/],
   ['NOTES', 'Σημειώσεις', /^σημειωσεις/],
   ['FIRST', 'Πρώτη κλήση', /^πρωτη κληση/],
-  ['LAST', 'Τελευταία κλήση', /^τελευταια κληση/]
+  ['LAST', 'Τελευταία κλήση', /^τελευταια κληση/],
+  ['EDITED', 'Διορθώθηκε', /^διορθωθηκε/]      // 2.7: ο μεσίτης άλλαξε όνομα / τηλέφωνο / email από την εφαρμογή
 ];
 
 let _contacts = null;   // γραμμές του «Επαφές εφαρμογής»
@@ -2777,7 +2800,8 @@ function readContacts_() {
     _contacts.push({
       row: i + 2, id: id, crmId: crmId, agent: cellText_(at(r, 'AGENT')) || me, name: name, phone: phone, email: email,
       codes: cellText_(at(r, 'CODES')).split(/[,;]/).map(x => x.trim()).filter(Boolean),
-      notes: cellText_(at(r, 'NOTES')), first: at(r, 'FIRST'), last: at(r, 'LAST')
+      notes: cellText_(at(r, 'NOTES')), first: at(r, 'FIRST'), last: at(r, 'LAST'),
+      edited: !!at(r, 'EDITED')
     });
   });
   return _contacts;
@@ -2808,7 +2832,17 @@ function agentIndex_(agentName) {
 
   readContacts_().filter(a => norm_(a.agent) === key).forEach(a => {
     const m = (a.crmId && byId[a.crmId]) || (a.phone && byPhone[a.phone]) || (a.email && byEmail[emailKey_(a.email)]);
-    if (m) { m.apps.push(a); return; }
+    if (m) {
+      m.apps.push(a);
+      // 2.7: ό,τι διόρθωσε ο μεσίτης στην εφαρμογή υπερισχύει του CRM (το CRM δεν αλλάζει).
+      if (a.edited && a.crmId && a.crmId === m.crmId) {
+        if (a.name) m.name = a.name;
+        if (a.phone) m.phones = [a.phone].concat(m.phones.filter(x => x !== a.phone));
+        if (a.email) m.emails = [a.email].concat(m.emails.filter(x => emailKey_(x) !== emailKey_(a.email)));
+        m.edited = true;
+      }
+      return;
+    }
     const c = { id: a.id, crm: false, crmId: '', name: a.name, phones: a.phone ? [a.phone] : [],
                 emails: emailList_(a.email), apps: [a] };
     list.push(c);
@@ -2957,7 +2991,7 @@ function contactPayload_(m) {
     id: m.id, crm: m.crm, name: m.name || a.name || '', phones: m.phones, emails: m.emails,
     role: m.role, tags: m.tags, job: m.job, source: m.source, street: m.street, area: m.area,
     added: m.added ? fmtDate_(m.added) : '', inactive: !!m.inactive, notes: a.notes,
-    first: stamp_(first), last: stamp_(last),
+    first: stamp_(first), last: stamp_(last), edited: !!m.edited,
     codes: codesOf_(m).map(code => {
       const p = props[normCode_(code)];
       return { code: code, street: p ? p.street : '', status: p ? p.status : '' };
@@ -3002,6 +3036,23 @@ function actContactSave_(agent, d) {
     }
     a.notes = notes;
     sh.getRange(a.row, cols.NOTES).setValue(safe_(notes));
+    // 2.7: ο μεσίτης διορθώνει και τα στοιχεία. Γράφονται ΜΟΝΟ στη γραμμή της εφαρμογής.
+    if (d.name != null || d.phone != null || d.email != null) {
+      const nm = String(d.name == null ? m.name : d.name).trim();
+      const ph = d.phone == null ? (m.phones[0] || '') : phoneDigits_(d.phone);
+      const em = String(d.email == null ? (m.emails[0] || '') : d.email).trim();
+      if (!nm && !ph) throw new Error('Γράψε όνομα ή τηλέφωνο.');
+      if (em && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('Το email δεν είναι σωστό.');
+      const changed = nm !== (m.name || '') || ph !== (m.phones[0] || '') || emailKey_(em) !== emailKey_(m.emails[0] || '');
+      if (changed) {
+        Object.assign(a, { name: nm, phone: ph, email: em, edited: true });
+        sh.getRange(a.row, cols.NAME).setValue(safe_(nm));
+        sh.getRange(a.row, cols.PHONE).setValue(safe_(ph));
+        sh.getRange(a.row, cols.EMAIL).setValue(safe_(em));
+        if (cols.EDITED) sh.getRange(a.row, cols.EDITED).setValue(new Date());
+        log_('Διόρθωση επαφής', agent.name, d.id);
+      }
+    }
     _cidx = {};
     return contactPayload_(myContact_(agent, d.id));
   }
