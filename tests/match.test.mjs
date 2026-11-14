@@ -17,7 +17,7 @@ const ctx = {
   HtmlService: noop, DocumentApp: noop, Logger: noop, ContactsApp: noop
 };
 vm.createContext(ctx);
-for (const f of ['Code.js', 'Profile.js', 'Match.js', 'Drops.js', 'Report.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
+for (const f of ['Code.js', 'Profile.js', 'Match.js', 'Drops.js', 'Report.js', 'Edit.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
 const run = (s) => vm.runInContext(s, ctx);
 const find = run('matchFind_');
 
@@ -146,4 +146,38 @@ test('FEAT-13: αναφορά ανά πηγή, σύγκριση, υποδείξ�
   assert.match(t, /2 ενδιαφερόμενοι βρήκαν την τιμή/);
   const h = run('reportHtml_')(r, '<b>x</b>', 'Γ');
   assert.ok(!h.includes('<b>x</b>'), 'escape');
+});
+
+// ── 2.7 · Διόρθωση ακινήτου, μετρήσεις χρήσης, έτοιμα SMS ──
+test('2.7: διόρθωση ακινήτου — καθαρίζει τιμές, απορρίπτει λάθος', () => {
+  const c = run('editClean_');
+  assert.equal(JSON.stringify(c({ price: '245.000 €', sqm: '85', street: '  Υμηττού   10 ', area: '' })),
+    JSON.stringify({ price: 245000, sqm: 85, street: 'Υμηττού 10' }));
+  assert.equal(JSON.stringify(c({ code: 'A-1' })), '{}');
+  assert.throws(() => c({ price: 'abc' }), /τιμή/);
+});
+
+test('2.7: μετρήσεις — άθροιση, άγνωστες ενέργειες και υπερβολές κόβονται', () => {
+  const add = run('usageAdd_');
+  const t = add({ sms: [2, 20, 6] }, { sms: [1, 10, 3], showing: [1, 9999, 5], hack: [5, 5, 5], status: [0, 0, 0] });
+  assert.equal(JSON.stringify(t), JSON.stringify({ sms: [3, 30, 9], showing: [1, 600, 5] }));
+});
+
+test('2.7: αναφορά — χρόνος που γλίτωσε = φορές × (με το χέρι − μέσος όρος), ποτέ αρνητικός', () => {
+  const r = run('usageRows_')({ sms: [10, 100, 30], status: [2, 400, 4] }, { sms: 60, status: 60 });
+  assert.equal(r.savedSec, 500);
+  assert.equal(r.actions, 12);
+  assert.equal(r.rows[0].key, 'sms');
+  assert.equal(r.rows[0].avgSec, 10);
+  assert.equal(r.rows[0].avgClicks, 3);
+  assert.equal(r.rows[1].savedSec, 0);
+});
+
+test('2.7: νέα έτοιμα SMS υπάρχουν σε ΕΛ και EN, ίδια με το κινητό', () => {
+  const T = run('DEFAULT_TEMPLATES');
+  const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  for (const k of ['noanswer', 'after', 'still']) {
+    assert.ok(T[k].el && T[k].en, k);
+    assert.ok(app.includes(T[k].el), 'TPL_FALLBACK ' + k + ' διαφέρει από τον server');
+  }
 });

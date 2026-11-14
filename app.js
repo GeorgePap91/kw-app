@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.6.0';
+var APP_VERSION = '2.7.0';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox'];
 var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -361,8 +361,16 @@ function api(action, data, signal) {
   });
 }
 
+/** 2.7 · Μετρήσεις χρήσης: «έγινε η ενέργεια a». mark=true: ξεκινά η μέτρηση (άνοιξε πελάτης / ακίνητο). */
+function used(a, mark) {
+  var u = window.kwUsage;
+  if (!u) return;
+  if (mark) u.mark(); else u.track(a);
+}
+
 /** Στέλνει χωρίς να περιμένει απάντηση· επιβιώνει όταν η σελίδα πάει στο παρασκήνιο. */
 function beacon(action, data) {
+  used(action);
   // 2.2: χωρίς σήμα, ή αν υπάρχει ήδη ουρά, η ενέργεια μπαίνει στην ουρά (με τη σειρά).
   if (OFF.QUEUED[action] && (S.queue.length || S.netBad || navigator.onLine === false)) { qPush(action, data); return; }
   var payload = body(action, data);
@@ -1326,7 +1334,7 @@ function showContact(c) {
   $('ct-facts').innerHTML = rows.filter(function (f) { return f[1]; }).map(function (f) {
     return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>';
   }).join('');
-  label($('btn-edit-contact'), 'form', c.crm ? (c.notes ? 'Αλλαγή σημειώσεων' : 'Προσθήκη σημείωσης') : 'Επεξεργασία επαφής');
+  label($('btn-edit-contact'), 'form', 'Επεξεργασία επαφής');
 
   var tel = intlPhone(phones[0]);
   $('ct-tel').href = tel ? 'tel:' + tel : '#';
@@ -1388,8 +1396,8 @@ function renderContactMail(r) {
 function editContact(c) {
   var crm = !!(c && c.crm);
   S.contactEdit = c ? c.id : '';
-  $('ce-head').textContent = crm ? 'Σημειώσεις' : c ? 'Αλλαγή επαφής' : 'Νέα επαφή';
-  $('ce-fields').hidden = crm;
+  $('ce-head').textContent = c ? 'Αλλαγή επαφής' : 'Νέα επαφή';
+  $('ce-fields').hidden = false;                     // 2.7: και οι επαφές του CRM διορθώνονται
   $('ce-crm-note').hidden = !crm;
   $('ce-name').value = c ? c.name || '' : '';
   $('ce-phone').value = c ? (c.phones || [])[0] || '' : '';
@@ -1403,6 +1411,7 @@ function editContact(c) {
 function onSaveContact() {
   var btn = $('btn-save-contact'), hint = $('ce-hint');
   btn.disabled = true;
+  used('contactSave');
   api('contactSave', {
     id: S.contactEdit, name: $('ce-name').value, phone: $('ce-phone').value,
     email: $('ce-email').value, notes: $('ce-notes').value
@@ -2071,6 +2080,47 @@ function addrLink(el, street, area) {
   label(el, 'map', [street, area].filter(Boolean).join(', '));
 }
 
+// ── 2.7 · Διόρθωση ακινήτου (μόνο δικό του) ──
+function openPropEdit(p) {
+  S.propEdit = p.code;
+  $('pe-name').textContent = p.street || p.title || p.code;
+  $('pe-price').value = String(p.price == null ? '' : p.price).replace(/[^\d.,]/g, '');
+  $('pe-sqm').value = p.sqm || '';
+  $('pe-street').value = p.street || '';
+  $('pe-area').value = p.area || '';
+  $('pe-hint').textContent = '';
+  $('pe-hint').className = 'save-hint';
+  $('pe-save').onclick = onSavePropEdit;
+  openPop('propedit');
+}
+
+function onSavePropEdit() {
+  var btn = $('pe-save'), hint = $('pe-hint'), code = S.propEdit;
+  var p = S.props.filter(function (x) { return x.code === code; })[0];
+  if (!p) return;
+  var d = { code: code }, same = function (a, b) { return String(a == null ? '' : a).trim() === String(b == null ? '' : b).trim(); };
+  var price = $('pe-price').value.trim(), now = String(p.price == null ? '' : p.price).replace(/[^\d.,]/g, '');
+  if (!same(price, now)) d.price = price;
+  if (!same($('pe-sqm').value, p.sqm)) d.sqm = $('pe-sqm').value.trim();
+  if (!same($('pe-street').value, p.street)) d.street = $('pe-street').value.trim();
+  if (!same($('pe-area').value, p.area)) d.area = $('pe-area').value.trim();
+  if (Object.keys(d).length === 1) { closePop('propedit'); return; }
+  btn.disabled = true;
+  used('propSave');
+  api('propSave', d).then(function (r) {
+    btn.disabled = false;
+    p.price = r.price; p.sqm = r.sqm; p.street = r.street; p.area = r.area;
+    closePop('propedit');
+    render();
+    openProp(code);
+    toast('Το ακίνητο ενημερώθηκε.');
+  }).catch(function (e) {
+    btn.disabled = false;
+    hint.className = 'save-hint err';
+    hint.textContent = e.net ? 'Χρειάζεται σύνδεση για την αλλαγή.' : e.message;
+  });
+}
+
 function openProp(code) {
   var p = S.props.filter(function (x) { return x.code === code; })[0];
   if (!p) return;
@@ -2104,7 +2154,10 @@ function openProp(code) {
   loadMedia('pd', p);
   $('pd-present').hidden = p.available === false;     // 1.19
   $('pd-report').hidden = !(S.flags && S.flags.ownerReport && p.mine);   // 2.6 · FEAT-13
-  $('pd-report').onclick = function () { if (window.kwAuto) window.kwAuto.report(p.code); };                // 1.18: εξώφυλλο και φωτογραφίες
+  $('pd-report').onclick = function () { if (window.kwAuto) window.kwAuto.report(p.code); };
+  $('pd-edit').hidden = !p.mine;                     // 2.7: ο μεσίτης διορθώνει το δικό του ακίνητο
+  $('pd-edit').onclick = function () { openPropEdit(p); };
+  used('', true);                // 1.18: εξώφυλλο και φωτογραφίες
   // Το ακίνητο άλλου μέλους δεν έχει έγγραφα εδώ: μόνο Στοιχεία και Κλήσεις.
   $('tab-pd-docs').hidden = !p.mine;
   $('tab-pd-bill').hidden = !p.mine;
@@ -2200,6 +2253,7 @@ function showLead(l, opts) {
   closeSheet('propdetail');
   closeSheet('contact');
 
+  used('', true);                                    // 2.7: από εδώ μετράμε χρόνο και πατήματα
   S.smsLang = 'el';
   S.smsKind = opts.remind && upcoming(l) ? 'reminder' : 'intro';
   fillDetail(l);
@@ -2232,6 +2286,9 @@ function hasShowing(l) { return !!(l && l.hasEvent && l.showingDate); }
 function upcoming(l) { return hasShowing(l) && l.showingTs > Date.now(); }
 
 /** Η υπόδειξη έγινε και δεν έχει γραφτεί ακόμα πώς πήγε. */
+/** 2.7: η υπόδειξη έχει περάσει (με βάση την ώρα του ημερολογίου). */
+function showingDone(l) { return hasShowing(l) && l.showingTs <= Date.now(); }
+
 function needsOutcome(l) {
   return hasShowing(l) && l.status === ST.SHOWING && !l.outcome && l.showingTs <= Date.now();
 }
@@ -2282,7 +2339,8 @@ function fillDetail(l) {
   fact('d-smsremind-wrap', 'd-smsremind', upcoming(l) ? l.smsRemind : '');
 
   $('btn-noanswer').textContent = l.status === ST.NO_ANSWER ? 'Δεν απάντησε ξανά' : 'Δεν απάντησε';
-  $('btn-showing-text').textContent = needsOutcome(l) ? 'Πώς πήγε η υπόδειξη;' : hasShowing(l) ? 'Αλλαγή υπόδειξης' : 'Κλείσε υπόδειξη';
+  $('btn-showing-text').textContent = needsOutcome(l) ? 'Πώς πήγε η υπόδειξη;'
+    : showingDone(l) ? 'Η υπόδειξη έγινε · κλείσε νέα' : hasShowing(l) ? 'Αλλαγή υπόδειξης' : 'Κλείσε υπόδειξη';
   // 1.14.1: το έντυπο υπόδειξης έχει δικό του κουμπί, μόλις υπάρχει υπόδειξη.
   $('btn-showform').hidden = !hasShowing(l);
   $('d-form-sub').textContent = l.form ? 'Κατάσταση: ' + l.form + '.' : 'Link για τον πελάτη, υπογραφή, PDF.';
@@ -2540,7 +2598,21 @@ function onNoteInput() {
 var SMS_KINDS = {
   intro:    { label: 'Πρώτη επαφή', button: 'Άνοιγμα SMS με έτοιμο μήνυμα' },
   reminder: { label: 'Υπενθύμιση',  button: 'Άνοιγμα SMS υπενθύμισης' },
-  cancel:   { label: 'Ακύρωση',     button: 'Άνοιγμα SMS ακύρωσης' }
+  cancel:   { label: 'Ακύρωση',     button: 'Άνοιγμα SMS ακύρωσης' },
+  // 2.7: έτοιμα μηνύματα, πάντα διαθέσιμα
+  noanswer: { label: 'Δεν σας βρήκα', button: 'Άνοιγμα SMS «δεν σας βρήκα»' },
+  after:    { label: 'Μετά την υπόδειξη', button: 'Άνοιγμα SMS μετά την υπόδειξη' },
+  still:    { label: 'Ψάχνετε ακόμα;', button: 'Άνοιγμα SMS «ψάχνετε ακόμα;»' }
+};
+
+/** 2.7: αν το κινητό έχει ακόμα παλιά στοιχεία από τον server (χωρίς τα νέα μηνύματα), ισχύουν αυτά. */
+var TPL_FALLBACK = {
+  noanswer: { el: 'Γεια σας[ {πελάτης}], σας κάλεσα[ για το ακίνητο {κωδικός}] αλλά δεν σας βρήκα. Καλέστε με όποτε μπορείτε[ στο {κινητό μου}]. {όνομά μου}, {γραφείο}',
+              en: 'Hello[ {πελάτης}], I tried to call you[ about property {κωδικός}]. Please call me back[ at {κινητό μου}]. {όνομά μου}, {γραφείο}' },
+  after:    { el: 'Γεια σας[ {πελάτης}], ευχαριστώ για τη σημερινή υπόδειξη. Πώς σας φάνηκε το ακίνητο; Είμαι στη διάθεσή σας για ό,τι χρειαστείτε. {όνομά μου}',
+              en: "Hello[ {πελάτης}], thank you for today's viewing. What did you think of the property? I am at your disposal. {όνομά μου}" },
+  still:    { el: 'Γεια σας[ {πελάτης}], ψάχνετε ακόμα ακίνητο; Έχω νέες επιλογές που ίσως σας ταιριάζουν. Να σας στείλω;[ {κινητό μου}.] {όνομά μου}',
+              en: 'Hello[ {πελάτης}], are you still looking for a property? I have new options that may suit you. Shall I send them?[ {κινητό μου}.] {όνομά μου}' }
 };
 
 /** Ποια SMS έχουν νόημα για αυτή την κλήση τώρα. */
@@ -2548,6 +2620,9 @@ function smsKinds(l) {
   var k = ['intro'];
   if (upcoming(l)) k.push('reminder');
   if (S.cancelled && S.cancelled.id === l.id) k.push('cancel');
+  k.push('noanswer');                                           // 2.7: έτοιμα μηνύματα
+  if (hasShowing(l) && l.showingTs <= Date.now()) k.push('after');
+  k.push('still');
   return k;
 }
 
@@ -2561,7 +2636,7 @@ function buildSmsText(l, me, lang, kind) {
 
 function templateOf(kind, lang) {
   var mine = ((S.me.prefs || {}).templates || {})[kind] || {};
-  return mine[lang] || S.boot.defaults.templates[kind][lang];
+  return mine[lang] || (S.boot.defaults.templates[kind] || TPL_FALLBACK[kind] || {})[lang] || '';
 }
 
 function smsVars(l, me, lang, kind) {
@@ -2748,14 +2823,19 @@ function latin(s) {
 //  ΥΠΟΔΕΙΞΗ (νέα ή αλλαγή)
 // ─────────────────────────────────────────────────────────────
 
-function openShowingForm() {
+function openShowingForm(fresh) {
   var l = S.lead;
-  var edit = hasShowing(l);
+  // 2.7: υπόδειξη που έγινε δεν «αλλάζει». Ή γράφεις πώς πήγε, ή κλείνεις ΝΕΑ (fresh).
+  S.showFresh = fresh === true && showingDone(l);   // (ως χειριστήριο κλικ παίρνει το event: δεν μετράει)
+  var edit = hasShowing(l) && !S.showFresh;
   var cal = S.me.calendar || {};
 
   var done = edit && l.showingTs <= Date.now();
   $('s-title').textContent = done ? 'Υπόδειξη ' + l.showingAt : edit ? 'Αλλαγή υπόδειξης' : 'Νέα υπόδειξη';
   $('s-outcome').hidden = !done;
+  $('s-when').hidden = done;                         // έγινε: ούτε αλλαγή ώρας, ούτε ακύρωση
+  $('s-new').hidden = !done;
+  $('s-new').onclick = function () { openShowingForm(true); };
   if (done) {
     S.outcome = l.outcome || '';
     $('s-outcome-note').value = l.outcomeNote || '';
@@ -2792,7 +2872,7 @@ function openShowingForm() {
   $('s-form').hidden = !edit;
   if (edit) loadShowingForm(l);
   resetCancelBtn();
-  $('btn-cancel-showing').hidden = !edit;
+  $('btn-cancel-showing').hidden = !edit || done;
   openSheet('showing');
 }
 
@@ -2816,6 +2896,13 @@ function loadShowingForm(l) {
   });
 }
 
+/** 2.7: νέο έντυπο μόνο αν το υπογεγραμμένο είναι από ΠΡΟΗΓΟΥΜΕΝΗ υπόδειξη (κλείστηκε νέα μετά). */
+function sfCanRenew(l, st) {
+  var sub = parseStamp(st && st.submitted);
+  if (!sub || !hasShowing(l)) return false;
+  return sub.getTime() < l.showingTs - 4 * 86400000;
+}
+
 function sfFact(label, value) {
   return value ? '<div><dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd></div>' : '';
 }
@@ -2837,8 +2924,8 @@ function renderShowingForm(st) {
       '<p class="cal-status muted">' + esc((signed ? 'Υπογράφηκε στην οθόνη ' : 'Συμπληρώθηκε, για υπογραφή σε χαρτί · ') + st.submitted) + '</p>' +
       '<a class="btn primary wide" href="' + esc(st.fileUrl) + '" target="_blank" rel="noopener">' + ico('out') +
         (signed ? 'Άνοιγμα PDF' : 'Άνοιγμα PDF για εκτύπωση') + '</a>' +
-      '<button class="link" id="sf-new">Νέο έντυπο για τον ίδιο πελάτη</button></div>';
-    $('sf-new').onclick = function () {
+      (sfCanRenew(l, st) ? '<button class="link" id="sf-new">Νέο έντυπο για τον ίδιο πελάτη</button>' : '') + '</div>';
+    if ($('sf-new')) $('sf-new').onclick = function () {
       ask('Νέο έντυπο;', 'Το προηγούμενο PDF μένει στον φάκελο του ακινήτου. Θα φτιαχτεί νέο link για τον πελάτη.', 'Ναι, νέο έντυπο')
         .then(function (yes) { if (yes) { st.status = ''; renderShowingForm(st); } });
     };
@@ -2910,6 +2997,7 @@ function onSfCreate(defects, deal) {
   var id = S.lead.id;
   var b = $('sf-create') || $('sf-again');
   if (b) { b.disabled = true; b.textContent = 'Ετοιμάζεται…'; }
+  used('formCreate');
   api('formCreate', { id: id, defects: defects || '', deal: deal || '' }).then(function (res) {
     S.sfLink = { id: id, url: res.url, sms: res.sms, email: res.email };
     var st = res.form;
@@ -3297,12 +3385,9 @@ function onSaveShowing() {
   btn.disabled = true;
   btn.textContent = 'Αποθήκευση…';
 
-  send('showing', {
-    id: S.lead.id,
-    date: $('s-date').value,
-    time: $('s-time').value,
-    address: $('s-addr').value.trim()
-  }).then(function (rr) {
+  var sd = { id: S.lead.id, date: $('s-date').value, time: $('s-time').value, address: $('s-addr').value.trim() };
+  if (S.showFresh) sd.fresh = true;                  // 2.7: νέο event, η παλιά υπόδειξη μένει στο ημερολόγιο
+  send('showing', sd).then(function (rr) {
     var res = rr.data;
     merge(res.lead);
     if (S.cancelled && S.cancelled.id === res.lead.id) S.cancelled = null;
@@ -3937,7 +4022,10 @@ function onDocDelete(p, b, set) {
 var TPL_PLACEHOLDERS = {
   intro:    ['πελάτης', 'κωδικός', 'όνομά μου', 'κινητό μου', 'γραφείο', 'link'],
   reminder: ['ημέρα', 'ώρα', 'διεύθυνση', 'πελάτης', 'όνομά μου', 'κινητό μου'],
-  cancel:   ['ημέρα', 'ώρα', 'διεύθυνση', 'πελάτης', 'όνομά μου', 'κινητό μου']
+  cancel:   ['ημέρα', 'ώρα', 'διεύθυνση', 'πελάτης', 'όνομά μου', 'κινητό μου'],
+  noanswer: ['πελάτης', 'κωδικός', 'όνομά μου', 'κινητό μου', 'γραφείο'],
+  after:    ['πελάτης', 'κωδικός', 'διεύθυνση', 'όνομά μου', 'κινητό μου'],
+  still:    ['πελάτης', 'όνομά μου', 'κινητό μου', 'γραφείο', 'link']
 };
 
 function sampleVars(lang) {
@@ -4000,7 +4088,7 @@ function renderTemplates() {
       };
     });
     card.querySelector('.tpl-reset').onclick = function () {
-      S.tplDraft[k][S.tplLang[k]] = S.boot.defaults.templates[k][S.tplLang[k]];
+      S.tplDraft[k][S.tplLang[k]] = (S.boot.defaults.templates[k] || TPL_FALLBACK[k] || {})[S.tplLang[k]] || '';
       renderTemplates();
     };
     tplPreview(card);
@@ -5418,6 +5506,7 @@ function openPresent(p, lead) {
   $('pr-hint').className = 'field-hint';
   presRefresh();
   openPop('present');
+  used('presCreate');
   api('presCreate', { code: p.code, leadId: S.pres.leadId }).then(function (r) {
     if (!S.pres || S.pres.p.code !== p.code) return;
     S.pres.link = r;
@@ -7018,6 +7107,7 @@ function qId() { return Date.now().toString(36) + Math.random().toString(36).sli
  * Απάντηση: { data, queued }.
  */
 function send(action, data) {
+  used(action);
   if (!OFF.QUEUED[action]) return api(action, data).then(function (d) { return { data: d, queued: false }; });
   if (S.queue.length || S.netBad || navigator.onLine === false) return Promise.resolve(qPush(action, data));
   return apiTimed(action, data, OFF.TRY_MS).then(function (d) {
@@ -7144,7 +7234,8 @@ function offLocal(op) {
   if (a === 'showing' && l) {
     var p = d.date.split('-').map(Number), hm = String(d.time).split(':').map(Number);
     var when = new Date(p[0], p[1] - 1, p[2], hm[0], hm[1]);
-    var updated = hasShowing(l);
+    var updated = hasShowing(l) && !d.fresh;
+    if (d.fresh || l.showingTs !== when.getTime()) { l.outcome = ''; l.outcomeNote = ''; }
     l.status = ST.SHOWING;
     l.showingAt = stampOf(when); l.showingDate = d.date; l.showingTime = d.time; l.showingTs = when.getTime();
     l.hasEvent = true; l.followUp = '';
@@ -7304,6 +7395,7 @@ window.showLead = showLead; window.openShowingForm = openShowingForm; window.ope
 window.send = send; window.merge = merge; window.render = render; window.toast = toast;
 window.openPresent = openPresent; window.openPop = openPop; window.closePop = closePop; window.api = api;   // 2.5 · FEAT-11
 window.ico = ico; window.plural = plural; window.openLead = openLead;
+window.beacon = beacon; window.used = used;                               // 2.7
 window.smsHref = smsHref; window.callLead = callLead; window.parseStamp = parseStamp; window.ST_ANSWERED = ST.ANSWERED;   // 2.6
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──

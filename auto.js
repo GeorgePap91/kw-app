@@ -168,6 +168,7 @@
     var send = box.querySelector('#rp-send');
     if (send) send.onclick = function () {
       send.disabled = true;
+      if (W.used) W.used('ownerReportSend');
       W.api('ownerReportSend', { code: rp.code, month: rp.month }).then(function (r) {
         W.toast('Στάλθηκε στον ιδιοκτήτη (' + r.to + ').');
         W.closePop('reportbox');

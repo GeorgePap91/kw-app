@@ -1390,3 +1390,12 @@ body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off
 .rp-table td:last-child{text-align:right;font-weight:700}
 .rp-table .rp-sub td{color:var(--ink-2);font-weight:400;border-top:0;padding-top:0}
 .rp-table .rp-sub td:last-child{font-weight:400}
+
+/* 2.7 · Χρόνος που γλιτώνεις */
+.us-top{text-align:center}
+.us-top > b{font-size:2rem;margin:.25rem 0}
+.us-list{list-style:none;margin:0 0 1rem;padding:0}
+.us-list li{padding:.75rem 0;border-top:1px solid var(--line)}
+.us-list b{display:block;font-size:1.0625rem}
+.us-list span{display:block;color:var(--ink-2);font-size:.9375rem;margin-top:.125rem}
+#s-new{margin:0 0 1rem}
