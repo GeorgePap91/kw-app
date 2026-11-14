@@ -41,3 +41,4 @@ GitHub Actions (public repo): δωρεάν απεριόριστα. clasp / Apps 
 - **DEV ανάπτυξη:** μία web app ανάπτυξη στο DEV project. Το /exec της μπαίνει στο `config.js` → `DEV_API_URL`. Κάθε push σε `feat/**` την ανανεώνει.
 - **Preview:** Cloudflare Pages συνδεδεμένο με το repo. Κάθε branch → `https://<branch>.kw-app.pages.dev`. Εκεί η εφαρμογή μιλάει ΜΟΝΟ με το DEV (έλεγχος στο `config.js`, test στο `tests/config.test.mjs`).
 - **Flags στο DEV:** Script property `FEATURES` με `"all"` σε όλα, ώστε στο preview να φαίνονται όλα.
+- **Cloudflare (Workers):** Production → Deploy command `npx wrangler deploy`. Previews Base → Build command `node scripts/build-site.mjs dist` (η εντολή preview δεν τρέχει μόνη της το build). Preview link: `https://<branch-με-παύλες>-kw-app.georgepapadakis532.workers.dev`.
