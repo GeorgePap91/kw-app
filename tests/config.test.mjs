@@ -12,6 +12,14 @@ test('παραγωγή (github.io): PROD backend', () => {
   assert.equal(w.KW_PREVIEW, false);
   assert.match(w.KW_CONFIG.API_URL, PROD);
 });
+test('preview Cloudflare Workers (*.workers.dev): ποτέ PROD', () => {
+  const w = run('feat-feat-14-kw-app.georgepap91.workers.dev');
+  assert.equal(w.KW_PREVIEW, true);
+  assert.doesNotMatch(w.KW_CONFIG.API_URL, PROD);
+});
+test('οποιοσδήποτε άλλος host (π.χ. αντίγραφο σε άλλο site): ποτέ PROD', () => {
+  assert.doesNotMatch(run('kw-app.example.com').KW_CONFIG.API_URL, PROD);
+});
 test('preview (*.pages.dev): ποτέ PROD', () => {
   const w = run('feat-feat-14.kw-app.pages.dev');
   assert.equal(w.KW_PREVIEW, true);

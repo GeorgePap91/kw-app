@@ -1,0 +1,10 @@
+// KW App · Cloudflare Workers (static assets) — ΜΟΝΟ για preview links των features.
+// Η παραγωγή μένει στο GitHub Pages. Σε οποιοδήποτε host εκτός github.io η εφαρμογή
+// μιλάει ΜΟΝΟ με το DEV backend (βλ. config.js, tests/config.test.mjs).
+// Πριν το ανέβασμα τρέχει το scripts/build-site.mjs → dist/ (μόνο τα αρχεία της εφαρμογής).
+{
+  "name": "kw-app",
+  "compatibility_date": "2026-11-01",
+  "build": { "command": "node scripts/build-site.mjs dist" },
+  "assets": { "directory": "./dist" }
+}
