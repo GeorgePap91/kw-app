@@ -25,3 +25,12 @@ test('preview (*.pages.dev): ποτέ PROD', () => {
   assert.equal(w.KW_PREVIEW, true);
   assert.doesNotMatch(w.KW_CONFIG.API_URL, PROD);
 });
+
+test('DEV και PROD είναι διαφορετικές αναπτύξεις', () => {
+  const prod = /PROD_API_URL = '([^']+)'/.exec(SRC)[1];
+  const dev = /DEV_API_URL = '([^']*)'/.exec(SRC)[1];
+  assert.ok(dev, 'λείπει το DEV_API_URL');
+  assert.notEqual(dev, prod);
+  assert.equal(run('x.workers.dev').KW_CONFIG.API_URL, dev);
+  assert.equal(run('georgepap91.github.io').KW_CONFIG.API_URL, prod);
+});

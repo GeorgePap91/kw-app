@@ -10,7 +10,7 @@
   // Παραγωγή: η ανάπτυξη του PROD Apps Script (τελειώνει σε /exec).
   var PROD_API_URL = 'https://script.google.com/macros/s/AKfycbzvR5oALOE8M6afHlts00p7VMMLPPsYXS0Jk0cQUYGxAYSvBf4Xe8Myh_9l6JLXnsv9/exec';
   // 2.4 · Δοκιμές: η ανάπτυξη του DEV Apps Script (ψεύτικα δεδομένα). Κενό = δεν έχει στηθεί ακόμα.
-  var DEV_API_URL = '';
+  var DEV_API_URL = 'https://script.google.com/macros/s/AKfycbwYYQorAHbgdqD26aIn1dTZ71XNxptFKKtK9g22d6DuEGCF-RehB26uU6WUnldIh_41/exec';
   // Preview links (Cloudflare: *.workers.dev ή *.pages.dev): ΠΟΤΕ στην παραγωγή.
   // Κανόνας ασφαλείας: η παραγωγή ΜΟΝΟ στο github.io· οτιδήποτε άλλο → DEV.
   var preview = !/(\.github\.io|^localhost|^127\.0\.0\.1)$/.test(location.hostname);
