@@ -633,6 +633,22 @@
   </div>
 </div>
 
+<!-- 2.6 · FEAT-12: ΜΕΙΩΣΗ ΤΙΜΗΣ -->
+<div class="pop" id="dropbox" role="dialog" aria-modal="true" aria-labelledby="dropbox-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="dropbox-title">Έπεσε η τιμή</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="dr-body"></div>
+  </div>
+</div>
+
+<!-- 2.6 · FEAT-13: ΑΝΑΦΟΡΑ ΙΔΙΟΚΤΗΤΗ -->
+<div class="pop" id="reportbox" role="dialog" aria-modal="true" aria-labelledby="reportbox-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="reportbox-title">Αναφορά ιδιοκτήτη</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="rp-body"></div>
+  </div>
+</div>
+
 <!-- 1.19: ΠΑΡΟΥΣΙΑΣΗ ΣΤΟΝ ΠΕΛΑΤΗ -->
 <div class="pop" id="present" role="dialog" aria-modal="true" aria-labelledby="present-title" hidden>
   <div class="pop-box">
@@ -849,6 +865,7 @@
     <a class="addr-link" id="pd-addr" target="_blank" rel="noopener" hidden></a>
     <div class="pd-chips" id="pd-chips"></div>
     <button class="btn solid-red wide pd-present" id="pd-present" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span>Στείλε στον πελάτη</span></button>
+    <button class="btn wide pd-present" id="pd-report" hidden><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg><span>Αναφορά ιδιοκτήτη</span></button>
     <div class="stats" id="pd-stats"></div>
 
     <div class="subtabs in-sheet four" id="tabs-prop" role="tablist" aria-label="Ακίνητο">
@@ -1209,5 +1226,6 @@
 <script src="memory.js"></script>
 <script src="gestures.js"></script>
 <script src="match.js"></script>
+<script src="auto.js"></script>
 </body>
 </html>

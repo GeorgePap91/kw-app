@@ -17,7 +17,7 @@ const ctx = {
   HtmlService: noop, DocumentApp: noop, Logger: noop, ContactsApp: noop
 };
 vm.createContext(ctx);
-for (const f of ['Code.js', 'Profile.js', 'Match.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
+for (const f of ['Code.js', 'Profile.js', 'Match.js', 'Drops.js', 'Report.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
 const run = (s) => vm.runInContext(s, ctx);
 const find = run('matchFind_');
 
@@ -53,7 +53,7 @@ test('χωρίς προφίλ: ίδια περιοχή με το ακίνητο 
 
 test('AC5: δεν ξαναπροτείνεται ο ίδιος πελάτης για το ίδιο ακίνητο', () => {
   const l = L('1');
-  const r = find([fresh()], [l], {}, byCode, st, new Set(['N9|' + l.phone]));
+  const r = find([fresh()], [l], {}, byCode, st, new Set(['N9|' + run('matchH_')(l.phone)]));
   assert.equal(r.length, 0);
 });
 
@@ -90,4 +90,60 @@ test('MATCH_SEEN: σπάει σε κομμάτια και ξαναδιαβάζε
   assert.ok(Number(store.MATCH_SEEN_N) >= 2);
   Object.assign(run('PROPS_'), store);
   assert.equal(JSON.stringify(run('matchSeenGet_()')), JSON.stringify(codes));
+});
+
+test('αποτύπωμα πελάτη: σταθερό και χωρίς το τηλέφωνο', () => {
+  const h = run('matchH_');
+  assert.equal(h('6900000001'), h('6900000001'));
+  assert.notEqual(h('6900000001'), h('6900000002'));
+  assert.ok(!h('6900000001').includes('690'));
+});
+
+// ── 2.6 · FEAT-12 · Μείωση τιμής ──
+test('FEAT-12: μείωση ≥2% βρίσκεται, μικρότερη ή αύξηση όχι', () => {
+  const f = run('dropFind_');
+  const props = { A1: { code: 'A-1', price: 230000, available: true }, B2: { code: 'B-2', price: 99000, available: true },
+                  C3: { code: 'C-3', price: 310000, available: true }, D4: { code: 'D-4', price: 100000, available: false } };
+  const r = f({ A1: 250000, B2: 100000, C3: 300000, D4: 150000 }, props);
+  assert.equal(r.map((x) => x.key).join(), 'A1');
+});
+
+test('FEAT-12: πελάτες — όχι «Ενδιαφέρθηκε»/κλειστοί, πρώτα όσοι τους καλύπτει τώρα', () => {
+  const c = run('dropClients_');
+  const d = { key: 'A1', p: { deal: 'Πώληση' }, old: 250000, now: 230000 };
+  const leads = [L('1'), L('2'), L('3'), L('4'), L('5', { code: 'X-9' })];
+  const pf = { 2: { budgetBuy: 235000 } };
+  const out = { 3: 'Ενδιαφέρθηκε' };
+  const r = c(d, leads, pf, (id) => (id === '4' ? 'Κλειστή' : 'Απαντημένη'), (id) => out[id] || '');
+  assert.equal(r.map((x) => x.id).join(), '2,1');
+  assert.match(r[0].why, /τώρα το καλύπτει/);
+});
+
+test('FEAT-12: οι τιμές της χθες σώζονται σε κομμάτια και ξαναδιαβάζονται', () => {
+  const props = {};
+  for (let i = 0; i < 1500; i++) props['KW' + i] = { price: 100000 + i, available: true };
+  run('dropLastSet_')(props);
+  assert.ok(Number(store.PRICE_LAST_N) >= 2);
+  Object.assign(run('PROPS_'), store);
+  const back = run('dropLastGet_()');
+  assert.equal(back.KW0, 100000);
+  assert.equal(back.KW1499, 101499);
+  assert.equal(Object.keys(back).length, 1500);
+});
+
+// ── 2.6 · FEAT-13 · Αναφορά ιδιοκτήτη ──
+test('FEAT-13: αναφορά ανά πηγή, σύγκριση, υποδείξεις — χωρίς ονόματα', () => {
+  const b = run('reportBuild_');
+  const r = b({ code: 'A-1', street: 'Υμηττού 10', price: 250000 }, 'Οκτώβριος',
+    [{ id: '1', source: 'Spitogatos' }, { id: '2', source: 'Spitogatos' }, { id: '3', source: 'XE' }], 1,
+    [{ outcome: 'Ενδιαφέρθηκε' }, { outcome: '' }], 2);
+  assert.equal(r.calls, 3);
+  assert.equal(r.trend, '+2 από τον προηγούμενο μήνα');
+  assert.equal(r.sources[0].name + r.sources[0].n, 'Spitogatos2');
+  const t = run('reportText_')(r, 'Νίκος Παπάς', 'Γιώργος');
+  assert.match(t, /^Καλησπέρα Νίκος,/);
+  assert.match(t, /Τηλεφωνήματα: 3 \(\+2/);
+  assert.match(t, /2 ενδιαφερόμενοι βρήκαν την τιμή/);
+  const h = run('reportHtml_')(r, '<b>x</b>', 'Γ');
+  assert.ok(!h.includes('<b>x</b>'), 'escape');
 });

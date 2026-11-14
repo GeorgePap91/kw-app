@@ -945,7 +945,11 @@ function readProps_() {
 
   const width = Math.max(sh.getLastColumn(), colIdx_(PCOL.STATUS));
   const avail = norm_(CONFIG.AVAILABLE);
-  const dealCol = propDealCol_(sh.getRange(1, 1, 1, width).getValues()[0]);
+  const heads = sh.getRange(1, 1, 1, width).getValues()[0];
+  const dealCol = propDealCol_(heads);
+  // 2.6 · FEAT-13: στοιχεία ιδιοκτήτη (ΔΕΝ πάνε στην εφαρμογή, μόνο στην αναφορά)
+  const ownerCol = heads.findIndex(h => norm_(h) === 'ιδιοκτητης') + 1;
+  const ownerMailCol = heads.findIndex(h => /^email ιδιοκτ/.test(norm_(h))) + 1;
 
   sh.getRange(2, 1, sh.getLastRow() - 1, width).getValues().forEach(r => {
     const key = normCode_(cell_(r, PCOL.ID));
@@ -964,6 +968,8 @@ function readProps_() {
       mandateDays: daysUntil_(cell_(r, PCOL.MANDATE_END))
     };
     p.deal = dealOf_(dealCol ? r[dealCol - 1] : '') || dealOf_(p.title);
+    p.owner = ownerCol ? cellText_(r[ownerCol - 1]) : '';
+    p.ownerEmail = ownerMailCol ? cellText_(r[ownerMailCol - 1]) : '';
     p.available = norm_(p.status).indexOf(avail) === 0;
     // Διπλό ID: κρατάμε τη διαθέσιμη γραμμή.
     if (!_props[key] || p.available) _props[key] = p;
@@ -1296,6 +1302,17 @@ function propertyLine_(l, p) {
   return l.code ? 'Κωδικός ' + l.code : 'Ακίνητο';
 }
 
+/** 2.6 · FEAT-15: αξιολόγηση + τι ψάχνει, από το «Προφίλ πελατών» (μία ανάγνωση ανά εκτέλεση). */
+function leadPf_(id) {
+  const all = typeof matchProfiles_ === 'function' ? matchProfiles_() : {};
+  const d = all[id];
+  if (!d) return { level: '', want: '' };
+  const rent = d.deal === 'rent';
+  const areas = String((rent ? d.areasRent : d.areasBuy) || '').split(/[,·]/)[0].trim();
+  const budget = matchNum_(rent ? d.budgetRent : d.budgetBuy);
+  return { level: d._level || '', want: [areas, budget ? 'έως ' + matchMoney_(budget) : ''].filter(String).join(' ') };
+}
+
 // ═════════════════════════════════════════════════════════════
 //  ΦΥΛΛΟ «ΕΦΑΡΜΟΓΗ»
 // ═════════════════════════════════════════════════════════════
@@ -1380,6 +1397,9 @@ function serialize_(l) {
     sms: stamp_(g(ACOL.SMS)),
     followUp: stamp_(g(ACOL.FU_AT)),
     tries: Number(g(ACOL.TRIES)) || 0,               // 2.4 · FEAT-14
+    updated: stamp_(g(ACOL.UPDATED)),                // 2.6 · FEAT-15: τελευταία ενέργεια
+    pfLevel: leadPf_(l.id).level,                    // 2.6 · FEAT-15: Θερμός / Χλιαρός / Κρύος
+    pfWant: leadPf_(l.id).want,
     showingAt: stamp_(showAt),
     showingDate: showAt && ts_(showAt) ? fmtIso_(showAt) : '',
     showingTime: showAt && ts_(showAt) ? fmtTime_(showAt) : '',
@@ -1561,7 +1581,8 @@ function actBootstrap_(agent, d, sess) {
     props: agentRole ? teamProps_(agent) : [],
     reviews: agentRole ? myReviews_(agent) : [],
     flags: featureFlags_(agent),
-    matches: agentRole && typeof matchesFor_ === 'function' ? matchesFor_(agent) : []
+    matches: agentRole && typeof matchesFor_ === 'function' ? matchesFor_(agent) : [],
+    drops: agentRole && typeof dropsFor_ === 'function' ? dropsFor_(agent) : []
   };
 }
 
@@ -3054,6 +3075,10 @@ function morningBrief() {
   // 2.5 · FEAT-11: νέα ακίνητα → πελάτες που ταιριάζουν (μόνο σε όσους έχουν το flag)
   if (typeof newPropMatch === 'function') {
     try { newPropMatch(); } catch (e) { console.warn('Ταιριάσματα: ' + e.message); }
+  }
+  // 2.6 · FEAT-12: μείωση τιμής → πελάτες που κάλεσαν
+  if (typeof priceDropCheck === 'function') {
+    try { priceDropCheck(); } catch (e) { console.warn('Μείωση τιμής: ' + e.message); }
   }
   if (CONFIG.MORNING.DAYS.indexOf(new Date().getDay()) === -1) return;
 

@@ -1375,3 +1375,18 @@ body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off
 .mt-acts{display:flex;gap:.5rem;flex:1 1 auto;justify-content:flex-end}
 .mt-acts .solid-red{flex:1 1 auto;min-height:3rem}
 .mt-x{flex:0 0 3rem;min-height:3rem;padding:0}
+
+/* 2.6 · FEAT-12/13/15 */
+.cool-note{margin:-.25rem 0 .75rem}
+.cool-list{margin-bottom:1.25rem}
+.cool-list .mt-acts .btn{min-height:3rem}
+.pd-present + .pd-present{margin-top:.5rem}
+.rp-tabs{display:flex;gap:.5rem;margin:0 0 1rem;flex-wrap:wrap}
+.rp-card{border:1px solid var(--line);border-radius:1rem;padding:1rem;background:var(--paper);margin:0 0 1rem}
+.rp-card > b{display:block;font-size:1.125rem}
+.rp-card > span{display:block;color:var(--ink-2);margin:.125rem 0 .75rem}
+.rp-table{width:100%;border-collapse:collapse;font-size:1rem}
+.rp-table td{padding:.375rem 0;border-top:1px solid var(--line)}
+.rp-table td:last-child{text-align:right;font-weight:700}
+.rp-table .rp-sub td{color:var(--ink-2);font-weight:400;border-top:0;padding-top:0}
+.rp-table .rp-sub td:last-child{font-weight:400}

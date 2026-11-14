@@ -8,15 +8,16 @@
  *      ή ίδια με το ακίνητο για το οποίο είχε καλέσει.
  *   3. Στέλνει ΜΙΑ ειδοποίηση ανά μεσίτη (μόνο αν υπάρχει ≥1 ταίριασμα).
  *
- * Κόστος: 1 ανάγνωση «Προφίλ πελατών» + 1 «Ταιριάσματα» + 1 εγγραφή, την ημέρα.
+ * Κόστος: 1 ανάγνωση «Προφίλ πελατών» την ημέρα. ΚΑΝΕΝΑ νέο φύλλο: ιστορικό και λίστα
+ * μένουν σε Ιδιότητες σεναρίου (χωρίς τηλέφωνα: μόνο ένα σύντομο hash).
  * Οι κλήσεις και τα ακίνητα διαβάζονται ήδη από το morningBrief (cache).
  * Η λίστα της εφαρμογής κρατιέται σε Ιδιότητα σεναρίου ανά μεσίτη, που φορτώνεται
  * μαζί με όλες τις άλλες: το άνοιγμα της εφαρμογής ΔΕΝ διαβάζει επιπλέον φύλλο.
  */
 
 const MATCH = {
-  SHEET: 'Ταιριάσματα',
-  HEADERS: ['Ημερομηνία', 'Μεσίτης', 'Κωδικός ακινήτου', 'Πελάτης (τηλ. ή ID)', 'Όνομα', 'Λόγος'],
+  HIST_KEY: 'MATCH_DONE:',      // + email → ποιοι προτάθηκαν ήδη (κωδικός|hash πελάτη), για να μην ξαναπροταθούν
+  HIST_MAX: 300,
   SEEN_KEY: 'MATCH_SEEN',       // κωδικοί που έχουμε ήδη δει (σε κομμάτια των 8.000 χαρακτήρων)
   LIST_KEY: 'MATCH_LIST:',      // + email μεσίτη → JSON λίστα για την εφαρμογή
   CHUNK: 8000,
@@ -82,7 +83,7 @@ function matchFind_(newProps, leads, profiles, byCode, status, done) {
     Object.keys(people).forEach(k => {
       const c = people[k], l = c.l, pf = c.pf || {};
       if (normCode_(l.code) === normCode_(p.code)) return;
-      if (done.has(normCode_(p.code) + '|' + c.key)) return;
+      if (done.has(normCode_(p.code) + '|' + matchH_(c.key))) return;
       const home = byCode[normCode_(l.code)] || null;
 
       const deal = matchDeal_(pf.deal) || (home && home.deal) || matchDeal_(l.deal);
@@ -137,6 +138,41 @@ function matchPushText_(list, props) {
 }
 
 // ── Αποθήκευση (Ιδιότητες σεναρίου) ──────────────────────────────────
+
+/** Σύντομο, μη αναστρέψιμο αποτύπωμα (για να μη μένουν τηλέφωνα στις Ιδιότητες). */
+function matchH_(s) {
+  let h = 5381;
+  s = String(s);
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function matchHistGet_(agent) {
+  const v = PROPS_[MATCH.HIST_KEY + String(agent.email || '').toLowerCase()];
+  return v ? String(v).split(',') : [];
+}
+
+function matchHistSet_(agent, list) {
+  const k = MATCH.HIST_KEY + String(agent.email || '').toLowerCase();
+  PROPS_[k] = list.slice(-MATCH.HIST_MAX).join(',');
+  PropertiesService.getScriptProperties().setProperty(k, PROPS_[k]);
+}
+
+/** Προφίλ πελατών: { ID κλήσης: δεδομένα }. Μία ανάγνωση ανά εκτέλεση (cache). */
+let _pfAll = null;
+function matchProfiles_() {
+  if (_pfAll) return _pfAll;
+  _pfAll = {};
+  const sh = getSS().getSheetByName(PROFILE.SHEET);
+  if (sh && sh.getLastRow() > 1) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(r => {
+      let d = null;
+      try { d = JSON.parse(r[6] || '{}'); } catch (e) { d = null; }
+      if (d) { d._level = String(r[4] || ''); d._sum = String(r[5] || ''); _pfAll[String(r[0])] = d; }
+    });
+  }
+  return _pfAll;
+}
 
 function matchSeenGet_() {
   const n = Number(prop_(MATCH.SEEN_KEY + '_N', '0'));
@@ -200,35 +236,17 @@ function newPropMatch() {
   const fresh = avail.filter(k => !seenSet.has(k)).map(k => props[k]);
   if (!fresh.length || !agents.length) return console.log('Ταιριάσματα: ' + fresh.length + ' νέα ακίνητα.');
 
-  const ss = getSS();
-  const profiles = {};
-  const psh = ss.getSheetByName(PROFILE.SHEET);
-  if (psh && psh.getLastRow() > 1) {
-    psh.getRange(2, 1, psh.getLastRow() - 1, 7).getValues().forEach(r => {
-      try { profiles[String(r[0])] = JSON.parse(r[6] || '{}'); } catch (e) { /* χαλασμένο προφίλ */ }
-    });
-  }
-
-  let sh = ss.getSheetByName(MATCH.SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(MATCH.SHEET);
-    sh.getRange(1, 1, 1, MATCH.HEADERS.length).setValues([MATCH.HEADERS]).setFontWeight('bold');
-    sh.setFrozenRows(1);
-  }
+  const profiles = matchProfiles_();
   const done = new Set();
-  if (sh.getLastRow() > 1) {
-    sh.getRange(2, 3, sh.getLastRow() - 1, 2).getValues().forEach(r => done.add(normCode_(r[0]) + '|' + String(r[1])));
-  }
-
-  const now = new Date(), rows = [];
+  const now = new Date();
   agents.forEach(agent => {
+    const hist = matchHistGet_(agent);
+    hist.forEach(h => done.add(h));
     const found = matchFind_(fresh, myLeads_(agent), profiles, props, statusOf_, done)
       .map(m => Object.assign(m, { at: now.getTime() }));
     if (!found.length) return console.log(agent.name + ': κανένα ταίριασμα');
-    found.forEach(m => {
-      done.add(normCode_(m.code) + '|' + m.key);
-      rows.push([now, agent.name, m.code, m.key, m.name, m.why]);
-    });
+    found.forEach(m => hist.push(normCode_(m.code) + '|' + matchH_(m.key)));
+    matchHistSet_(agent, hist);
     matchListSet_(agent, matchMerge_(matchListGet_(agent), found.map(m => ({
       code: m.code, id: m.id, name: m.name, why: m.why, at: m.at })), now.getTime()));
     const t = matchPushText_(found, props);
@@ -238,7 +256,6 @@ function newPropMatch() {
       body: t.body + '\n\nΆνοιξε την εφαρμογή → Σήμερα → «Νέα ακίνητα για πελάτες σου».' });
     console.log(agent.name + ': ' + t.body + ' → ' + sent + ' συσκευή/ές');
   });
-  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, MATCH.HEADERS.length).setValues(rows);
 }
 
 /** ▶ Δοκιμή χωρίς να περιμένεις το πρωί: τρέχει μόνο το πέρασμα ταιριάσματος. */
