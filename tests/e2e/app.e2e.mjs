@@ -35,13 +35,13 @@ function bootData(flags) {
   };
 }
 
-async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply) {
+async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}) {
   const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR', serviceWorkers: 'block' });
   const sent = [], errors = [];
   await ctx.route(/script\.google\.com/, async (r) => {
     const b = JSON.parse(r.request().postData() || '{}');
     sent.push(b.action);
-    const data = b.action === 'bootstrap' ? bootData(flags)
+    const data = b.action === 'bootstrap' ? { ...bootData(flags), ...boot }
       : b.action === 'status' ? (statusReply ? statusReply(b.data) : { ...lead(b.data.id, 'x', b.data.status, 'A-12') }) : {};
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
   });
@@ -169,5 +169,45 @@ test('FEAT-14: σύρσιμο «Δεν απάντησε» με σκάλα → «
   await a.page.locator('#tabs-calls [data-tab="followup"]').click();
   await a.page.waitForTimeout(300);
   assert.match(await a.page.locator('#call-list').innerText(), /Δεν απάντησε \(2\/4\)/);
+  await a.ctx.close();
+});
+
+// ── 2.5 · FEAT-11 · Νέο ακίνητο → πελάτες που ταιριάζουν ──
+const MT = [
+  { code: 'N-1', id: 'L1', name: 'Μαρία Π.', why: 'budget 260.000 € · Παγκράτι', at: now,
+    p: { code: 'N-1', title: 'Νέο διαμέρισμα', street: 'Υμηττού 10', area: 'Παγκράτι', price: 255000, sqm: 85, deal: 'Πώληση' } },
+  { code: 'N-1', id: 'L2', name: 'Γιώργος Ν.', why: 'ζήτησε 250.000 € · Παγκράτι', at: now,
+    p: { code: 'N-1', title: 'Νέο διαμέρισμα', street: 'Υμηττού 10', area: 'Παγκράτι', price: 255000, sqm: 85, deal: 'Πώληση' } }
+];
+
+test('FEAT-11: Σήμερα δείχνει «Νέο ακίνητο για πελάτες σου» → λίστα → Στείλε παρουσίαση', { skip }, async () => {
+  const a = await openApp({ newPropMatch: true }, null, { matches: MT });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  const item = a.page.locator('#today-body [data-match]');
+  assert.match(await item.innerText(), /Νέο ακίνητο για πελάτες σου[\s\S]*2 πελάτες ταιριάζουν/);
+  await item.click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#matchbox').isVisible(), true);
+  assert.equal(await a.page.locator('#matchbox .mt-row').count(), 2);
+  assert.match(await a.page.locator('#matchbox').innerText(), /budget 260\.000 € · Παγκράτι/);
+  await a.page.locator('#matchbox [data-mt-send]').first().click();
+  await a.page.waitForTimeout(600);
+  assert.equal(await a.page.locator('#present').isVisible(), true, 'ανοίγει η παρουσίαση');
+  assert.match(await a.page.locator('#pr-card').innerText(), /Νέο διαμέρισμα/);
+  assert.equal(await a.page.locator('#pr-name').inputValue(), 'Μαρία');
+  assert.ok(a.sent.includes('presCreate') && a.sent.includes('matchDone'), a.sent.join(','));
+  assert.equal(await a.page.locator('#matchbox .mt-row').count(), 1, 'βγήκε από τη λίστα');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('FEAT-11: με κλειστό flag δεν φαίνεται τίποτα', { skip }, async () => {
+  const a = await openApp({}, null, { matches: MT });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#today-body [data-match]').count(), 0);
+  await a.page.evaluate(() => window.kwMatch.open());
+  assert.equal(await a.page.locator('#matchbox').isVisible(), false);
   await a.ctx.close();
 });

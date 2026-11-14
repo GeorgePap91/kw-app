@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.4.0';
+var APP_VERSION = '2.5.0';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox'];
 var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -398,7 +398,7 @@ function start() {
     apiTimed('bootstrap', {}, 20000).then(function (b) {
       S.bootStale = false;
       S.bootAt = Date.now();
-      S.boot = b; S.me = b.agent; S.flags = b.flags || {};   // 2.3.2: και τα feature flags
+      S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || [];   // 2.3.2: και τα feature flags
       applyData(b);
       render();
       fillSettings();
@@ -541,7 +541,7 @@ function bootFail(msg, final) {
 function onBoot(b) {
   S.boot = b;
   S.me = b.agent;
-  S.flags = b.flags || {};                         // 2.3: feature flags (Ιδιότητα σεναρίου FEATURES)
+  S.flags = b.flags || {}; S.matches = b.matches || [];                         // 2.3: feature flags (Ιδιότητα σεναρίου FEATURES)
   applyData(b);
 
   $('env').hidden = b.env === 'prod';
@@ -1528,6 +1528,14 @@ function renderToday() {
   ending.slice(0, TODAY_MAX).forEach(function (p) {
     att.push(attItem('data-prop="' + esc(p.code) + '"', 'home', mandateText(p.mandateDays), p.street || p.code, p.mandateDays <= 7 ? 'bad' : 'warn'));
   });
+  // 2.5 · FEAT-11: νέα ακίνητα που ταιριάζουν σε πελάτες του
+  var mt = (S.flags && S.flags.newPropMatch && S.matches) || [];
+  if (mt.length) {
+    var mtProps = {}; mt.forEach(function (m) { mtProps[m.code] = 1; });
+    var mtN = Object.keys(mtProps).length;
+    att.unshift(attItem('data-match="1"', 'home', mtN === 1 ? 'Νέο ακίνητο για πελάτες σου' : mtN + ' νέα ακίνητα για πελάτες σου',
+      plural(mt.length, 'πελάτης ταιριάζει', 'πελάτες ταιριάζουν') + ' · στείλε παρουσίαση με 1 πάτημα', 'ok'));
+  }
   if (lack.length) {
     att.push(attItem('data-more="docs"', 'upload', plural(lack.length, 'ακίνητο θέλει έγγραφα', 'ακίνητα θέλουν έγγραφα'),
       'ΠΕΑ, ταυτότητα και ό,τι άλλο λείπει', 'warn'));
@@ -1563,6 +1571,9 @@ function renderToday() {
   });
   el.querySelectorAll('[data-fix]').forEach(function (b) {
     b.onclick = function () { openFix(b.dataset.fix); };
+  });
+  el.querySelectorAll('[data-match]').forEach(function (b) {
+    b.onclick = function () { if (window.kwMatch) window.kwMatch.open(); };
   });
   el.querySelectorAll('[data-more]').forEach(function (b) {
     b.onclick = function () {
@@ -2150,6 +2161,7 @@ function routeTo(where, opts) {
   while (closeTop()) { /* κλείνουμε ό,τι είναι ανοιχτό */ }
   if (where === 'today') return goto('today');
   if (where === 'form') return goto('metrics');
+  if (where === 'match') { goto('today'); if (window.kwMatch) window.kwMatch.open(); return; }   // 2.5 · FEAT-11
   if (where.indexOf('prop:') === 0) {
     S.propTab = 'mine';
     goto('props');
@@ -3339,7 +3351,7 @@ function fillSettings() {
     (server !== API_VERSION ? ' — δεν ταιριάζουν, ολοκλήρωσε την εγκατάσταση' : '');
   v.className = 'version' + (server !== API_VERSION ? ' warn' : '');
   // 2.3.3: ποια νέα features είναι ανοιχτά σε αυτό το κινητό (για έλεγχο μετά από κάθε εγκατάσταση)
-  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up' };
+  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up', newPropMatch: 'Νέο ακίνητο → πελάτες' };
   var on = Object.keys(S.flags || {}).filter(function (k) { return S.flags[k]; })
     .map(function (k) { return FEAT_NAMES[k] || k; });
   v.textContent += ' · Νέα: ' + (on.length ? on.join(', ') : 'κανένα ανοιχτό');
@@ -4085,7 +4097,7 @@ function refreshNow() {
   apiTimed('bootstrap', {}, 20000).then(function (b) {
     S.boot = b;
     S.me = b.agent;
-    S.flags = b.flags || {};                         // 2.3.2: και τα feature flags
+    S.flags = b.flags || {}; S.matches = b.matches || [];                         // 2.3.2: και τα feature flags
     S.bootStale = false;
     S.bootAt = Date.now();
     applyData(b);
@@ -6946,13 +6958,13 @@ function wireProfile() {
 
 var OFF = {
   KEEP_DAYS: 14,
-  QUIET: { open: 1, called: 1, sms: 1 },   // καταγραφές στο παρασκήνιο: στέλνονται, δεν μετράνε στη μπάρα
+  QUIET: { open: 1, called: 1, sms: 1, matchDone: 1 },   // καταγραφές στο παρασκήνιο: στέλνονται, δεν μετράνε στη μπάρα
   TRY_MS: 6000,          // πόσο περιμένουμε τον server πριν πάει η αλλαγή στην ουρά
   FLUSH_MS: 20000,       // κάθε πόσο ξαναδοκιμάζει όσο υπάρχει ουρά
   // Οι αλλαγές που δουλεύουν χωρίς σήμα. Όλες είναι «ασφαλείς να ξανασταλούν»:
   // το ίδιο αίτημα δύο φορές δίνει το ίδιο αποτέλεσμα (π.χ. η υπόδειξη μετακινεί το ίδιο event).
   QUEUED: { status: 1, note: 1, showing: 1, cancelShowing: 1, outcome: 1, taskDone: 1, taskSave: 1, taskDelete: 1,
-            callNote: 1, profileSave: 1, open: 1, called: 1, sms: 1 }
+            callNote: 1, profileSave: 1, open: 1, called: 1, sms: 1, matchDone: 1 }
 };
 S.queue = [];
 S.netBad = false;        // η τελευταία προσπάθεια απέτυχε → οι επόμενες αλλαγές πάνε κατευθείαν στην ουρά
@@ -7095,6 +7107,10 @@ function stampOf(d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/
 /** Εφαρμόζει την αλλαγή στα τοπικά στοιχεία και επιστρέφει ό,τι θα επέστρεφε ο server. */
 function offLocal(op) {
   var a = op.a, d = op.d || {};
+  if (a === 'matchDone') {                         // 2.5 · FEAT-11: μένει κρυμμένο και μετά από επανεκκίνηση χωρίς σήμα
+    S.matches = (S.matches || []).filter(function (m) { return !(m.code === d.code && m.id === d.id); });
+    return {};
+  }
   var l0 = d.id ? findLead(d.id) : null;
   var l = l0 ? cloneOf(l0) : null;
   if (a === 'status' && l) {
@@ -7171,7 +7187,7 @@ function offReapply() {
 
 function offRefresh() {
   apiTimed('bootstrap', {}, 15000).then(function (b) {
-    S.boot = b; S.me = b.agent; S.flags = b.flags || {};   // 2.3.2: και τα feature flags
+    S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || [];   // 2.3.2: και τα feature flags
     S.bootStale = false; S.bootAt = Date.now(); S.netBad = false;
     applyData(b);
     offSnapshot();
@@ -7270,6 +7286,8 @@ window.store = store; window.fold = fold; window.esc = esc; window.fmtPrice = fm
 window.normCode = normCode; window.findLead = findLead; window.hasShowing = hasShowing;
 window.showLead = showLead; window.openShowingForm = openShowingForm; window.openProp = openProp;
 window.send = send; window.merge = merge; window.render = render; window.toast = toast;
+window.openPresent = openPresent; window.openPop = openPop; window.closePop = closePop; window.api = api;   // 2.5 · FEAT-11
+window.ico = ico; window.plural = plural; window.openLead = openLead;
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──
 start();

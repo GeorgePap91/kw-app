@@ -1560,7 +1560,8 @@ function actBootstrap_(agent, d, sess) {
     leads: agentRole ? myLeads_(agent).map(l => serialize_(l)) : [],
     props: agentRole ? teamProps_(agent) : [],
     reviews: agentRole ? myReviews_(agent) : [],
-    flags: featureFlags_(agent)
+    flags: featureFlags_(agent),
+    matches: agentRole && typeof matchesFor_ === 'function' ? matchesFor_(agent) : []
   };
 }
 
@@ -3050,6 +3051,10 @@ function actContactMail_(agent, d) {
 function morningBrief() {
   _agents = null;
   mandateReminder();
+  // 2.5 · FEAT-11: νέα ακίνητα → πελάτες που ταιριάζουν (μόνο σε όσους έχουν το flag)
+  if (typeof newPropMatch === 'function') {
+    try { newPropMatch(); } catch (e) { console.warn('Ταιριάσματα: ' + e.message); }
+  }
   if (CONFIG.MORNING.DAYS.indexOf(new Date().getDay()) === -1) return;
 
   const today = fmtIso_(new Date());
