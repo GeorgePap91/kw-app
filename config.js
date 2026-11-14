@@ -6,9 +6,20 @@
  * Δοκιμή → ανάπτυξη και Firebase project του georgepapadakis532@gmail.com
  * Παραγωγή → αλλάζει μόνο το API_URL (το Firebase μπορεί να μείνει ίδιο)
  */
+(function () {
+  // Παραγωγή: η ανάπτυξη του PROD Apps Script (τελειώνει σε /exec).
+  var PROD_API_URL = 'https://script.google.com/macros/s/AKfycbzvR5oALOE8M6afHlts00p7VMMLPPsYXS0Jk0cQUYGxAYSvBf4Xe8Myh_9l6JLXnsv9/exec';
+  // 2.4 · Δοκιμές: η ανάπτυξη του DEV Apps Script (ψεύτικα δεδομένα). Κενό = δεν έχει στηθεί ακόμα.
+  var DEV_API_URL = '';
+  // Preview links (Cloudflare: *.workers.dev ή *.pages.dev): ΠΟΤΕ στην παραγωγή.
+  // Κανόνας ασφαλείας: η παραγωγή ΜΟΝΟ στο github.io· οτιδήποτε άλλο → DEV.
+  var preview = !/(\.github\.io|^localhost|^127\.0\.0\.1)$/.test(location.hostname);
+  window.KW_PREVIEW = preview;
+  window.KW_API = preview ? DEV_API_URL : PROD_API_URL;
+})();
+
 window.KW_CONFIG = {
-  // Το URL της ανάπτυξης του Apps Script (τελειώνει σε /exec).
-  API_URL: 'https://script.google.com/macros/s/AKfycbzvR5oALOE8M6afHlts00p7VMMLPPsYXS0Jk0cQUYGxAYSvBf4Xe8Myh_9l6JLXnsv9/exec',
+  API_URL: window.KW_API,
 
   // Firebase → ⚙ Ρυθμίσεις έργου → Γενικά → Οι εφαρμογές σου → KW App → «Config».
   // Αντέγραψε τις 5 τιμές από εκεί, μέσα στα εισαγωγικά.

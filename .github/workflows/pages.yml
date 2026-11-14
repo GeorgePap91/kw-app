@@ -43,11 +43,9 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Μόνο τα αρχεία της εφαρμογής (χωρίς tests, backend, οδηγίες)
+      - name: Μόνο τα αρχεία της εφαρμογής (ίδιος κανόνας με το preview)
         run: |
-          mkdir _site
-          git ls-files | grep -vE '^(\.github|tests|apps-script|docs)/|^package(-lock)?\.json$|^\.gitignore$' \
-            | while read -r f; do mkdir -p "_site/$(dirname "$f")"; cp "$f" "_site/$f"; done
+          node scripts/build-site.mjs _site
           touch _site/.nojekyll
           ls _site
       - uses: actions/configure-pages@v5
