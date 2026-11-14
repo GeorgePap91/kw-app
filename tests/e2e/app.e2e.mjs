@@ -35,13 +35,13 @@ function bootData(flags) {
   };
 }
 
-async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}) {
+async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}, replies = {}) {
   const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR', serviceWorkers: 'block' });
   const sent = [], errors = [];
   await ctx.route(/script\.google\.com/, async (r) => {
     const b = JSON.parse(r.request().postData() || '{}');
     sent.push(b.action);
-    const data = b.action === 'bootstrap' ? { ...bootData(flags), ...boot }
+    const data = replies[b.action] ? replies[b.action](b.data) : b.action === 'bootstrap' ? { ...bootData(flags), ...boot }
       : b.action === 'status' ? (statusReply ? statusReply(b.data) : { ...lead(b.data.id, 'x', b.data.status, 'A-12') }) : {};
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
   });
@@ -209,5 +209,83 @@ test('FEAT-11: με κλειστό flag δεν φαίνεται τίποτα', {
   assert.equal(await a.page.locator('#today-body [data-match]').count(), 0);
   await a.page.evaluate(() => window.kwMatch.open());
   assert.equal(await a.page.locator('#matchbox').isVisible(), false);
+  await a.ctx.close();
+});
+
+// ── 2.6 · FEAT-15 · «Πάρε σήμερα αυτούς» ──
+const cold = (id, name, level, days) => ({ ...lead(id, name, 'Απαντημένη', 'A-12'), phone: '69000000' + id.slice(-2).padStart(2, '0'),
+  dateTs: now - days * 864e5, ts: now - days * 864e5, pfLevel: level, pfWant: 'Παγκράτι έως 250.000 €' });
+
+test('FEAT-15: πελάτες που κρυώνουν — Θερμοί πρώτα, «Όχι τώρα» τον κρύβει', { skip }, async () => {
+  const a = await openApp({ coolingClients: true }, null, { leads: [
+    cold('C01', 'Χλιαρός Παλιός', 'Χλιαρός', 20), cold('C02', 'Θερμός Πελάτης', 'Θερμός', 9),
+    cold('C03', 'Φρέσκος', 'Θερμός', 2), cold('C04', 'Κρύος', 'Κρύος', 30)] });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  const rows = a.page.locator('#today-body .cool-list .mt-row');
+  assert.equal(await rows.count(), 2);
+  assert.match(await rows.first().innerText(), /Θερμός Πελάτης[\s\S]*Θερμός · 9 ημέρες χωρίς επαφή · ψάχνει Παγκράτι/);
+  await a.page.locator('#today-body [data-cool-skip="C02"]').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#today-body .cool-list .mt-row').count(), 1);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+// ── 2.6 · FEAT-12 · Μείωση τιμής ──
+test('FEAT-12: «Έπεσε η τιμή» → λίστα → έτοιμο SMS με παλιά/νέα τιμή → Έγινε', { skip }, async () => {
+  const drops = [{ code: 'A-12', title: 'Ερατοσθένους 5', area: 'Παγκράτι', deal: 'Πώληση', old: 250000, now: 230000, at: now,
+    clients: [{ id: 'L1', why: 'budget 235.000 € · τώρα το καλύπτει', fits: true }] }];
+  const a = await openApp({ priceDrop: true }, null, { drops });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  const item = a.page.locator('#today-body [data-drop]');
+  assert.match(await item.innerText(), /Έπεσε η τιμή · Ερατοσθένους 5[\s\S]*1 πελάτης να ενημερώσεις/);
+  await item.click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#dropbox').isVisible(), true);
+  const href = decodeURIComponent(await a.page.locator('#dropbox a[href^="sms:"]').getAttribute('href'));
+  assert.match(href, /Καλησπέρα Μαρία, καλά νέα: η τιμή του ακινήτου «Ερατοσθένους 5» \(Παγκράτι\) έπεσε από 250\.000 € σε 230\.000 €/);
+  await a.page.locator('#dropbox [data-dr-done]').click();
+  await a.page.waitForTimeout(500);
+  assert.ok(a.sent.includes('dropDone'));
+  assert.equal(await a.page.locator('#today-body [data-drop]').count(), 0);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+// ── 2.6 · FEAT-13 · Αναφορά ιδιοκτήτη ──
+test('FEAT-13: καρτέλα ακινήτου → Αναφορά ιδιοκτήτη → προεπισκόπηση → αποστολή', { skip }, async () => {
+  const report = { title: 'Ερατοσθένους 5', code: 'A-12', month: 'Οκτώβριος', calls: 7, trend: '+3 από τον προηγούμενο μήνα',
+    sources: [{ name: 'Spitogatos', n: 5 }, { name: 'XE', n: 2 }], showings: 2, outcomes: [{ name: 'Δεν ενδιαφέρθηκε', n: 2 }], over: 3, price: 250000 };
+  const a = await openApp({ ownerReport: true }, null, {}, {
+    ownerReport: () => ({ report, text: 'Καλησπέρα…', hasEmail: true, emailHint: 'ni***@gmail.com', quota: 90, quotaLow: false }),
+    ownerReportSend: () => ({ sent: true, to: 'ni***@gmail.com', quota: 89 })
+  });
+  await a.page.evaluate(() => window.openProp('A-12'));
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#pd-report').isVisible(), true);
+  await a.page.locator('#pd-report').click();
+  await a.page.waitForTimeout(500);
+  const t = await a.page.locator('#reportbox').innerText();
+  assert.match(t, /Τηλεφωνήματα[\s\S]*7 \(\+3 από τον προηγούμενο μήνα\)/);
+  assert.match(t, /3 ενδιαφερόμενοι βρήκαν την τιμή/);
+  await a.page.locator('#rp-send').click();
+  await a.page.waitForTimeout(500);
+  assert.ok(a.sent.includes('ownerReportSend'));
+  assert.equal(await a.page.locator('#reportbox').isVisible(), false);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.6: με κλειστά flags δεν φαίνεται τίποτα από τα νέα', { skip }, async () => {
+  const a = await openApp({}, null, { drops: [{ code: 'A-12', title: 'x', old: 2, now: 1, at: now, clients: [] }],
+    leads: [cold('C02', 'Θερμός Πελάτης', 'Θερμός', 9)] });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#today-body [data-drop], #today-body .cool-list').count(), 0);
+  await a.page.evaluate(() => window.openProp('A-12'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#pd-report').isVisible(), false);
   await a.ctx.close();
 });
