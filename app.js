@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.7.0';
+var APP_VERSION = '2.8.0';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox'];
 var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -921,6 +921,7 @@ function tabList(list, tab) {
 }
 
 function render() {
+  applyView();                                     // 2.8
   offSnapshotSoon();                               // 2.2: κρατά τα τελευταία στο κινητό
   setBadge(S.leads.filter(isOpen).length);
   renderCalls();
@@ -1568,8 +1569,69 @@ function renderToday() {
   if (!plan.length && !att.length && !fresh.length && !follow.length) {
     side += '<div class="empty small"><b>Όλα εντάξει</b>Μόλις έρθει νέα κλήση, θα τη δεις εδώ.</div>';
   }
-  // Κινητό: όλα σε μία στήλη. Υπολογιστής: πρόγραμμα αριστερά, εκκρεμότητες δεξιά.
-  html += '<div class="today-cols"><div class="t-col">' + main + '</div><div class="t-col">' + side + '</div></div>';
+  // 2.8 · FEAT-25: μετά τις 17:00, «Κλείσε τη μέρα σου» πρώτο στα «Θέλουν προσοχή»
+  var closeN = window.kwClose && S.flags && S.flags.dayClose && h >= 17 ? window.kwClose.items().length : 0;
+  var cols = '<div class="today-cols"><div class="t-col">' + main + '</div><div class="t-col">' +
+    (closeN ? '<div class="mlist close-row">' + attItem('data-dayclose="1"', 'check', 'Κλείσε τη μέρα σου', plural(closeN, 'εκκρεμότητα', 'εκκρεμότητες') + ' · θέλει 1 λεπτό', 'ok') + '</div>' : '') +
+    side + '</div></div>';
+
+  if (simpleOn('simpleToday')) {
+    // 2.8 · FEAT-23 + FEAT-1: ΜΙΑ λίστα «Κάνε τώρα» με σταθερή σειρά, που προσαρμόζεται στην ώρα:
+    // πρωί → υποδείξεις και νέες κλήσεις · μεσημέρι → follow-up · απόγευμα → αποτελέσματα και κλείσιμο ημέρας.
+    var todo = [];
+    var put = function (rank, itemHtml) { todo.push({ r: rank, i: todo.length, html: itemHtml }); };
+    var nm = function (l) { return l.name || 'Χωρίς όνομα'; };
+    if (closeN) put(5, attItem('data-dayclose="1"', 'check', 'Κλείσε τη μέρα σου', plural(closeN, 'εκκρεμότητα', 'εκκρεμότητες') + ' · θέλει 1 λεπτό', 'ok'));
+    (S.boot.reviews || []).forEach(function (r) {
+      put(10, attItem('data-fix="' + esc(r.id) + '"', 'alert', 'Θέλει διόρθωση · ' + r.title, '«' + r.note + '»', 'bad'));
+    });
+    showings.forEach(function (l) {
+      put(20, attItem('data-id="' + esc(l.id) + '"', 'calendar', 'Υπόδειξη στις ' + (l.showingTime || '') + ' · ' + nm(l), l.address || l.property || '', ''));
+    });
+    fresh.forEach(function (l) {
+      put(30, attItem('data-id="' + esc(l.id) + '"', 'phone', 'Νέα κλήση · ' + nm(l), [l.property, l.code ? 'Κωδ. ' + l.code : ''].filter(Boolean).join(' · '), 'bad'));
+    });
+    past.forEach(function (l) {
+      put(h >= 17 ? 15 : 40, attItem('data-outcome="' + esc(l.id) + '"', 'calendar', 'Πώς πήγε η υπόδειξη;', nm(l) + ' · ' + l.showingAt, 'warn'));
+    });
+    open.forEach(function (t) {
+      put(45, attItem('data-more="tasks"', 'tasks', 'Εργασία · ' + t.title, [t.time, t.leadName].filter(Boolean).join(' · '), ''));
+    });
+    dr.forEach(function (d) {
+      put(50, attItem('data-drop="' + esc(d.code) + '"', 'home', 'Έπεσε η τιμή · ' + d.title, fmtPrice(d.old) + ' → ' + fmtPrice(d.now), 'ok'));
+    });
+    if (mt.length) put(52, attItem('data-match="1"', 'home', 'Νέο ακίνητο για πελάτες σου', plural(mt.length, 'πελάτης ταιριάζει', 'πελάτες ταιριάζουν'), 'ok'));
+    (window.kwAuto && S.flags && S.flags.coolingClients ? window.kwAuto.cooling(S.leads) : []).forEach(function (x) {
+      put(60, attItem('data-id="' + esc(x.l.id) + '"', 'phone', 'Πάρε τηλέφωνο · ' + nm(x.l), x.l.pfLevel + ' · ' + x.days + ' ημέρες χωρίς επαφή', ''));
+    });
+    follow.filter(function (l) { var f = parseStamp(l.followUp); return !f || f.getTime() <= now; }).forEach(function (l) {
+      put(h >= 12 && h < 17 ? 25 : 70, attItem('data-id="' + esc(l.id) + '"', 'phone', 'Κάλεσε ξανά · ' + nm(l), statusLine(l), 'warn'));
+    });
+    forms.forEach(function (l) {
+      put(80, attItem('data-form="' + esc(l.id) + '"', 'form', 'Έντυπο υπόδειξης · ' + nm(l), lowerDay(niceDate(l.showingAt)), ''));
+    });
+    ending.forEach(function (p) {
+      put(85, attItem('data-prop="' + esc(p.code) + '"', 'home', mandateText(p.mandateDays), p.street || p.code, p.mandateDays <= 7 ? 'bad' : 'warn'));
+    });
+    if (lack.length) put(90, attItem('data-more="docs"', 'upload', plural(lack.length, 'ακίνητο θέλει έγγραφα', 'ακίνητα θέλουν έγγραφα'), '', 'warn'));
+    todo.sort(function (a, b) { return a.r - b.r || a.i - b.i; });
+
+    // Η πρώτη γραμμή λέει το ίδιο με τη λίστα (όχι «τίποτα εκκρεμές» πάνω από 3 εκκρεμότητες).
+    $('today-sum').textContent = todo.length ? 'Έχεις ' + plural(todo.length, 'πράγμα', 'πράγματα') + ' να κάνεις. Ξεκίνα από το πρώτο.'
+                                             : 'Δεν έχεις κάτι εκκρεμές για σήμερα.';
+    var rest = todo.length - TODAY_MAX;
+    html = html.replace('class="stat-grid"', 'class="stat-grid row"') +
+      (todo.length
+        ? '<h2 class="group-title">Κάνε τώρα</h2><div class="mlist" id="todo-list">' +
+          todo.slice(0, TODAY_MAX).map(function (x) { return x.html; }).join('') + '</div>'
+        : '<div class="empty small"><b>Όλα εντάξει</b>Δεν έχεις κάτι εκκρεμές. Μόλις έρθει νέα κλήση, θα τη δεις εδώ.</div>') +
+      '<button class="btn wide more-toggle' + (S.todayAll ? ' is-open' : '') + '" id="today-all" aria-expanded="' + (S.todayAll ? 'true' : 'false') + '"><span>' +
+        (S.todayAll ? 'Λιγότερα' : rest > 0 ? 'Δες όλα (' + todo.length + ')' : 'Δες όλη τη μέρα') + '</span>' + ico('next') + '</button>' +
+      (S.todayAll ? cols : '');
+  } else {
+    // Κινητό: όλα σε μία στήλη. Υπολογιστής: πρόγραμμα αριστερά, εκκρεμότητες δεξιά.
+    html += cols;
+  }
 
   var el = $('today-body');
   el.innerHTML = html;
@@ -1596,6 +1658,10 @@ function renderToday() {
     b.onclick = function () { if (window.kwAuto) window.kwAuto.drop(b.dataset.drop); };
   });
   if (window.kwAuto) window.kwAuto.wireCool(el);
+  el.querySelectorAll('[data-dayclose]').forEach(function (b) {
+    b.onclick = function () { if (window.kwClose) window.kwClose.open(); };
+  });
+  if ($('today-all')) $('today-all').onclick = function () { S.todayAll = !S.todayAll; renderToday(); };
   el.querySelectorAll('[data-more]').forEach(function (b) {
     b.onclick = function () {
       var go = b.dataset.more;
@@ -2229,6 +2295,7 @@ function routeTo(where, opts) {
   if (where === 'today') return goto('today');
   if (where === 'form') return goto('metrics');
   if (where === 'match') { goto('today'); if (window.kwMatch) window.kwMatch.open(); return; }   // 2.5 · FEAT-11
+  if (where === 'dayclose') { goto('today'); if (window.kwClose) window.kwClose.open(); return; }   // 2.8 · FEAT-25
   if (where === 'drop') { goto('today'); if (window.kwAuto) window.kwAuto.drop(); return; }       // 2.6 · FEAT-12
   if (where.indexOf('prop:') === 0) {
     S.propTab = 'mine';
@@ -2286,6 +2353,56 @@ function hasShowing(l) { return !!(l && l.hasEvent && l.showingDate); }
 function upcoming(l) { return hasShowing(l) && l.showingTs > Date.now(); }
 
 /** Η υπόδειξη έγινε και δεν έχει γραφτεί ακόμα πώς πήγε. */
+// ── 2.8 · «Απλή» / «Πλήρης» εμφάνιση (FEAT-22, 23, 24) ──
+// Η επιλογή είναι στις προτιμήσεις του μεσίτη (Ρυθμίσεις). Τα flags simpleLead / simpleToday
+// είναι διακόπτες ασφαλείας: ισχύουν εκτός αν το FEATURES τα έχει "off".
+function viewSimple() { return !!(S.me && S.me.prefs && S.me.prefs.view === 'simple'); }
+function simpleOn(name) { return viewSimple() && !(S.flags && S.flags[name] === false); }
+
+function applyView() {
+  var simple = viewSimple();
+  document.body.classList.toggle('kw-simple', simple);
+  $$('#view-pick [data-view-set]').forEach(function (b) {
+    var on = (b.dataset.viewSet === 'simple') === simple;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
+function onViewPick(view) {
+  if (!S.me || (S.me.prefs || {}).view === view) return;
+  var before = (S.me.prefs || {}).view;
+  S.me.prefs = S.me.prefs || {};
+  S.me.prefs.view = view;                            // αλλάζει αμέσως· αν αποτύχει η αποθήκευση, γυρίζει πίσω
+  applyView(); render();
+  if (S.lead && !$('detail').hidden) fillDetail(S.lead);
+  api('settings', { view: view }).then(function (me) {
+    S.me = me; applyView();
+    toast(view === 'simple' ? 'Απλή εμφάνιση · όλα τα άλλα είναι στο «Περισσότερα»' : 'Πλήρης εμφάνιση');
+  }).catch(function (e) {
+    S.me.prefs.view = before; applyView(); render();
+    toast(e.net ? 'Χρειάζεται σύνδεση για να αλλάξει η εμφάνιση.' : e.message, true);
+  });
+}
+$$('#view-pick [data-view-set]').forEach(function (b) { b.onclick = function () { onViewPick(b.dataset.viewSet); }; });
+
+/** FEAT-22: στην Απλή, οι «Άλλες ενέργειες» και η Κατάσταση μπαίνουν κάτω από το «Περισσότερα». */
+function leadMore(open) {
+  var simple = simpleOn('simpleLead');
+  if (open == null) open = store('kw_more_open') === '1';
+  $('d-more-btn').hidden = !simple;
+  $('d-more').hidden = simple && !open;
+  $('d-more-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('d-more-btn').classList.toggle('is-open', !!open);
+  $('d-more-text').textContent = open ? 'Λιγότερα' : 'Περισσότερα';
+  $('detail').classList.toggle('more-open', !simple || !!open);
+}
+$('d-more-btn').onclick = function () {
+  var open = $('d-more').hidden;
+  store('kw_more_open', open ? '1' : '0');
+  leadMore(open);
+};
+
 /** 2.7: η υπόδειξη έχει περάσει (με βάση την ώρα του ημερολογίου). */
 function showingDone(l) { return hasShowing(l) && l.showingTs <= Date.now(); }
 
@@ -2353,6 +2470,7 @@ function fillDetail(l) {
   renderHist(l);
   prepareSms(l);
   pfLine(l);                                         // 2.1
+  leadMore();                                        // 2.8 · FEAT-22
 }
 
 // ── Επόμενο βήμα (1.16) ───────────────────────────────────
@@ -2407,6 +2525,11 @@ function renderNext(l) {
   var el = $('d-next');
   el.innerHTML = '<span class="next-kicker">Επόμενο βήμα</span><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' +
     '<div class="next-btns">' + btns + '</div>';
+  // 2.8 · FEAT-22: στην Απλή, ΕΝΑ κουμπί. Τα υπόλοιπα είναι στο «Περισσότερα».
+  if (simpleOn('simpleLead')) {
+    var nb = el.querySelectorAll('.next-btns > *');
+    for (var ni = 1; ni < nb.length; ni++) nb[ni].remove();
+  }
   el.querySelectorAll('[data-next]').forEach(function (x) {
     var act = x.dataset.next;
     x.onclick = act === 'call' ? onTelClick
@@ -3451,7 +3574,7 @@ function fillSettings() {
     (server !== API_VERSION ? ' — δεν ταιριάζουν, ολοκλήρωσε την εγκατάσταση' : '');
   v.className = 'version' + (server !== API_VERSION ? ' warn' : '');
   // 2.3.3: ποια νέα features είναι ανοιχτά σε αυτό το κινητό (για έλεγχο μετά από κάθε εγκατάσταση)
-  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up', newPropMatch: 'Νέο ακίνητο → πελάτες', priceDrop: 'Μείωση τιμής', ownerReport: 'Αναφορά ιδιοκτήτη', coolingClients: 'Πάρε σήμερα' };
+  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up', newPropMatch: 'Νέο ακίνητο → πελάτες', priceDrop: 'Μείωση τιμής', ownerReport: 'Αναφορά ιδιοκτήτη', coolingClients: 'Πάρε σήμερα', dayClose: 'Κλείσιμο ημέρας', usageMail: 'Εβδομαδιαίο email' };
   var on = Object.keys(S.flags || {}).filter(function (k) { return S.flags[k]; })
     .map(function (k) { return FEAT_NAMES[k] || k; });
   v.textContent += ' · Νέα: ' + (on.length ? on.join(', ') : 'κανένα ανοιχτό');
@@ -7396,6 +7519,7 @@ window.send = send; window.merge = merge; window.render = render; window.toast =
 window.openPresent = openPresent; window.openPop = openPop; window.closePop = closePop; window.api = api;   // 2.5 · FEAT-11
 window.ico = ico; window.plural = plural; window.openLead = openLead;
 window.beacon = beacon; window.used = used;                               // 2.7
+window.needsOutcome = needsOutcome; window.niceDate = niceDate; window.lowerDay = lowerDay; window.isoDate = isoDate;   // 2.8
 window.smsHref = smsHref; window.callLead = callLead; window.parseStamp = parseStamp; window.ST_ANSWERED = ST.ANSWERED;   // 2.6
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──

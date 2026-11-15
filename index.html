@@ -589,6 +589,8 @@
       </div>
     </div>
 
+    <button class="btn wide more-toggle" id="d-more-btn" aria-expanded="false" hidden><span id="d-more-text">Περισσότερα</span><svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></button>
+    <div id="d-more">
     <h3 class="sub-head">Άλλες ενέργειες</h3>
     <div class="mlist">
       <button class="mrow" id="btn-showform" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="mrow-body"><b>Έντυπο υπόδειξης</b><span id="d-form-sub">Link για τον πελάτη, υπογραφή, PDF.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
@@ -603,6 +605,7 @@
       <span>Κατάσταση</span>
       <select id="d-status-select"></select>
     </label>
+    </div>
   </div>
 </div>
 
@@ -630,6 +633,14 @@
   <div class="pop-box">
     <div class="pop-head"><h2 id="matchbox-title">Νέα ακίνητα για πελάτες σου</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
     <div id="mt-body"></div>
+  </div>
+</div>
+
+<!-- 2.8 · FEAT-25: ΚΛΕΙΣΙΜΟ ΗΜΕΡΑΣ -->
+<div class="pop" id="closebox" role="dialog" aria-modal="true" aria-labelledby="closebox-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="closebox-title">Κλείσε τη μέρα σου</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="cl-body"></div>
   </div>
 </div>
 
@@ -958,6 +969,13 @@
           <button data-size="xl"><b class="s3">Α</b>Πολύ μεγάλα</button>
         </div>
 
+        <h3 class="sub-head">Εμφάνιση</h3>
+        <div class="seg theme-pick" id="view-pick" role="group" aria-label="Εμφάνιση">
+          <button class="seg-btn" data-view-set="simple">Απλή</button>
+          <button class="seg-btn" data-view-set="full">Πλήρης</button>
+        </div>
+        <p class="cal-status muted theme-note" id="view-note">«Απλή»: λιγότερα κουμπιά, μόνο το επόμενο βήμα. Τίποτα δεν χάνεται, όλα είναι στο «Περισσότερα».</p>
+
         <h3 class="sub-head">Θέμα</h3>
         <div class="seg theme-pick" id="theme-pick" role="group" aria-label="Θέμα">
           <button class="seg-btn" data-theme-set="auto">Αυτόματο</button>
@@ -1257,5 +1275,6 @@
 <script src="match.js"></script>
 <script src="auto.js"></script>
 <script src="usage.js"></script>
+<script src="close.js"></script>
 </body>
 </html>

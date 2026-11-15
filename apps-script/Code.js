@@ -899,7 +899,9 @@ function prefs_(agent) {
   Object.keys(DEFAULT_TEMPLATES).forEach(k => {
     templates[k] = { el: (custom[k] || {}).el || '', en: (custom[k] || {}).en || '' };
   });
-  return { colors: Object.assign({}, CONFIG.COLORS, p.colors || {}), templates: templates };
+  // 2.8 · FEAT-24: «Απλή» ή «Πλήρης» εμφάνιση. Προεπιλογή γραφείου: Ιδιότητα DEFAULT_VIEW (simple | full).
+  const view = p.view === 'simple' || p.view === 'full' ? p.view : (prop_('DEFAULT_VIEW', 'full') === 'simple' ? 'simple' : 'full');
+  return { colors: Object.assign({}, CONFIG.COLORS, p.colors || {}), templates: templates, view: view };
 }
 
 function templateFor_(agent, kind, lang) {
@@ -1900,8 +1902,10 @@ function actSettings_(agent, d) {
     if (c.LINK) sh.getRange(agent.row, c.LINK).setValue(safe_(agent.link));
   }
 
-  if (has('templates') || has('colors')) {
+  if (has('templates') || has('colors') || has('view')) {
     const p = agent.prefs || {};
+
+    if (has('view')) p.view = d.view === 'simple' ? 'simple' : 'full';      // 2.8 · FEAT-24
 
     if (has('templates')) {
       const t = {};
@@ -1936,6 +1940,10 @@ function actSettings_(agent, d) {
 // ═════════════════════════════════════════════════════════════
 
 function sendShowingReminders() {
+  // 2.8 · FEAT-25: «Κλείσε τη μέρα σου» (ελέγχει μόνο την ώρα· διαβάζει φύλλα μία φορά την ημέρα)
+  if (typeof dayClosePush === 'function') {
+    try { dayClosePush(); } catch (e) { console.warn('Κλείσιμο ημέρας: ' + e.message); }
+  }
   const sh = sheet_(CONFIG.SHEETS.APP);
   if (sh.getLastRow() < 2) return;
 
@@ -3126,6 +3134,10 @@ function morningBrief() {
   // 2.5 · FEAT-11: νέα ακίνητα → πελάτες που ταιριάζουν (μόνο σε όσους έχουν το flag)
   if (typeof newPropMatch === 'function') {
     try { newPropMatch(); } catch (e) { console.warn('Ταιριάσματα: ' + e.message); }
+  }
+  // 2.8 · FEAT-26: Δευτέρα → email στον Admin με τον χρόνο που γλίτωσε η ομάδα
+  if (typeof usageWeeklyMail === 'function') {
+    try { usageWeeklyMail(); } catch (e) { console.warn('Εβδομαδιαίο email: ' + e.message); }
   }
   // 2.6 · FEAT-12: μείωση τιμής → πελάτες που κάλεσαν
   if (typeof priceDropCheck === 'function') {

@@ -17,7 +17,7 @@ const ctx = {
   HtmlService: noop, DocumentApp: noop, Logger: noop, ContactsApp: noop
 };
 vm.createContext(ctx);
-for (const f of ['Code.js', 'Profile.js', 'Match.js', 'Drops.js', 'Report.js', 'Edit.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
+for (const f of ['Code.js', 'Profile.js', 'Match.js', 'Drops.js', 'Report.js', 'Edit.js', 'Ops.js']) vm.runInContext(readFileSync(DIR + f, 'utf8'), ctx, { filename: f });
 const run = (s) => vm.runInContext(s, ctx);
 const find = run('matchFind_');
 
@@ -180,4 +180,51 @@ test('2.7: νέα έτοιμα SMS υπάρχουν σε ΕΛ και EN, ίδι�
     assert.ok(T[k].el && T[k].en, k);
     assert.ok(app.includes(T[k].el), 'TPL_FALLBACK ' + k + ' διαφέρει από τον server');
   }
+});
+
+// ── 2.8 · Απλή εμφάνιση, Κλείσιμο ημέρας, Εβδομαδιαίο email ──
+test('2.8: προτίμηση εμφάνισης — προεπιλογή Πλήρης, ή ό,τι ορίζει το γραφείο', () => {
+  const prefs = run('prefs_');
+  assert.equal(prefs({ prefs: {} }).view, 'full');
+  assert.equal(prefs({ prefs: { view: 'simple' } }).view, 'simple');
+  run('PROPS_').DEFAULT_VIEW = 'simple';
+  assert.equal(prefs({ prefs: {} }).view, 'simple');
+  assert.equal(prefs({ prefs: { view: 'full' } }).view, 'full');
+  delete run('PROPS_').DEFAULT_VIEW;
+});
+
+test('2.8: κλείσιμο ημέρας — μόνο εργάσιμες 18:30–19:30, μία φορά την ημέρα', () => {
+  const due = run('dayCloseDue_');
+  const at = (d, h, m) => new Date(2026, 10, d, h, m);            // 16/11/2026 = Δευτέρα
+  assert.equal(due(at(16, 18, 30), '', '2026-11-16'), true);
+  assert.equal(due(at(16, 18, 29), '', '2026-11-16'), false);
+  assert.equal(due(at(16, 19, 45), '', '2026-11-16'), false);
+  assert.equal(due(at(16, 18, 45), '2026-11-16', '2026-11-16'), false, 'ήδη στάλθηκε');
+  assert.equal(due(at(14, 18, 45), '', '2026-11-14'), false, 'Σάββατο');
+  assert.equal(due(at(15, 18, 45), '', '2026-11-15'), false, 'Κυριακή');
+});
+
+test('2.8: κλείσιμο ημέρας — μετράει υποδείξεις χωρίς αποτέλεσμα και νέες κλήσεις', () => {
+  const now = Date.now(), A = run('ACOL'), ST = run('STATUS');
+  const data = { 1: { at: new Date(now - 3600e3), oc: '' }, 2: { at: new Date(now - 3600e3), oc: 'Ενδιαφέρθηκε' },
+                 3: { at: new Date(now + 3600e3), oc: '' }, 5: { at: new Date(now - 9 * 864e5), oc: '' } };
+  const get = (id, col) => { const d = data[id] || {}; return col === A.SHOW_AT ? (d.at || '') : col === A.OUTCOME ? (d.oc || '') : ''; };
+  const status = (id) => (id === '4' ? ST.PENDING : id === '6' ? ST.CLOSED : ST.SHOWING);
+  const n = run('dayCloseCount_')(['1', '2', '3', '4', '5', '6'].map((id) => ({ id })), status, get, now);
+  assert.equal(n, 2, 'η 1 (χωρίς αποτέλεσμα) και η 4 (νέα κλήση)');
+});
+
+test('2.8: εβδομαδιαίο email — εβδομάδα = τώρα − στιγμιότυπο, και στην αλλαγή μήνα', () => {
+  const w = run('usageWeek_');
+  assert.equal(JSON.stringify(w(null, '2026-11', { n: 5, s: 300 }, null)), JSON.stringify({ n: 5, s: 300, first: true }));
+  assert.equal(JSON.stringify(w({ m: '2026-11', n: 5, s: 300 }, '2026-11', { n: 12, s: 900 }, null)), JSON.stringify({ n: 7, s: 600 }));
+  assert.equal(JSON.stringify(w({ m: '2026-10', n: 40, s: 2000 }, '2026-11', { n: 3, s: 100 }, { n: 44, s: 2300 })), JSON.stringify({ n: 7, s: 400 }));
+});
+
+test('2.8: εβδομαδιαίο email — πίνακας ανά μεσίτη, μεταβολή, αχρησιμοποίητες λειτουργίες, χωρίς HTML από ονόματα', () => {
+  const b = run('usageMailBody_')([{ name: 'Α <b>', n: 12, s: 3900, wn: 9 }, { name: 'Β', n: 2, s: 120, wn: null }], ['Αναφορά ιδιοκτήτη']);
+  assert.match(b.text, /Σύνολο: 14 ενέργειες · γλίτωσε περίπου 1 ώρ\. 7′/);
+  assert.match(b.text, /· Α <b>: 12 ενέργειες, 1 ώρ\. 5′ \(▲ \+3 από την προηγούμενη\)/);
+  assert.match(b.text, /Δεν χρησιμοποιήθηκαν αυτόν τον μήνα: Αναφορά ιδιοκτήτη/);
+  assert.ok(b.html.includes('Α &lt;b&gt;') && !b.html.includes('Α <b>'));
 });

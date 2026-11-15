@@ -376,3 +376,103 @@ test('2.7: μετρήσεις χρήσης — χρόνος και πατήμα�
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
+
+// ── 2.8 · Απλή εμφάνιση, Κλείσιμο ημέρας ──
+const SIMPLE = { agent: { name: 'Test Agent', smsName: 'T', phone: '', link: '', calendar: {}, prefs: { view: 'simple' } } };
+
+test('2.8 · FEAT-22: Απλή — ο πελάτης έχει ΕΝΑ κουμπί και «Περισσότερα»', { skip }, async () => {
+  const a = await openApp({}, null, SIMPLE);
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#d-next .next-btns > *').count(), 1);
+  assert.equal(await a.page.locator('#d-more').isVisible(), false);
+  assert.equal(await a.page.locator('#d-mail').isVisible(), false);
+  assert.equal(await a.page.locator('#d-tel').isVisible(), true);
+  await a.page.locator('#d-more-btn').click();
+  await a.page.waitForTimeout(200);
+  assert.equal(await a.page.locator('#btn-lead-task').isVisible(), true, 'όλα είναι ακόμα εδώ');
+  assert.equal(await a.page.locator('#d-status-select').isVisible(), true);
+  assert.equal(await a.page.locator('#d-more-text').innerText(), 'Λιγότερα');
+  // το θυμάται στον επόμενο πελάτη
+  await a.page.evaluate(() => window.openLead('L2', {}));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#d-more').isVisible(), true);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8: Πλήρης εμφάνιση — όπως πριν (δύο κουμπιά, όλες οι ενέργειες, χωρίς «Περισσότερα»)', { skip }, async () => {
+  const a = await openApp({});
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#d-next .next-btns > *').count(), 2);
+  assert.equal(await a.page.locator('#d-more').isVisible(), true);
+  assert.equal(await a.page.locator('#d-more-btn').isVisible(), false);
+  assert.equal(await a.page.locator('#d-mail').isVisible(), true);
+  assert.equal(await a.page.locator('#todo-list').count(), 0);
+  await a.ctx.close();
+});
+
+test('2.8 · FEAT-23: Απλή — Σήμερα με «Κάνε τώρα» (έως 3) και «Δες όλα»', { skip }, async () => {
+  const many = ['N1', 'N2', 'N3', 'N4', 'N5'].map((id, i) => lead(id, 'Νέος ' + (i + 1), 'Αναπάντητη', 'A-12'));
+  const a = await openApp({}, null, { ...SIMPLE, leads: many });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#todo-list .mrow').count(), 3);
+  assert.match(await a.page.locator('#todo-list .mrow').first().innerText(), /Νέα κλήση · Νέος 1/);
+  assert.equal(await a.page.locator('#today-body .today-cols').count(), 0, 'η πλήρης λίστα είναι κλειστή');
+  assert.match(await a.page.locator('#today-all').innerText(), /Δες όλα \(5\)/);
+  await a.page.locator('#today-all').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#today-body .today-cols').count(), 1);
+  await a.page.locator('#todo-list .mrow').first().click();
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#d-name').innerText(), 'Νέος 1');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8 · FEAT-24: ο διακόπτης Απλή/Πλήρης αποθηκεύεται στις προτιμήσεις', { skip }, async () => {
+  let got = null;
+  const a = await openApp({}, null, {}, { settings: (d) => { got = d; return { ...SIMPLE.agent }; } });
+  assert.equal(await a.page.evaluate(() => document.body.classList.contains('kw-simple')), false);
+  await a.page.evaluate(() => document.querySelector('#view-pick [data-view-set="simple"]').click());
+  await a.page.waitForTimeout(500);
+  assert.equal(JSON.stringify(got), JSON.stringify({ view: 'simple' }));
+  assert.equal(await a.page.evaluate(() => document.body.classList.contains('kw-simple')), true);
+  assert.equal(await a.page.evaluate(() => document.querySelector('#view-pick [data-view-set="simple"]').classList.contains('is-on')), true);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8 · FEAT-25: Κλείσιμο ημέρας — μία ερώτηση τη φορά, 1 πάτημα, «Η μέρα έκλεισε»', { skip }, async () => {
+  const past = now - 3 * 3600e3;
+  const shown = { ...lead('S1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past, showingDate: '2026-01-01', showingTime: '10:00', showingAt: '01/01/2026 10:00' };
+  const fresh = lead('P1', 'Νίκος Κ.', 'Αναπάντητη', 'A-12');
+  let out = null, stat = null;
+  const a = await openApp({ dayClose: true }, null, { leads: [fresh, shown] }, {
+    outcome: (d) => { out = d; return { ...shown, outcome: d.outcome }; },
+    status: (d) => { stat = d; return { ...fresh, status: d.status }; }
+  });
+  assert.equal(await a.page.evaluate(() => window.kwClose.items().length), 2);
+  await a.page.evaluate(() => window.kwClose.open());
+  await a.page.waitForTimeout(300);
+  assert.match(await a.page.locator('#closebox').innerText(), /1 από 2[\s\S]*Πώς πήγε η υπόδειξη;[\s\S]*Μαρία Π\./);
+  await a.page.locator('#closebox [data-cl-out="2"]').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(out && out.outcome, 'Δεν ενδιαφέρθηκε');
+  assert.match(await a.page.locator('#closebox').innerText(), /2 από 2[\s\S]*Δεν έχεις καλέσει ακόμα[\s\S]*Νίκος Κ\./);
+  await a.page.locator('#closebox [data-cl-na]').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(stat && stat.status, 'Δεν απάντησε');
+  assert.match(await a.page.locator('#closebox').innerText(), /Η μέρα έκλεισε ✓[\s\S]*Τακτοποίησες 2 εκκρεμότητες/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8: με κλειστό flag dayClose ο οδηγός δεν ανοίγει', { skip }, async () => {
+  const a = await openApp({});
+  await a.page.evaluate(() => window.kwClose.open());
+  assert.equal(await a.page.locator('#closebox').isVisible(), false);
+  await a.ctx.close();
+});
