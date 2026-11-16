@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.21';
+const VERSION = '1.22';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -346,7 +346,7 @@ const AGENT_HEADERS = {
 };
 
 /** 1.17 · Οι τιμές της στήλης «Ρόλος». */
-const ROLE_VALUES = ['Μεσίτης', 'Admin', 'Μεσίτης + Admin', 'Coach'];
+const ROLE_VALUES = ['Μεσίτης', 'Admin', 'Μεσίτης + Admin', 'Coach', 'Super Admin'];
 
 /** «Εφαρμογή»: το μόνο φύλλο όπου γράφει η εφαρμογή. */
 const APP_HEADERS = ['ID', 'Μεσίτης', 'Κατάσταση', 'Σημειώσεις', 'Άνοιξε', 'Κάλεσε', 'SMS',
@@ -886,10 +886,12 @@ function readAgents_() {
  */
 function parseRoles_(s) {
   const t = norm_(s);
+  // 2.9.1: «Super Admin» = και οι τρεις ρόλοι μαζί (Μεσίτης + Admin + Coach).
+  if (/super|σουπερ/.test(t)) return { agent: true, admin: true, coach: true, super: true };
   const admin = /admin|διαχειρ/.test(t);
   const coach = /coach|προπονητ/.test(t);                 // 2.9
   const agent = (!admin && !coach) || /μεσιτ|agent|[+&\/,]|και/.test(t);
-  return { agent: agent, admin: admin, coach: coach };
+  return { agent: agent, admin: admin, coach: coach, super: false };
 }
 function isAdmin_(a) { return !!(a && a.roles && a.roles.admin); }
 function isCoach_(a) { return !!(a && a.roles && a.roles.coach); }
@@ -1584,7 +1586,7 @@ function actBootstrap_(agent, d, sess) {
   const agentRole = isAgent_(agent);
   return {
     session: sess ? { device: sess.device, since: stamp_(sess.since) } : null,
-    roles: { agent: agentRole, admin: isAdmin_(agent), coach: isCoach_(agent) },
+    roles: { agent: agentRole, admin: isAdmin_(agent), coach: isCoach_(agent), super: !!(agent.roles && agent.roles.super) },
     env: CONFIG.ENV,
     version: VERSION,
     agent: agentPayload_(agent),

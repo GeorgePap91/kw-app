@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.9.0';
+var APP_VERSION = '2.9.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.21';
+var API_VERSION = '1.22';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -4435,7 +4435,7 @@ function renderMore() {
   var me = S.me || {};
   fillInitials();
   $('more-name').textContent = me.name || '';
-  $('more-sub').textContent = [S.boot && S.boot.office && S.boot.office.name, 'Προφίλ και ρυθμίσεις'].filter(Boolean).join(' · ');
+  $('more-sub').textContent = [roles().super ? 'Super Admin · λειτουργία μεσίτη' : '', S.boot && S.boot.office && S.boot.office.name, 'Προφίλ και ρυθμίσεις'].filter(Boolean).join(' · ');
   if (window.kwDash) kwDash.sync();                      // 2.9: «Η πορεία μου» μόνο με το flag dashboard
   if (S.mx) renderMoreMx();
   else {
@@ -4586,7 +4586,9 @@ function setMode(mode, quiet) {
   $('mode-wrap').hidden = !((r.admin || r.coach) && r.agent);
   $('mode-admin').hidden = !r.admin;
   $('mode-coach').hidden = !r.coach;
-  $('a-mode-wrap').hidden = !r.agent;
+  $('a-mode-wrap').hidden = !(r.agent || r.coach);     // 2.9.1: Super Admin → και Coach από το Admin
+  $('a-to-agent').hidden = !r.agent;
+  $('a-to-coach').hidden = !r.coach;
   $('set-cal').hidden = !r.agent;
   $('btn-templates').hidden = !r.agent;
   if (changed || quiet) {
@@ -5166,7 +5168,7 @@ function renderAMore() {
   var me = S.me || {};
   fillInitials();
   $('a-more-name').textContent = me.name || '';
-  $('a-more-sub').textContent = ['Admin', S.boot && S.boot.office && S.boot.office.name].filter(Boolean).join(' · ');
+  $('a-more-sub').textContent = [roles().super ? 'Super Admin · λειτουργία Admin' : 'Admin', S.boot && S.boot.office && S.boot.office.name].filter(Boolean).join(' · ');
   if (!S.adm) return;
   var el = $('a-team');
   el.innerHTML = S.adm.agents.map(function (a) {

@@ -379,7 +379,7 @@
     var me = W.S.me || {}, r = W.roles();
     W.fillInitials();
     W.$('c-more-name').textContent = me.name || '';
-    W.$('c-more-sub').textContent = ['Coach', W.S.boot && W.S.boot.office && W.S.boot.office.name].filter(Boolean).join(' · ');
+    W.$('c-more-sub').textContent = [r.super ? 'Super Admin · λειτουργία Coach' : 'Coach', W.S.boot && W.S.boot.office && W.S.boot.office.name].filter(Boolean).join(' · ');
     W.$('c-mode-wrap').hidden = !(r.agent || r.admin);
     W.$('c-to-agent').hidden = !r.agent;
     W.$('c-to-admin').hidden = !r.admin;
