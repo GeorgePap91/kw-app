@@ -1423,3 +1423,91 @@ body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off
 .cl-skip{display:block;margin:1rem auto 0}
 .cl-end{margin-bottom:1rem}
 #today-all{margin-bottom:5.5rem}
+
+/* ───────── 2.9 · Πίνακας προόδου, στόχοι, οικονομικά, Coach ─────────
+   Χρώματα γραφημάτων: 4 σταθερές θέσεις (μπλε, πορτοκαλί, πράσινο-γαλάζιο, κίτρινο), ελεγμένες
+   για δυσχρωματοψία σε φωτεινό και σκούρο. Κάθε γράφημα έχει υπόμνημα με τιμές και πίνακα,
+   ώστε τίποτα να μη διαβάζεται μόνο από το χρώμα. */
+:root{--c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100}
+html[data-theme="dark"]{--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dz{padding:0 1rem 2rem;max-width:60rem}
+.dz .group-title{margin-top:1.25rem}
+.dz-more{margin-top:.625rem}
+.dz-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:1rem;margin-bottom:.75rem}
+.dz-card h3{margin:1rem 0 .5rem;font-size:1rem;font-weight:700;color:var(--ink-2)}
+.dz-card>h3:first-child{margin-top:0}
+.dz-card .card-note{margin:.25rem 0}
+.dz-test{margin:0 0 .75rem;padding:.5rem .75rem;border-radius:.625rem;background:var(--a-bg2);color:var(--ink);font-size:.9375rem;font-weight:600}
+.dz-hero b{display:block;font-size:2.5rem;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.dz-hero span{display:block;color:var(--ink-2);font-size:1rem;margin-top:.125rem}
+.dz-meter{margin-top:1rem}
+.dz-meter-top{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+.dz-meter-top b{font-size:1rem;font-weight:700;min-width:0}
+.dz-meter-top span{font-size:1rem;font-variant-numeric:tabular-nums;color:var(--ink-2);margin-left:auto}
+.dz-bar{display:block;height:.625rem;border-radius:.3125rem;background:var(--line);margin-top:.375rem;overflow:hidden}
+.dz-bar i{display:block;height:100%;border-radius:.3125rem;background:var(--c1);min-width:0}
+.dz-meter.done .dz-bar i,.dz-mini.done .dz-bar i{background:var(--green-solid)}
+.dz-meter p{margin:.375rem 0 0;font-size:.9375rem;color:var(--ink-2)}
+.dz-meter p b{color:var(--ink)}
+.dz-split{display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap}
+.dn{position:relative;width:9.5rem;height:9.5rem;flex:0 0 auto}
+.dn svg{width:100%;height:100%;display:block}
+.dn circle{fill:none;stroke-width:4.5}
+.dn-bg{stroke:var(--line)}
+.dn-arc.c0{stroke:transparent}.dn-arc.c1{stroke:var(--c1)}.dn-arc.c2{stroke:var(--c2)}.dn-arc.c3{stroke:var(--c3)}.dn-arc.c4{stroke:var(--c4)}
+.dn-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:1.5rem}
+.dn-mid b{font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.dn-mid span{font-size:.8125rem;color:var(--ink-2)}
+.dz-legend{list-style:none;margin:0;padding:0;flex:1 1 12rem;min-width:0}
+.dz-legend li{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-top:1px solid var(--line);font-size:.9375rem}
+.dz-legend li:first-child{border-top:0}
+.dz-legend i{flex:0 0 auto;width:.75rem;height:.75rem;border-radius:.1875rem}
+.dz-legend i.c0{background:var(--line)}.dz-legend i.c1{background:var(--c1)}.dz-legend i.c2{background:var(--c2)}.dz-legend i.c3{background:var(--c3)}.dz-legend i.c4{background:var(--c4)}
+.dz-legend span{flex:1;min-width:0;color:var(--ink)}
+.dz-legend b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dz-legend em{font-style:normal;color:var(--ink-2);width:2.75rem;text-align:right;font-variant-numeric:tabular-nums}
+.dz-sum{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column;gap:.25rem}
+.dz-sum b{font-size:1.125rem;font-weight:800}
+.dz-sum span{color:var(--ink-2);font-size:.9375rem}
+.dz-sum .dz-pace{color:var(--ink);font-weight:600}
+.dz-cols{display:flex;align-items:flex-end;gap:2px;height:8rem;padding-top:.25rem}
+.dz-col{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.dz-col i{display:block;width:100%;max-width:1.5rem;border-radius:4px 4px 0 0;background:var(--c1)}
+.dz-col em{font-style:normal;font-size:.75rem;color:var(--ink-2);margin-top:.25rem;border-top:1px solid var(--line);width:100%;text-align:center;padding-top:.125rem}
+.dz-col.cur em{color:var(--ink);font-weight:800}
+.dz-foot{margin:.625rem 0 0;font-size:.9375rem;color:var(--ink-2)}
+.dz-scroll{overflow-x:auto;margin:0 -.25rem}
+.dz-table{width:100%;border-collapse:collapse;font-size:.9375rem;font-variant-numeric:tabular-nums}
+.dz-table th{text-align:left;font-weight:600;color:var(--ink-2);font-size:.8125rem;padding:.375rem .25rem;border-bottom:1px solid var(--edge);vertical-align:bottom}
+.dz-table td{padding:.5rem .25rem;border-bottom:1px solid var(--line)}
+.dz-table .n{text-align:right;white-space:nowrap}
+.dz-table th.n{white-space:normal}
+.dz-table tfoot td{border-bottom:0;border-top:1px solid var(--edge);font-weight:700}
+.dz-dim{color:var(--ink-2);font-size:.8125rem}
+.dz-tabs{margin-bottom:.75rem}
+.dz-tiles{padding:.25rem 0 0}
+.dz-tiles .mx-tile b{font-size:1.5rem}
+.dz-agent .mrow-body>span{display:block}
+.dz-mini{display:flex;align-items:center;gap:.5rem;margin-top:.375rem}
+.dz-mini .dz-bar{flex:1;max-width:12rem;margin-top:0;height:.375rem}
+.dz-mini em{font-style:normal;font-size:.8125rem;color:var(--ink-2);white-space:nowrap}
+.tag.ok{background:var(--g-bg);color:var(--green)}
+.c-filter{display:flex;gap:.5rem;align-items:stretch;margin-top:.5rem;flex-wrap:wrap}
+.c-filter .field{flex:1 1 12rem;margin:0}
+.c-filter .btn{flex:0 0 auto;min-height:3.25rem;padding:.5rem 1rem}
+.g-group{margin:1.5rem 0 .25rem;font-size:1.0625rem;font-weight:800}
+.g-head,.g-row{display:grid;grid-template-columns:minmax(0,1fr) 4rem 4rem 4.5rem;gap:.375rem;align-items:center}
+.g-head em{font-style:normal;font-size:.8125rem;color:var(--ink-2);text-align:center}
+.g-row{padding:.375rem 0;border-top:1px solid var(--line)}
+.g-row span b{display:block;font-size:.9375rem;font-weight:600;line-height:1.25}
+.g-row span small{display:block;font-size:.8125rem;color:var(--ink-2)}
+.g-row input{width:100%;min-width:0;min-height:2.75rem;padding:.25rem;text-align:center;font-size:1rem;font-variant-numeric:tabular-nums;
+  border:1.5px solid var(--edge);border-radius:.5rem;background:var(--paper);color:var(--ink)}
+.g-row input:focus{outline:3px solid var(--red);outline-offset:-1px;border-color:transparent}
+.g-hint{margin-top:.5rem}
+#goals #g-save{margin-top:1.25rem}
+.dz-date{display:block}
+.dz-agent .tag{display:inline-block}
+.dz-tiles .mx-tile b{font-size:1.25rem;overflow-wrap:anywhere}
+.dz-table td b{white-space:nowrap}

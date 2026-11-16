@@ -263,6 +263,9 @@
         <span class="mx-card-head"><b id="more-mx-title">Αυτός ο μήνας</b><span>Αναλυτικά <svg class="ico" aria-hidden="true"><use href="#i-next"/></svg></span></span>
         <span id="more-mx"></span>
       </button>
+      <div class="mlist dz-more" id="more-dash" hidden>
+        <button class="mrow" data-goto="dash"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="mrow-body"><b>Η πορεία μου</b><span>Στόχοι, γραφήματα, τζίρος και cap.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      </div>
 
       <h2 class="group-title">Γραφείο</h2>
       <div class="mlist">
@@ -273,7 +276,8 @@
       <div id="mode-wrap" hidden>
         <h2 class="group-title">Λειτουργία</h2>
         <div class="mlist">
-          <button class="mrow" data-mode-to="admin"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Admin</b><span>Έλεγχος εντύπων, κλήσεις και αρχεία όλων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+          <button class="mrow" data-mode-to="coach" id="mode-coach" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Coach</b><span>Ομάδα, στόχοι και οικονομικά όλων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+          <button class="mrow" data-mode-to="admin" id="mode-admin"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Admin</b><span>Έλεγχος εντύπων, κλήσεις και αρχεία όλων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         </div>
       </div>
 
@@ -495,6 +499,60 @@
     </div>
   </section>
 
+  <!-- 2.9: Η ΠΟΡΕΙΑ ΜΟΥ (στόχοι, γραφήματα, οικονομικά) -->
+  <section class="view" id="view-dash" hidden>
+    <header class="head">
+      <div class="head-row">
+        <div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Η πορεία μου</h1></div>
+        <div class="head-actions">
+          <button class="icon-btn" id="dash-refresh" aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+        </div>
+      </div>
+    </header>
+    <div id="dash-body"><div class="empty">Φόρτωση…</div></div>
+  </section>
+
+  <!-- 2.9: COACH · ΟΜΑΔΑ -->
+  <section class="view" id="view-c-team" hidden>
+    <header class="head">
+      <div class="head-row">
+        <h1>Ομάδα</h1>
+        <div class="head-actions">
+          <button class="icon-btn" id="c-refresh" aria-label="Ανανέωση"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+        </div>
+      </div>
+      <div class="c-filter">
+        <label class="field"><span class="sr-only">Μεσίτης</span><select id="c-agent" aria-label="Φίλτρο ανά μεσίτη"><option value="">Όλοι οι μεσίτες</option></select></label>
+        <button class="btn primary" id="c-goals" hidden>Ορισμός στόχων</button>
+      </div>
+    </header>
+    <div id="c-body"><div class="empty">Φόρτωση…</div></div>
+  </section>
+
+  <section class="view" id="view-c-more" hidden>
+    <header class="head">
+      <div class="head-row"><h1>Άλλα</h1></div>
+    </header>
+    <div class="more">
+      <button class="profile-card" data-open-settings>
+        <span class="avatar big" data-initials></span>
+        <span class="profile-body"><b id="c-more-name"></b><span id="c-more-sub"></span></span>
+        <svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg>
+      </button>
+      <div id="c-mode-wrap" hidden>
+        <h2 class="group-title">Λειτουργία</h2>
+        <div class="mlist">
+          <button class="mrow" data-mode-to="agent" id="c-to-agent"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Μεσίτη</b><span>Οι δικές σου κλήσεις, εργασίες και ακίνητα.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+          <button class="mrow" data-mode-to="admin" id="c-to-admin"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="mrow-body"><b>Μετάβαση σε Admin</b><span>Έλεγχος εντύπων, κλήσεις και αρχεία όλων.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+      <h2 class="group-title">Εφαρμογή</h2>
+      <div class="mlist">
+        <button class="mrow" data-open-settings><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-gear"/></svg></span><span class="mrow-body"><b>Ρυθμίσεις</b><span>Γράμματα, ειδοποιήσεις, ασφάλεια.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      </div>
+    </div>
+  </section>
+
   <button class="fab" id="fab" aria-haspopup="dialog" aria-controls="quick"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Καταγραφή</button>
   <div class="ptr" id="ptr" aria-hidden="true"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></div>
 
@@ -515,6 +573,13 @@
     <button class="tab" data-view="a-calls"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span>Κλήσεις</button>
     <button class="tab" data-view="a-props"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></span>Ακίνητα</button>
     <button class="tab" data-view="a-more"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-more"/></svg></span>Άλλα</button>
+  </nav>
+
+  <!-- 2.9: μενού Coach -->
+  <nav class="tabs" id="nav-coach" aria-label="Μενού Coach" hidden>
+    <div class="nav-brand" aria-hidden="true"><span class="boot-mark">KW</span><b>KW Coach</b></div>
+    <button class="tab" data-view="c-team"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span>Ομάδα</button>
+    <button class="tab" data-view="c-more"><span class="tab-ico"><svg class="ico" aria-hidden="true"><use href="#i-more"/></svg></span>Άλλα</button>
   </nav>
 </div>
 
@@ -809,6 +874,18 @@
 </div>
 
 <!-- ΕΡΓΑΣΙΑ (νέα ή αλλαγή) -->
+<!-- 2.9: ΟΡΙΣΜΟΣ ΣΤΟΧΩΝ (Coach) -->
+<div class="sheet" id="goals" hidden>
+  <div class="sheet-head">
+    <button class="back" id="goals-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
+    <span class="sheet-title" id="g-title">Στόχοι</span>
+  </div>
+  <div class="sheet-body">
+    <div id="g-body"></div>
+    <button class="btn primary wide" id="g-save">Αποθήκευση στόχων</button>
+  </div>
+</div>
+
 <div class="sheet" id="task" hidden>
   <div class="sheet-head">
     <button class="back" id="task-back"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg>Πίσω</button>
@@ -1276,5 +1353,6 @@
 <script src="auto.js"></script>
 <script src="usage.js"></script>
 <script src="close.js"></script>
+<script src="dash.js"></script>
 </body>
 </html>

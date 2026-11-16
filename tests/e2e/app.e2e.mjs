@@ -23,7 +23,7 @@ const now = Date.now();
 const lead = (id, name, status, code) => ({ id, name, status, property: 'Διαμέρισμα 80τμ', code, phone: '6900000000', phoneIntl: '+306900000000', date: '13/11/2026 07:00', dateTs: now - 3600e3, source: 'Spitogatos', history: [] });
 function bootData(flags) {
   return {
-    session: { device: 'Android · εφαρμογή', since: '' }, roles: { agent: true, admin: true }, env: 'test', version: '1.20',
+    session: { device: 'Android · εφαρμογή', since: '' }, roles: { agent: true, admin: true }, env: 'test', version: '1.21',
     agent: { name: 'Test Agent', smsName: 'T', phone: '', link: '', calendar: {}, prefs: {} },
     defaults: { templates: {}, colors: {} }, placeholders: [], docSlots: [], billSlots: [], callLog: {}, docsRequires: '', maxUploadMb: 10,
     mapEnabled: false, outcomes: ['Ενδιαφέρθηκε', 'Θέλει δεύτερη υπόδειξη', 'Δεν ενδιαφέρθηκε', 'Δεν ήρθε'], mandateSoon: 30, tasks: [], drive: null,
@@ -35,7 +35,7 @@ function bootData(flags) {
   };
 }
 
-async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}, replies = {}) {
+async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}, replies = {}, opts = {}) {
   const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR', serviceWorkers: 'block' });
   const sent = [], errors = [];
   await ctx.route(/script\.google\.com/, async (r) => {
@@ -51,7 +51,7 @@ async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows:
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(base);
   await page.waitForFunction(() => window.S && window.S.boot, null, { timeout: 15000 });
-  await page.locator('.tab[data-view="calls"]').first().click();
+  if (!opts.stay) await page.locator('.tab[data-view="calls"]').first().click();   // stay: μόνο Coach/Admin, χωρίς καρτέλα «Πελάτες»
   await page.waitForTimeout(300);
   const cdp = await ctx.newCDPSession(page);
   const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -537,6 +537,103 @@ test('2.8.1: κλήση χωρίς επαφή δείχνει «Άνοιγμα ε
   assert.ok(asked && asked.id, 'δεν ζητήθηκε η επαφή από τον server');
   assert.equal(await a.page.locator('#contact').isHidden(), false, 'δεν άνοιξε η επαφή');
   assert.equal(await a.page.evaluate(() => S.leads.filter((l) => l.contactId === 'A9').length), 1);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+// ── 2.9 · Πίνακας προόδου, στόχοι, οικονομικά, Coach ─────────────────
+const ymNow = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+const mxData = () => ({
+  configured: true, emails: ['t@example.com'], lastSent: '', formUrl: '', updated: '',
+  metrics: [{ key: 'buyer', group: 'clients', label: '1ο Ραντεβού με αγοραστή', sub: 'δια ζώσης' },
+            { key: 'showSale', group: 'showings', label: 'Υπόδειξη πώλησης', sub: 'υπογεγραμμένη' }],
+  groups: [{ key: 'clients', label: 'Αγοραστές & μισθωτές' }, { key: 'showings', label: 'Υποδείξεις' }],
+  months: [{ ym: ymNow, label: 'Τρέχων μήνας', values: { buyer: 3, showSale: 4 }, missing: [],
+             weeks: [{ label: '01/01 – 07/01', start: ymNow + '-01', end: ymNow + '-07', values: { buyer: 3, showSale: 4 }, sent: '' }] }]
+});
+const dashData = () => ({
+  goals: { showSale: { w: 2, m: 8, y: 96 }, rev: { w: 0, m: 0, y: 60000 } }, capStart: '01/09',
+  finance: { configured: true, test: true, year: new Date().getFullYear(), yearTotal: 40800, yearDeals: 2, owner: 27200, buyer: 13600,
+             months: [0, 30000, 0, 0, 0, 0, 0, 0, 0, 10800, 0, 0], cap: 50000, capTotal: 10800, capLeft: 39200, capped: false,
+             capFrom: '2026-09-01', capTo: '2027-08-31',
+             deals: [{ date: '2026-10-06', code: 'TEST-101', owner: 7200, buyer: 3600, total: 10800, cap: true, year: true },
+                     { date: '2026-02-10', code: 'TEST-102', owner: 20000, buyer: 10000, total: 30000, cap: false, year: true }] }
+});
+
+test('2.9: «Η πορεία μου» δείχνει τζίρο, υπόλοιπο ως τον στόχο, cap και στόχους με ρυθμό', { skip }, async () => {
+  const a = await openApp({ dashboard: true, finance: true }, null, {}, { metrics: mxData, dash: dashData });
+  await a.page.evaluate(() => goto('more'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#more-dash').isVisible(), true, 'λείπει η γραμμή «Η πορεία μου»');
+  await a.page.locator('#more-dash .mrow').click();
+  await a.page.waitForTimeout(600);
+  const text = await a.page.locator('#dash-body').innerText();
+  assert.match(text, /40\.800 €/);                             // τζίρος έτους
+  assert.match(text, /Απομένουν 19\.200 € για τον στόχο/);      // 60.000 − 40.800
+  assert.match(text, /Απομένουν 39\.200 € μέχρι το cap/);
+  assert.match(text, /Κύκλος 01\/09\/2026 – 31\/08\/2027/);
+  assert.match(text, /TEST-101/);
+  assert.match(text, /Δοκιμαστικά στοιχεία/);
+  assert.match(text, /4 από 8/);                                // στόχος μήνα
+  assert.match(text, /Με αυτόν τον ρυθμό κλείνεις τον μήνα στο/);
+  await a.page.locator('[data-dz-period="w"]').click();
+  await a.page.waitForTimeout(200);
+  assert.match(await a.page.locator('#dash-body').innerText(), /4 από 2/);
+  assert.ok(a.sent.includes('dash'));
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.9: χωρίς το flag dashboard η γραμμή δεν φαίνεται και δεν ζητιέται τίποτα', { skip }, async () => {
+  const a = await openApp({}, null, {}, { metrics: mxData });
+  await a.page.evaluate(() => goto('more'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#more-dash').isHidden(), true);
+  assert.ok(!a.sent.includes('dash'));
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.9: ο Coach βλέπει την ομάδα, φιλτράρει ανά μεσίτη και ορίζει στόχους', { skip }, async () => {
+  let saved = null;
+  const team = () => ({
+    agents: [{ name: 'Μαρία Δοκιμή', active: true, capStart: '01/09', goals: 2, monthPct: 0.5, revTarget: 60000, yearTotal: 40800, capTotal: 10800, capped: false },
+             { name: 'Νίκος Δοκιμή', active: true, capStart: '', goals: 0, monthPct: null, revTarget: 0, yearTotal: 52000, capTotal: 52000, capped: true }],
+    cap: 50000, finance: true, test: true, metricsOn: true, updated: '16/11 20:00', metrics: mxData().metrics, groups: mxData().groups
+  });
+  const a = await openApp({}, null, { roles: { agent: false, admin: false, coach: true }, leads: [], props: [] }, {
+    coachBoot: team,
+    coachDash: (d) => ({ agent: d.agent, mx: mxData(), dash: dashData() }),
+    coachGoalSet: (d) => { saved = d; return { agent: d.agent, mx: mxData(), dash: dashData() }; }
+  }, { stay: true });
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.evaluate(() => S.mode), 'coach');
+  assert.equal(await a.page.locator('#nav-coach').isVisible(), true);
+  assert.equal(await a.page.locator('#nav-agent').isHidden(), true);
+  assert.equal(await a.page.locator('#fab').isHidden(), true);
+  let text = await a.page.locator('#c-body').innerText();
+  assert.match(text, /Μαρία Δοκιμή/); assert.match(text, /50% στόχων μήνα/); assert.match(text, /1\/2/);   // 1 από 2 έπιασε το cap
+  await a.page.locator('#c-agent').selectOption('Μαρία Δοκιμή');
+  await a.page.waitForTimeout(500);
+  text = await a.page.locator('#c-body').innerText();
+  assert.match(text, /40\.800 €/); assert.match(text, /4 από 8/);
+  await a.page.locator('#c-goals').click();
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#goals').isHidden(), false);
+  assert.equal(await a.page.locator('.g-row[data-g="showSale"] [data-p="m"]').inputValue(), '8');
+  await a.page.locator('.g-row[data-g="buyer"] [data-p="w"]').fill('3');
+  await a.page.locator('#g-auto').click();
+  assert.equal(await a.page.locator('.g-row[data-g="buyer"] [data-p="m"]').inputValue(), '12');
+  await a.page.locator('#g-rev').fill('75000');
+  await a.page.locator('#g-cap').fill('15/05');
+  await a.page.locator('#g-save').click();
+  await a.page.waitForTimeout(600);
+  assert.equal(saved.agent, 'Μαρία Δοκιμή');
+  assert.deepEqual(saved.goals.buyer, { w: 3, m: 12, y: 144 });
+  assert.deepEqual(saved.goals.rev, { y: 75000 });
+  assert.equal(saved.capStart, '15/05');
+  assert.equal(await a.page.locator('#goals').isHidden(), true);
+  assert.ok(!a.sent.includes('leads') && !a.sent.includes('adminBoot'), 'ο Coach δεν ζητά κλήσεις ή στοιχεία Admin');
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
