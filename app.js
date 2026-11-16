@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.8.1';
+var APP_VERSION = '2.9.0';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.20';
+var API_VERSION = '1.21';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -178,7 +178,7 @@ function showPane(container, value) {
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
 var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox'];
-var SHEETS = ['review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
+var SHEETS = ['goals', 'review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
 function backGuard() { if (history.pushState) history.pushState({ kw: 1 }, ''); }
@@ -261,6 +261,7 @@ window.addEventListener('popstate', function () {
   backGuard();
   if (closeTop()) return;
   if (isAdminMode()) { if (S.view !== 'a-review') goto('a-review'); else askExit(); return; }
+  if (isCoachMode()) { if (S.view !== 'c-team') goto('c-team'); else askExit(); return; }
   if (NAV_OF[S.view]) goto('more');
   else if (S.view !== 'today') goto('today');
   else askExit();
@@ -599,7 +600,10 @@ function onBoot(b) {
 
   // 1.17: Μόνο Admin → κατευθείαν Admin. Και οι δύο ρόλοι → όπως την άφησες την τελευταία φορά.
   var r = roles();
-  setMode(!r.agent || (r.admin && store('kw_mode') === 'admin') ? 'admin' : 'agent', true);
+  // 2.9: Μόνο Coach → κατευθείαν στην Ομάδα.
+  var saved = store('kw_mode');
+  setMode((saved === 'coach' && r.coach) || (!r.agent && !r.admin) ? 'coach'
+    : !r.agent || (r.admin && saved === 'admin') ? 'admin' : 'agent', true);
 
   setInterval(poll, 180000);
   document.addEventListener('visibilitychange', function () {
@@ -738,7 +742,7 @@ function wire() {
 
   wireTabs('tabs-props', 'props-panes', function (v) { S.propTab = v; resetPage('props:' + v); renderProps(); window.scrollTo(0, 0); });
   // 2.0: ο κύκλος με τα αρχικά ανοίγει τα «Περισσότερα»· οι Ρυθμίσεις είναι μέσα εκεί.
-  $$('[data-settings]').forEach(function (b) { b.onclick = function () { goto(isAdminMode() ? 'a-more' : 'more'); }; });
+  $$('[data-settings]').forEach(function (b) { b.onclick = function () { goto(isAdminMode() ? 'a-more' : isCoachMode() ? 'c-more' : 'more'); }; });
   $$('[data-open-settings]').forEach(function (b) { b.onclick = openSettings; });
   $$('[data-back]').forEach(function (b) { b.onclick = function () { goto(S.lastMain || 'today'); }; });
   $$('#theme-pick [data-theme-set]').forEach(function (b) {
@@ -879,9 +883,9 @@ function wire() {
 }
 
 var VIEWS = ['today', 'calls', 'props', 'alerts', 'more', 'tasks', 'contacts', 'referrals', 'metrics', 'forms',
-             'a-review', 'a-calls', 'a-props', 'a-more'];
+             'dash', 'a-review', 'a-calls', 'a-props', 'a-more', 'c-team', 'c-more'];
 // Ποιο κουμπί του μενού φωτίζεται. Τα «Περισσότερα» φαίνονται ως κουμπί μόνο στον υπολογιστή.
-var NAV_OF = { metrics: 'more', forms: 'more', contacts: 'more', referrals: 'more', tasks: 'more' };
+var NAV_OF = { dash: 'more', metrics: 'more', forms: 'more', contacts: 'more', referrals: 'more', tasks: 'more' };
 // Οι 4 καρτέλες: σε αυτές γυρίζει το «Πίσω» των υπόλοιπων οθονών.
 var MAIN_VIEWS = { today: 1, calls: 1, props: 1, alerts: 1 };
 
@@ -912,7 +916,12 @@ function goto(view) {
   if (view === 'a-calls') renderACalls();
   if (view === 'a-props') renderAProps();
   if (view === 'a-more') renderAMore();
-  $('fab').hidden = view === 'metrics' || isAdminMode();
+  if (window.kwDash) {                                   // 2.9
+    if (view === 'dash') kwDash.load(false);
+    if (view === 'c-team') kwDash.coachLoad(false);
+    if (view === 'c-more') kwDash.coachMore();
+  }
+  $('fab').hidden = view === 'metrics' || view === 'dash' || isAdminMode() || isCoachMode();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4362,6 +4371,10 @@ function refreshNow() {
   var btns = $$('[data-refresh]');
   var spin = function (on) { btns.forEach(function (x) { x.classList.toggle('spin', on); }); };
   spin(true);
+  if (isCoachMode()) {                                   // 2.9
+    var cl = window.kwDash && kwDash.coachLoad(true);
+    return (cl || Promise.resolve()).then(function () { spin(false); });
+  }
   if (isAdminMode()) {
     S.afiles = {};
     return loadAdmin(true).then(function () { spin(false); toast('Ανανεώθηκε'); },
@@ -4390,6 +4403,7 @@ function refreshNow() {
 var polling = false;
 function poll() {
   if (isAdminMode()) return pollAdmin();
+  if (isCoachMode()) return;                             // 2.9: ο Coach δεν έχει κλήσεις να ανανεώσει
   if (!$('detail').hidden || !$('showing').hidden) return;   // μην πειράξεις ανοιχτή κλήση
   refreshLeads();
 }
@@ -4422,6 +4436,7 @@ function renderMore() {
   fillInitials();
   $('more-name').textContent = me.name || '';
   $('more-sub').textContent = [S.boot && S.boot.office && S.boot.office.name, 'Προφίλ και ρυθμίσεις'].filter(Boolean).join(' · ');
+  if (window.kwDash) kwDash.sync();                      // 2.9: «Η πορεία μου» μόνο με το flag dashboard
   if (S.mx) renderMoreMx();
   else {
     $('more-mx').innerHTML = '<span class="mx-mini">' + [1, 2, 3].map(function () { return '<span class="skel tile"><i></i><i></i></span>'; }).join('') + '</span>';
@@ -4552,29 +4567,34 @@ S.afiles = {};
 
 function roles() { return (S.boot && S.boot.roles) || { agent: true, admin: false }; }
 function isAdminMode() { return S.mode === 'admin'; }
+function isCoachMode() { return S.mode === 'coach'; }   // 2.9
 
 /** Αλλαγή λειτουργίας. Μένει στη συσκευή για το επόμενο άνοιγμα. */
 function setMode(mode, quiet) {
   var r = roles();
+  if (mode === 'coach' && !r.coach) mode = 'agent';
   if (mode === 'admin' && !r.admin) mode = 'agent';
-  if (mode === 'agent' && !r.agent) mode = 'admin';
+  if (mode === 'agent' && !r.agent) mode = r.admin ? 'admin' : r.coach ? 'coach' : 'admin';
   var changed = S.mode !== mode;
   S.mode = mode;
   store('kw_mode', mode);
-  var admin = mode === 'admin';
+  var admin = mode === 'admin', coach = mode === 'coach';
   document.body.classList.toggle('mode-admin', admin);
-  $('nav-agent').hidden = admin;
+  $('nav-agent').hidden = admin || coach;
   $('nav-admin').hidden = !admin;
-  $('mode-wrap').hidden = !(r.admin && r.agent);
+  $('nav-coach').hidden = !coach;
+  $('mode-wrap').hidden = !((r.admin || r.coach) && r.agent);
+  $('mode-admin').hidden = !r.admin;
+  $('mode-coach').hidden = !r.coach;
   $('a-mode-wrap').hidden = !r.agent;
   $('set-cal').hidden = !r.agent;
   $('btn-templates').hidden = !r.agent;
   if (changed || quiet) {
     while (closeTop()) { /* κλείνουν τα ανοιχτά φύλλα */ }
-    goto(admin ? 'a-review' : 'today');
+    goto(admin ? 'a-review' : coach ? 'c-team' : 'today');
   }
   if (admin) loadAdmin(false).catch(function () {});
-  if (!quiet && changed) toast(admin ? 'Λειτουργία Admin' : 'Λειτουργία μεσίτη');
+  if (!quiet && changed) toast(admin ? 'Λειτουργία Admin' : coach ? 'Λειτουργία Coach' : 'Λειτουργία μεσίτη');
 }
 
 function loadAdmin(force) {
@@ -7330,7 +7350,7 @@ function offFlush(manual) {
     if (failed.length) toast('Δεν πέρασαν ' + plural(failed.length, 'αλλαγή', 'αλλαγές') + ': ' + failed.map(offLabel).join(', '), true);
     if (sent && !S.queue.length) {
       if (!failed.length) toast('✓ ' + (sent === 1 ? 'Στάλθηκε 1 αλλαγή' : 'Στάλθηκαν ' + sent + ' αλλαγές') + ' που έκανες χωρίς σήμα');
-      if (!isAdminMode() && $('detail').hidden && $('showing').hidden) offRefresh();
+      if (!isAdminMode() && !isCoachMode() && $('detail').hidden && $('showing').hidden) offRefresh();
     }
     if (S.queue.length) offFlushSoon();
   }, function () { S.flushing = false; offBar(); });
@@ -7568,6 +7588,8 @@ window.openPresent = openPresent; window.openPop = openPop; window.closePop = cl
 window.ico = ico; window.plural = plural; window.openLead = openLead;
 window.beacon = beacon; window.used = used;                               // 2.7
 window.needsOutcome = needsOutcome; window.niceDate = niceDate; window.lowerDay = lowerDay; window.isoDate = isoDate;   // 2.8
+window.skel = skel; window.initials = initials; window.fillInitials = fillInitials; window.roles = roles;      // 2.9
+window.openSheet = openSheet; window.closeSheet = closeSheet; window.goto = goto;
 window.smsHref = smsHref; window.callLead = callLead; window.parseStamp = parseStamp; window.ST_ANSWERED = ST.ANSWERED;   // 2.6
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──

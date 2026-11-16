@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.20';
+const VERSION = '1.21';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -341,11 +341,12 @@ const AGENT_HEADERS = {
   KEY: 'Κλειδί', SMS_NAME: 'Όνομα SMS', PHONE: 'Κινητό', LINK: 'Link',
   PREFS: 'Ρυθμίσεις', FOLDER: 'Φάκελος Drive', ACTIVE: 'Ενεργός',
   FORM_EMAIL: 'Email φόρμας',      // 1.5: το email με το οποίο συμπληρώνει τη φόρμα (π.χ. @kwgreece.gr)
-  ROLE: 'Ρόλος'                    // 1.17: Μεσίτης · Admin · Μεσίτης + Admin (κενό = Μεσίτης)
+  ROLE: 'Ρόλος',                   // 1.17: Μεσίτης · Admin · Μεσίτης + Admin · Coach (κενό = Μεσίτης)
+  CAP_START: 'Έναρξη cap'          // 2.9: ημερομηνία που ξεκινά ο ετήσιος κύκλος του cap (π.χ. 01/09). Κενό = 1 Ιανουαρίου
 };
 
 /** 1.17 · Οι τιμές της στήλης «Ρόλος». */
-const ROLE_VALUES = ['Μεσίτης', 'Admin', 'Μεσίτης + Admin'];
+const ROLE_VALUES = ['Μεσίτης', 'Admin', 'Μεσίτης + Admin', 'Coach'];
 
 /** «Εφαρμογή»: το μόνο φύλλο όπου γράφει η εφαρμογή. */
 const APP_HEADERS = ['ID', 'Μεσίτης', 'Κατάσταση', 'Σημειώσεις', 'Άνοιξε', 'Κάλεσε', 'SMS',
@@ -483,6 +484,9 @@ const ADMIN_ACTIONS = {
   reviewSet:   actReviewSet_
 };
 
+/** 2.9 · Μόνο για Coach. Γεμίζει από το Goals.js. Ο έλεγχος ρόλου γίνεται στον server, σε κάθε αίτημα. */
+const COACH_ACTIONS = {};
+
 /** Ενέργειες χωρίς σύνδεση: η σύνδεση νέας συσκευής και η φόρμα του πελάτη (με link μίας χρήσης). */
 const PUBLIC_ACTIONS = {
   presOpen:   actPresOpen_,          // 1.19: η σελίδα του πελάτη
@@ -520,6 +524,9 @@ function doPost(e) {
     if (ADMIN_ACTIONS[req.action]) {
       if (!isAdmin_(sess.agent)) return json_({ ok: false, code: 'role', error: 'Δεν έχεις δικαίωμα Admin.' });
       fn = ADMIN_ACTIONS[req.action];
+    } else if (COACH_ACTIONS[req.action]) {
+      if (!isCoach_(sess.agent)) return json_({ ok: false, code: 'role', error: 'Η ενέργεια είναι μόνο για τον Coach.' });
+      fn = COACH_ACTIONS[req.action];
     } else if (fn && fn !== actLogout_ && !SHARED_ACTIONS[req.action] && !isAgent_(sess.agent)) {
       return json_({ ok: false, code: 'role', error: 'Η ενέργεια είναι μόνο για μεσίτες.' });
     }
@@ -865,6 +872,7 @@ function readAgents_() {
     folder:  get(v, c.FOLDER),
     formEmail: get(v, c.FORM_EMAIL),
     roles:   parseRoles_(get(v, c.ROLE)),
+    capStart: c.CAP_START ? v[c.CAP_START - 1] : '',     // 2.9: Date ή κείμενο «ΗΗ/ΜΜ»
     // Κενό ή τσεκαρισμένο = ενεργός. Ξετσεκάρισμα = κλειδώνει αμέσως όλες τις συσκευές του.
     active:  !c.ACTIVE || !/^(false|όχι|οχι|no|0)$/i.test(get(v, c.ACTIVE))
   })).filter(a => a.name);
@@ -879,10 +887,12 @@ function readAgents_() {
 function parseRoles_(s) {
   const t = norm_(s);
   const admin = /admin|διαχειρ/.test(t);
-  const agent = !admin || /μεσιτ|agent|[+&\/,]|και/.test(t);
-  return { agent: agent, admin: admin };
+  const coach = /coach|προπονητ/.test(t);                 // 2.9
+  const agent = (!admin && !coach) || /μεσιτ|agent|[+&\/,]|και/.test(t);
+  return { agent: agent, admin: admin, coach: coach };
 }
 function isAdmin_(a) { return !!(a && a.roles && a.roles.admin); }
+function isCoach_(a) { return !!(a && a.roles && a.roles.coach); }
 function isAgent_(a) { return !a || !a.roles || a.roles.agent !== false; }
 
 function parsePrefs_(s) {
@@ -1574,7 +1584,7 @@ function actBootstrap_(agent, d, sess) {
   const agentRole = isAgent_(agent);
   return {
     session: sess ? { device: sess.device, since: stamp_(sess.since) } : null,
-    roles: { agent: agentRole, admin: isAdmin_(agent) },
+    roles: { agent: agentRole, admin: isAdmin_(agent), coach: isCoach_(agent) },
     env: CONFIG.ENV,
     version: VERSION,
     agent: agentPayload_(agent),
@@ -1609,7 +1619,7 @@ function actBootstrap_(agent, d, sess) {
 
 /**
  * 2.3 · Feature flags. Ιδιότητα σεναρίου FEATURES (JSON), π.χ. {"smartMemory":"admin"}.
- * Τιμή ανά feature: "all" = όλοι · "admin" = μόνο admins · "off" = κανείς ·
+ * Τιμή ανά feature: "all" = όλοι · "admin" = μόνο admins · "coach" = μόνο ο Coach · "off" = κανείς ·
  * ή λίστα email με κόμμα (π.χ. "a@x.gr, b@x.gr"). Χωρίς FEATURES = όλα κλειστά.
  */
 /**
@@ -1653,7 +1663,7 @@ function featureFlags_(agent) {
   const out = {};
   Object.keys(cfg).forEach(k => {
     const v = String(cfg[k] == null ? '' : cfg[k]).trim().toLowerCase();
-    out[k] = v === 'all' || (v === 'admin' && admin) ||
+    out[k] = v === 'all' || (v === 'admin' && admin) || (v === 'coach' && isCoach_(agent)) ||
       (!!email && v !== 'off' && v.split(',').map(s => s.trim()).indexOf(email) !== -1);
   });
   return out;
@@ -3882,6 +3892,7 @@ function metricsFor_(agent) {
     const m = month(r.start);       // η εβδομάδα μετρά στον μήνα που ξεκινά
     METRIC_LIST.forEach(x => { m.values[x.key] += r.values[x.key] || 0; });
     m.weeks.push({ label: dm_(r.start) + ' – ' + dm_(r.end), values: r.values,
+                   start: fmtIso_(r.start), end: fmtIso_(r.end),      // 2.9: για τον ρυθμό στους στόχους
                    sent: r.ts ? stamp_(r.ts) : '' });
   });
 
@@ -5329,7 +5340,7 @@ function setupAdmin() {
   _agents = null;
   const lines = ['Ρόλοι:'];
   readAgents_().forEach(a => lines.push('  ' + a.name + ': ' + (a.roles.agent ? 'Μεσίτης' : '') +
-    (a.roles.agent && a.roles.admin ? ' + ' : '') + (a.roles.admin ? 'Admin' : '')));
+    (a.roles.agent && a.roles.admin ? ' + ' : '') + (a.roles.admin ? 'Admin' : '') + (a.roles.coach ? ' Coach' : '')));
   lines.push('', 'Φύλλο «' + CONFIG.SHEETS.REVIEW + '» έτοιμο.');
   console.log(lines.join('\n'));
 }
