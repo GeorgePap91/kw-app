@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.8.0';
+var APP_VERSION = '2.8.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.20';
@@ -201,6 +201,27 @@ function closeSheet(id) {
     el.classList.remove('leaving');
   }, 210);
 }
+
+/**
+ * 2.8.1: πάτημα ΕΚΤΟΣ του ανοιχτού φύλλου το κλείνει (υπολογιστής / tablet, όπου το φύλλο είναι πλαϊνή μπάρα).
+ * Στο κινητό το φύλλο πιάνει όλη την οθόνη, άρα δεν υπάρχει «εκτός» και δεν αλλάζει τίποτα.
+ * Πάτημα σε κουμπί/γραμμή της λίστας από πίσω κάνει τη δουλειά του (π.χ. ανοίγει άλλον πελάτη) χωρίς να κλείσει.
+ */
+function outsideSheetTap(e) {
+  if (e.defaultPrevented || e.button) return;
+  var t = e.target;
+  if (!t || !t.closest || !document.body.contains(t)) return;       // το στοιχείο ξαναζωγραφίστηκε από το ίδιο πάτημα
+  if (!$('ask').hidden || !$('gallery').hidden) return;
+  if (POPS.some(function (id) { return $(id) && !$(id).hidden; })) return;
+  var top = openSheets()[0];
+  if (!top) return;
+  if (t.closest('.sheet,.pop,.toast,#ask,#gallery,#fab,.netbar')) return;
+  if (t.closest('button,a,input,select,textarea,label,summary,[role="button"],[data-id]')) return;
+  var r = $(top).getBoundingClientRect();
+  if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
+  closeTop();
+}
+document.addEventListener('click', outsideSheetTap);
 
 function openSheets() {
   return SHEETS.filter(function (id) { return !$(id).hidden && !$(id).classList.contains('leaving'); });
@@ -1196,8 +1217,17 @@ function wireLeadRows(el) {
 function renderKnown(l) {
   var el = $('d-known');
   var others = l.otherCodes || [];
-  el.hidden = !l.contactId;
-  if (!l.contactId) return;
+  // 2.8.1: κλήση που δεν έχει ακόμα επαφή (π.χ. ο κωδικός ακινήτου μπήκε αργότερα) παίρνει κι αυτή «Άνοιγμα επαφής».
+  //        Ο server φτιάχνει την επαφή εκείνη τη στιγμή (leadContact).
+  if (!l.contactId) {
+    var can = !!(l.code && (l.phone || l.email));
+    el.hidden = !can;
+    if (!can) return;
+    el.innerHTML = '<button class="link" id="d-open-contact">Άνοιγμα επαφής</button>';
+    $('d-open-contact').onclick = function () { makeLeadContact(l, this); };
+    return;
+  }
+  el.hidden = false;
   var names = others.map(function (c) {
     var p = S.props.filter(function (x) { return normCode(x.code) === normCode(c); })[0];
     return (p && p.street ? p.street + ', ' : '') + c;
@@ -1205,6 +1235,24 @@ function renderKnown(l) {
   el.innerHTML = (others.length ? '<b>Έχει καλέσει και για:</b> ' + esc(names.join(' · ')) : '') +
     '<button class="link" id="d-open-contact">Άνοιγμα επαφής</button>';
   $('d-open-contact').onclick = function () { openContact(l.contactId); };
+}
+
+function makeLeadContact(l, btn) {
+  if (!navigator.onLine) return toast('Χωρίς σύνδεση. Η επαφή ανοίγει μόλις έρθει σήμα.', true);
+  btn.disabled = true;
+  btn.textContent = 'Άνοιγμα…';
+  api('leadContact', { id: l.id }).then(function (r) {
+    l.contactId = r.contactId || '';
+    l.otherCodes = r.otherCodes || [];
+    S.contacts = null;                                   // η λίστα επαφών έχει πλέον μία ακόμα
+    if (S.lead && S.lead.id === l.id) renderKnown(l);
+    if (l.contactId) openContact(l.contactId);
+    else toast('Δεν βρέθηκε τηλέφωνο ή email για να γίνει επαφή.', true);
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.textContent = 'Άνοιγμα επαφής';
+    toast(/Άγνωστη ενέργεια/.test(e.message) ? 'Ο server δεν έχει ακόμα την 2.8.1 (Νέα έκδοση στο Apps Script).' : e.message, true);
+  });
 }
 
 function loadContacts() {

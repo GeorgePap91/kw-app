@@ -476,3 +476,67 @@ test('2.8: με κλειστό flag dayClose ο οδηγός δεν ανοίγε
   assert.equal(await a.page.locator('#closebox').isVisible(), false);
   await a.ctx.close();
 });
+
+// ── 2.8.1 ──────────────────────────────────────────────────
+test('2.8.1: ο διακόπτης στο Προφίλ δεν «αδειάζει» την οθόνη (το φύλλο δεν κυλάει)', { skip }, async () => {
+  const a = await openApp();
+  await a.page.evaluate(() => openLead('L1', { profile: true }));
+  await a.page.waitForTimeout(500);
+  await a.page.locator('#detail [data-pf-v]').filter({ hasText: 'δάνειο' }).first().click();   // εμφανίζει το «Έχει προέγκριση»
+  await a.page.waitForTimeout(300);
+  const sw = a.page.locator('#detail .pf-check:visible');
+  assert.ok(await sw.count() >= 2, 'δεν φάνηκαν οι διακόπτες');
+  for (let i = 0; i < 2; i++) {
+    await sw.nth(i).click();
+    await a.page.waitForTimeout(250);
+    assert.equal(await a.page.evaluate(() => document.getElementById('detail').scrollTop), 0, 'το φύλλο κύλησε: κενή οθόνη');
+    assert.equal(await sw.nth(i).locator('input').isChecked(), true);
+    assert.equal(await a.page.locator('#detail .sheet-head').isVisible(), true);
+  }
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8.1: στον υπολογιστή, πάτημα εκτός της πλαϊνής μπάρας την κλείνει· μέσα της όχι', { skip }, async () => {
+  const a = await openApp();
+  await a.page.setViewportSize({ width: 1366, height: 800 });
+  await a.page.evaluate(() => openLead('L1'));
+  await a.page.waitForTimeout(500);
+  await a.page.mouse.click(1100, 400);                       // μέσα στη μπάρα
+  await a.page.waitForTimeout(350);
+  assert.equal(await a.page.locator('#detail').isHidden(), false, 'έκλεισε με πάτημα μέσα');
+  await a.page.mouse.click(520, 700);                        // κενός χώρος της λίστας
+  await a.page.waitForTimeout(450);
+  assert.equal(await a.page.locator('#detail').isHidden(), true, 'δεν έκλεισε με πάτημα εκτός');
+  // Πάτημα σε άλλον πελάτη με ανοιχτή μπάρα: ανοίγει εκείνος, η μπάρα μένει.
+  await a.page.evaluate(() => openLead('L1'));
+  await a.page.waitForTimeout(400);
+  await a.page.locator('.row.lead:visible').nth(1).click({ position: { x: 60, y: 20 } });   // το αριστερό μέρος της γραμμής, που δεν το σκεπάζει η μπάρα
+  await a.page.waitForTimeout(450);
+  assert.equal(await a.page.locator('#detail').isHidden(), false);
+  assert.equal(await a.page.evaluate(() => S.lead && S.lead.id), 'L2');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.8.1: κλήση χωρίς επαφή δείχνει «Άνοιγμα επαφής» και τη φτιάχνει στον server', { skip }, async () => {
+  let asked = null;
+  const contact = { id: 'A9', name: 'Μαρία Π.', phones: ['6900000000'], emails: [], codes: [{ code: 'A-12' }], crm: false };
+  const a = await openApp({}, null, {}, {
+    leadContact: (d) => { asked = d; return { contactId: 'A9', otherCodes: [] }; },
+    contacts: () => [contact]
+  });
+  await a.page.locator('[data-cmode="pipe"]').click();
+  await a.page.waitForTimeout(300);
+  await a.page.locator('.pk-open:visible').click();
+  await a.page.waitForTimeout(500);
+  const btn = a.page.locator('#d-open-contact');
+  assert.equal(await btn.isVisible(), true, 'λείπει το «Άνοιγμα επαφής»');
+  await btn.click();
+  await a.page.waitForTimeout(700);
+  assert.ok(asked && asked.id, 'δεν ζητήθηκε η επαφή από τον server');
+  assert.equal(await a.page.locator('#contact').isHidden(), false, 'δεν άνοιξε η επαφή');
+  assert.equal(await a.page.evaluate(() => S.leads.filter((l) => l.contactId === 'A9').length), 1);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
