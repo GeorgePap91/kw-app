@@ -23,7 +23,7 @@ const now = Date.now();
 const lead = (id, name, status, code) => ({ id, name, status, property: 'Διαμέρισμα 80τμ', code, phone: '6900000000', phoneIntl: '+306900000000', date: '13/11/2026 07:00', dateTs: now - 3600e3, source: 'Spitogatos', history: [] });
 function bootData(flags) {
   return {
-    session: { device: 'Android · εφαρμογή', since: '' }, roles: { agent: true, admin: true }, env: 'test', version: '1.21',
+    session: { device: 'Android · εφαρμογή', since: '' }, roles: { agent: true, admin: true }, env: 'test', version: '1.22',
     agent: { name: 'Test Agent', smsName: 'T', phone: '', link: '', calendar: {}, prefs: {} },
     defaults: { templates: {}, colors: {} }, placeholders: [], docSlots: [], billSlots: [], callLog: {}, docsRequires: '', maxUploadMb: 10,
     mapEnabled: false, outcomes: ['Ενδιαφέρθηκε', 'Θέλει δεύτερη υπόδειξη', 'Δεν ενδιαφέρθηκε', 'Δεν ήρθε'], mandateSoon: 30, tasks: [], drive: null,
@@ -634,6 +634,42 @@ test('2.9: ο Coach βλέπει την ομάδα, φιλτράρει ανά μ
   assert.equal(saved.capStart, '15/05');
   assert.equal(await a.page.locator('#goals').isHidden(), true);
   assert.ok(!a.sent.includes('leads') && !a.sent.includes('adminBoot'), 'ο Coach δεν ζητά κλήσεις ή στοιχεία Admin');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.9.1: Super Admin περνά και στους τρεις ρόλους από τα «Άλλα» και η επιλογή θυμάται', { skip }, async () => {
+  const adminBoot = () => ({ agents: [], props: [], leads: [], review: { items: [], counts: {} }, reasons: [], drive: null, limits: {} });
+  const coachBoot = () => ({ agents: [], cap: 50000, finance: false, test: false, metricsOn: false, updated: '', metrics: [], groups: [] });
+  const a = await openApp({}, null, { roles: { agent: true, admin: true, coach: true, super: true } }, { adminBoot, coachBoot });
+  assert.equal(await a.page.evaluate(() => S.mode), 'agent');
+  await a.page.evaluate(() => goto('more'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#mode-coach').isVisible(), true);
+  assert.equal(await a.page.locator('#mode-admin').isVisible(), true);
+  assert.match(await a.page.locator('#more-sub').innerText(), /Super Admin/);
+  await a.page.locator('#mode-coach').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.evaluate(() => S.mode), 'coach');
+  assert.equal(await a.page.locator('#nav-coach').isVisible(), true);
+  await a.page.evaluate(() => goto('c-more'));
+  await a.page.waitForTimeout(300);
+  await a.page.locator('#c-to-admin').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.evaluate(() => S.mode), 'admin');
+  await a.page.evaluate(() => goto('a-more'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#a-to-coach').isVisible(), true, 'από το Admin λείπει η μετάβαση σε Coach');
+  await a.page.locator('#a-to-coach').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.evaluate(() => S.mode), 'coach');
+  assert.equal(await a.page.evaluate(() => localStorage.getItem('kw_mode')), 'coach');
+  await a.page.evaluate(() => goto('c-more'));
+  await a.page.waitForTimeout(300);
+  await a.page.locator('#c-to-agent').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.evaluate(() => S.mode), 'agent');
+  assert.equal(await a.page.locator('#nav-agent').isVisible(), true);
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });

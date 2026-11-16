@@ -21,11 +21,13 @@ const plain = (v) => JSON.parse(JSON.stringify(v));
 
 test('ρόλοι: ο Coach είναι μόνο Coach· οι παλιές τιμές δεν αλλάζουν', () => {
   const pr = run('parseRoles_');
-  assert.deepEqual(plain(pr('Coach')), { agent: false, admin: false, coach: true });
-  assert.deepEqual(plain(pr('')), { agent: true, admin: false, coach: false });
-  assert.deepEqual(plain(pr('Μεσίτης')), { agent: true, admin: false, coach: false });
-  assert.deepEqual(plain(pr('Admin')), { agent: false, admin: true, coach: false });
-  assert.deepEqual(plain(pr('Μεσίτης + Admin')), { agent: true, admin: true, coach: false });
+  assert.deepEqual(plain(pr('Coach')), { agent: false, admin: false, coach: true, super: false });
+  assert.deepEqual(plain(pr('Super Admin')), { agent: true, admin: true, coach: true, super: true });   // 2.9.1
+  assert.ok(run('ROLE_VALUES').includes('Super Admin'));
+  assert.deepEqual(plain(pr('')), { agent: true, admin: false, coach: false, super: false });
+  assert.deepEqual(plain(pr('Μεσίτης')), { agent: true, admin: false, coach: false, super: false });
+  assert.deepEqual(plain(pr('Admin')), { agent: false, admin: true, coach: false, super: false });
+  assert.deepEqual(plain(pr('Μεσίτης + Admin')), { agent: true, admin: true, coach: false, super: false });
   assert.ok(run('ROLE_VALUES').includes('Coach'));
 });
 
