@@ -207,7 +207,7 @@ html[data-size="xl"] #tabs-detail .subtab{font-size:.8rem}
 
 /* ── Sheets ───────────────────────────── */
 .sheet{position:fixed;inset:var(--env-h) 0 0 0;z-index:60;background:var(--paper);
-  display:flex;flex-direction:column;overflow:hidden;--cx:0px;
+  display:flex;flex-direction:column;overflow:hidden;overflow:clip;--cx:0px;
   animation:sheet-in .28s var(--move)}
 .sheet.leaving{animation:sheet-out .2s ease-in forwards;pointer-events:none}
 @keyframes sheet-in{from{transform:translateX(calc(var(--cx) + 100%))}to{transform:translateX(var(--cx))}}
@@ -1286,9 +1286,11 @@ html[data-theme="dark"] .seg-btn.is-on{background:var(--card);box-shadow:inset 0
 .pf-money input{padding-right:2.5rem!important;font-size:1.25rem!important;font-weight:800;font-variant-numeric:tabular-nums}
 .pf-money span{position:absolute;right:1rem;top:50%;transform:translateY(-50%);font-weight:800;color:var(--ink-2)}
 
-.pf-check{display:flex;align-items:center;gap:.75rem;min-height:3.25rem;margin-bottom:.625rem;padding:.5rem .75rem;border:1.5px solid var(--line);
+/* 2.8.1: position:relative, ώστε το κρυφό checkbox να μένει ΜΕΣΑ στη γραμμή του. Χωρίς αυτό «κρεμόταν» από
+   ολόκληρο το φύλλο και, μόλις έπαιρνε εστίαση, ο browser κύλαγε το φύλλο ~1200px: η οθόνη έδειχνε κενό μπλοκ. */
+.pf-check{position:relative;display:flex;align-items:center;gap:.75rem;min-height:3.25rem;margin-bottom:.625rem;padding:.5rem .75rem;border:1.5px solid var(--line);
   border-radius:.875rem;background:var(--card);cursor:pointer}
-.pf-check input{position:absolute;opacity:0;width:1px;height:1px}
+.pf-check input{position:absolute;left:.75rem;top:50%;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
 .pf-switch{flex:none;position:relative;width:3.25rem;height:2rem;border-radius:1rem;background:var(--edge);transition:background .18s ease}
 .pf-switch::after{content:'';position:absolute;left:.25rem;top:.25rem;width:1.5rem;height:1.5rem;border-radius:50%;background:#fff;
   box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s var(--move)}

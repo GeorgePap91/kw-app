@@ -47,6 +47,7 @@ const USAGE = {
     ACTIONS.propSave = actPropSave_;
     ACTIONS.usage = actUsage_;
     ACTIONS.usageReport = actUsageReport_;
+    ACTIONS.leadContact = actLeadContact_;   // 2.8.1
   } catch (e) {
     console.error('Edit.gs: μετακίνησέ το ΚΑΤΩ από το Code.gs.');
   }
@@ -199,4 +200,21 @@ function actUsageReport_(agent, d) {
   const r = usageRows_(total, base);
   return { month: month, team: !!(d.team && isAdmin_(agent)), people: people, canTeam: isAdmin_(agent),
            rows: r.rows, actions: r.actions, savedSec: r.savedSec };
+}
+
+
+/**
+ * 2.8.1 · «Άνοιγμα επαφής» για κλήση που δεν έχει ακόμα επαφή.
+ * Συμβαίνει όταν η κλήση ήρθε χωρίς κωδικό ακινήτου και ο κωδικός μπήκε αργότερα: η αυτόματη
+ * καταχώριση στις επαφές τρέχει μόνο τη στιγμή που έρχεται η κλήση. Εδώ γίνεται για ΜΙΑ κλήση,
+ * μόνο όταν ο μεσίτης το ζητήσει (καμία σάρωση φύλλων). Ασφαλές να ξανατρέξει: δεν φτιάχνει διπλή επαφή.
+ */
+function actLeadContact_(agent, d) {
+  const l = findMyLead_(agent, d.id);
+  let c = contactOfLead_(l);
+  if (!c) {
+    addLeadsToContacts_([l]);
+    c = contactOfLead_(l);
+  }
+  return { contactId: c ? c.id : '', otherCodes: c ? otherCodes_(l) : [] };
 }
