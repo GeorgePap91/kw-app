@@ -1,0 +1,119 @@
+{
+ "id": "story",
+ "v": 1,
+ "name": "Story / Reel",
+ "hint": "Κάθετο 9:16 για Instagram/Facebook",
+ "format": "story",
+ "w": 1080,
+ "h": 1920,
+ "out": 1,
+ "bg": "story-bg.png",
+ "inputs": [],
+ "safe": {
+  "top": 250,
+  "bottom": 340
+ },
+ "layers": [
+  {
+   "id": "photo1",
+   "type": "photo",
+   "slot": 0,
+   "x": 0,
+   "y": 600,
+   "w": 1080,
+   "h": 700
+  },
+  {
+   "type": "bg"
+  },
+  {
+   "id": "deal",
+   "type": "text",
+   "text": "{deal}",
+   "x": 30,
+   "y": 258,
+   "w": 1020,
+   "h": 116,
+   "size": 92,
+   "font": "noto",
+   "weight": 700,
+   "color": "#ffffff",
+   "align": "center",
+   "valign": "middle",
+   "fit": true,
+   "maxLines": 1
+  },
+  {
+   "id": "desc",
+   "type": "text",
+   "text": "{desc}",
+   "x": 56,
+   "y": 378,
+   "w": 968,
+   "h": 212,
+   "size": 44,
+   "font": "noto",
+   "weight": 700,
+   "color": "#ffffff",
+   "align": "center",
+   "valign": "middle",
+   "lh": 1.38,
+   "fit": true,
+   "minSize": 26
+  },
+  {
+   "id": "agent",
+   "type": "text",
+   "text": "{agent}",
+   "x": 50,
+   "y": 1160,
+   "w": 720,
+   "h": 44,
+   "size": 30.5,
+   "font": "noto",
+   "weight": 700,
+   "color": "#ffffff",
+   "align": "left",
+   "valign": "middle",
+   "prefix": "Υπεύθυνος Συνεργάτης: ",
+   "fit": true,
+   "maxLines": 1
+  },
+  {
+   "id": "code",
+   "type": "text",
+   "text": "{code}",
+   "x": 58,
+   "y": 1247,
+   "w": 720,
+   "h": 66,
+   "size": 47,
+   "font": "noto",
+   "weight": 700,
+   "color": "#ffffff",
+   "align": "left",
+   "valign": "middle",
+   "prefix": "Κωδικός ακινήτου: ",
+   "fit": true,
+   "maxLines": 1
+  },
+  {
+   "id": "agentPhoto",
+   "type": "agent",
+   "x": 775,
+   "y": 793,
+   "w": 305,
+   "h": 459,
+   "anchor": "bottom"
+  },
+  {
+   "id": "qr",
+   "type": "qr",
+   "x": 56,
+   "y": 1340,
+   "w": 195,
+   "h": 195,
+   "link": true
+  }
+ ]
+}

@@ -33,12 +33,14 @@ const USAGE = {
     formCreate: 600,           // έντυπο υπόδειξης: εκτύπωση, συμπλήρωση, υπογραφή
     ownerReportSend: 1200,     // αναφορά στον ιδιοκτήτη με το χέρι
     propSave: 60,
-    contactSave: 45
+    contactSave: 45,
+    mktCreate: 900             // 2.10 · προωθητικό στο Canva με το χέρι: αντιγραφή στοιχείων, φωτογραφίες, QR, εξαγωγή
   },
   LABELS: {
     called: 'Κλήση πελάτη', status: 'Αλλαγή κατάστασης / follow-up', sms: 'SMS', showing: 'Υπόδειξη στο ημερολόγιο',
     outcome: 'Αποτέλεσμα υπόδειξης', callNote: 'Σημείωση κλήσης', taskSave: 'Εργασία', presCreate: 'Παρουσίαση ακινήτου',
-    formCreate: 'Έντυπο υπόδειξης', ownerReportSend: 'Αναφορά ιδιοκτήτη', propSave: 'Διόρθωση ακινήτου', contactSave: 'Διόρθωση επαφής'
+    formCreate: 'Έντυπο υπόδειξης', ownerReportSend: 'Αναφορά ιδιοκτήτη', propSave: 'Διόρθωση ακινήτου', contactSave: 'Διόρθωση επαφής',
+    mktCreate: 'Προωθητικό ακινήτου'
   }
 };
 

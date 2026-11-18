@@ -1,0 +1,43 @@
+/* 2.10 · Marketing: ενότητα στο ακίνητο + οθόνη προωθητικού (mkt.js) */
+.subtabs.five{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)}
+.mk-box{margin-bottom:1rem}
+.mk-under{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:-.625rem 0 .75rem;font-size:.9375rem;color:var(--ink-2)}
+.mk-link-btn{border:0;background:none;color:var(--red);font-weight:700;font-size:1rem;padding:.5rem 0;min-height:2.75rem;cursor:pointer}
+.mk-h{font-size:1.125rem;font-weight:800;margin:1.5rem 0 .75rem}
+.mk-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.mk-tpl{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;text-align:left;min-width:0;cursor:pointer;
+  border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:.875rem;padding:.5rem .5rem .75rem;
+  transition:transform .1s ease}
+.mk-tpl:active{transform:scale(.98)}
+.mk-thumb{display:flex;align-items:center;justify-content:center;width:100%;height:9.5rem;background:var(--wash);border-radius:.5rem;overflow:hidden;margin-bottom:.25rem}
+.mk-thumb canvas{display:block;max-width:100%;max-height:100%;width:auto;height:auto;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.mk-tpl b{font-size:1rem;font-weight:800}
+.mk-tpl small{font-size:.875rem;color:var(--ink-2);line-height:1.25}
+.mk-stats{color:var(--ink-2);font-size:.9375rem;margin:1rem 0 0}
+
+.mk-pop .pop-box{max-height:96vh}
+.mk-stage{position:relative;display:flex;justify-content:center;align-items:center;background:var(--wash);border-radius:.75rem;
+  padding:.5rem;margin-bottom:.75rem;min-height:12rem}
+.mk-stage canvas{display:block;max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.18);touch-action:none}
+.mk-stage.is-loading canvas{visibility:hidden}
+.mk-stage.is-loading::after{content:'Ετοιμάζεται…';position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-2);font-weight:600}
+.mk-warn{background:var(--r-bg);color:var(--red);border-radius:.625rem;padding:.625rem .75rem;font-size:.9375rem;font-weight:600;margin:0 0 .75rem}
+.mk-safe{display:flex;gap:.5rem;align-items:center;font-size:.9375rem;margin:0 0 .75rem;color:var(--ink-2)}
+.mk-safe input{width:1.25rem;height:1.25rem;flex:0 0 auto}
+.mk-oh{display:grid;grid-template-columns:1fr 1fr;gap:0 .5rem}
+.mk-oh .field:first-child{grid-column:1/-1}
+.mk-oh .field{margin-bottom:.5rem;min-width:0}
+.mk-oh .field input{padding:.75rem .5rem}
+.mk-text{margin-bottom:.5rem}
+.mk-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.25rem 0 .5rem}
+.mk-size{min-width:3.5rem;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.mk-tip{font-size:.9375rem;color:var(--ink-2);margin:.25rem 0 .75rem}
+.mk-tip.bad{color:var(--red);font-weight:600}
+.mk-strip{display:flex;gap:.5rem;overflow-x:auto;padding:.25rem 0 .5rem;-webkit-overflow-scrolling:touch}
+.mk-strip button{flex:0 0 auto;width:4.5rem;height:4.5rem;padding:0;border:3px solid transparent;border-radius:.5rem;overflow:hidden;background:var(--wash);cursor:pointer}
+.mk-strip button.is-on{border-color:var(--red-solid)}
+.mk-strip img{display:block;width:100%;height:100%;object-fit:cover}
+.mk-actions{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem}
+.mk-actions .btn{min-height:3.25rem}
+.mk-actions #mk-share{grid-column:1/-1}
+@media (min-width:700px){.mk-pop .pop-box{max-width:56rem}}

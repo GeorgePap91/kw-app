@@ -6,10 +6,11 @@
  *  3. Όταν πατηθεί, ανοίγει την εφαρμογή απευθείας στη συγκεκριμένη κλήση.
  */
 
-var SHELL = 'kw-shell-2.9.1';
+var SHELL = 'kw-shell-2.10';
 var SHELL_FILES = ['./', 'index.html', 'app.js', 'app.css', 'config.js', 'push.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js', 'gestures.js', 'match.js', 'auto.js', 'usage.js', 'close.js', 'dash.js'];
+  'vendor/firebase-app-compat.js', 'vendor/firebase-messaging-compat.js', 'memory.js', 'gestures.js', 'match.js', 'auto.js', 'usage.js', 'close.js', 'dash.js',
+  'mkt.js', 'mkt.css', 'vendor/qrcode.js'];   // 2.10 · οι γραμματοσειρές φορτώνουν μόνο όταν ανοίξει το Marketing
 var NET_WAIT = 4000;                         // μετά από 4" χωρίς απάντηση ανοίγει από το αντίγραφο
 
 self.addEventListener('install', function (e) {

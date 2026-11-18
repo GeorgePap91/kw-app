@@ -1,0 +1,114 @@
+{
+ "id": "openhouse",
+ "v": 1,
+ "name": "Open House",
+ "hint": "Post για Facebook/Instagram",
+ "format": "post",
+ "w": 1410,
+ "h": 1182,
+ "out": 1,
+ "bg": "openhouse-bg.png",
+ "inputs": [
+  "ohDate",
+  "ohFrom",
+  "ohTo"
+ ],
+ "layers": [
+  {
+   "type": "bg"
+  },
+  {
+   "id": "title",
+   "type": "text",
+   "text": "OPEN HOUSE",
+   "x": 40,
+   "y": 30,
+   "w": 1330,
+   "h": 190,
+   "size": 154,
+   "font": "fira",
+   "weight": 700,
+   "color": "#242424",
+   "align": "center",
+   "valign": "middle",
+   "ls": 0.04,
+   "maxLines": 1,
+   "fit": true
+  },
+  {
+   "id": "address",
+   "type": "text",
+   "text": "{address}",
+   "x": 60,
+   "y": 218,
+   "w": 1290,
+   "h": 48,
+   "size": 32.6,
+   "font": "open",
+   "weight": 400,
+   "color": "#242424",
+   "align": "center",
+   "valign": "middle",
+   "ls": 0.35,
+   "upper": true,
+   "fit": true,
+   "maxLines": 1
+  },
+  {
+   "id": "when",
+   "type": "text",
+   "text": "{oh}",
+   "x": 60,
+   "y": 318,
+   "w": 1290,
+   "h": 54,
+   "size": 34.6,
+   "font": "open",
+   "weight": 700,
+   "color": "#edeae7",
+   "align": "center",
+   "valign": "middle",
+   "style": "italic",
+   "ls": 0.2,
+   "upper": true,
+   "fit": true,
+   "maxLines": 1
+  },
+  {
+   "id": "photo1",
+   "type": "photo",
+   "slot": 0,
+   "x": 90,
+   "y": 468,
+   "w": 806,
+   "h": 714
+  },
+  {
+   "id": "photo2",
+   "type": "photo",
+   "slot": 1,
+   "x": 916,
+   "y": 468,
+   "w": 404,
+   "h": 226
+  },
+  {
+   "id": "photo3",
+   "type": "photo",
+   "slot": 2,
+   "x": 916,
+   "y": 714,
+   "w": 404,
+   "h": 224
+  },
+  {
+   "id": "photo4",
+   "type": "photo",
+   "slot": 3,
+   "x": 916,
+   "y": 958,
+   "w": 404,
+   "h": 224
+  }
+ ]
+}
