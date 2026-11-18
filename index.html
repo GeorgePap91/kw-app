@@ -19,6 +19,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="mkt.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -743,6 +744,19 @@
   </div>
 </div>
 
+<!-- 2.10 · MARKETING: ΠΡΟΩΘΗΤΙΚΟ (mkt.js) -->
+<div class="pop mk-pop" id="mktbox" role="dialog" aria-modal="true" aria-labelledby="mk-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="mk-title">Προωθητικό</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div class="mk-stage" id="mk-stage"><canvas id="mk-canvas" aria-label="Προεπισκόπηση: πάτα ένα κείμενο ή μια φωτογραφία για αλλαγή"></canvas></div>
+    <p class="mk-warn" id="mk-warn" hidden></p>
+    <label class="mk-safe" id="mk-safe-wrap" hidden><input type="checkbox" id="mk-safe"> Δείξε τι κρύβει το Instagram (πάνω και κάτω)</label>
+    <div id="mk-inputs" hidden></div>
+    <div id="mk-tools"></div>
+    <div class="mk-actions" id="mk-actions"></div>
+  </div>
+</div>
+
 <!-- 2.6 · FEAT-13: ΑΝΑΦΟΡΑ ΙΔΙΟΚΤΗΤΗ -->
 <div class="pop" id="reportbox" role="dialog" aria-modal="true" aria-labelledby="reportbox-title" hidden>
   <div class="pop-box">
@@ -990,9 +1004,11 @@
       <button class="subtab" role="tab" data-tab="docs" id="tab-pd-docs"><span>Έγγραφα</span> <i class="pill" id="pd-docs-count"></i></button>
       <button class="subtab" role="tab" data-tab="bill" id="tab-pd-bill"><span>Τιμολόγηση</span> <i class="pill" id="pd-bill-count"></i></button>
       <button class="subtab" role="tab" data-tab="leads"><span>Κλήσεις</span> <i class="pill" id="pd-leads-count"></i></button>
+      <button class="subtab" role="tab" data-tab="mkt" id="tab-pd-mkt" hidden><span>Marketing</span></button>
     </div>
 
     <div id="prop-panes">
+      <section class="mk-pane" id="pd-mkt" data-pane="mkt" hidden><div id="pd-mkt-body"></div></section>   <!-- 2.10 -->
       <section class="docs" id="pd-docs" data-pane="docs" hidden>
         <div id="pd-docs-list"></div>
         <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
@@ -1355,5 +1371,7 @@
 <script src="usage.js"></script>
 <script src="close.js"></script>
 <script src="dash.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="mkt.js"></script>
 </body>
 </html>

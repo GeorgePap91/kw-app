@@ -673,3 +673,46 @@ test('2.9.1: Super Admin περνά και στους τρεις ρόλους α
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
+
+// 2.10 · Marketing: ενότητα στο ακίνητο, άνοιγμα προτύπου, αλλαγή μεγέθους, εξαγωγή.
+test('Marketing: πρότυπα στο ακίνητο, επεξεργασία κειμένου, λήψη αρχείου', { skip }, async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const tdir = join(ROOT, 'marketing/templates');
+  const tpls = readdirSync(tdir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(String(readFileSync(join(tdir, f)))));
+  const png = (f) => 'data:image/png;base64,' + readFileSync(join(tdir, f)).toString('base64');
+  // Συνθετική «φωτογραφία» (καμία πραγματική εικόνα στο repo): ένα PNG φόντου κάνει τη δουλειά.
+  const photo = png(tpls[0].bg);
+  const logged = [];
+  const a = await openApp({ marketing: true }, null, {
+    props: [{ code: 'A-12', street: 'Ερατοσθένους 5', area: 'Παγκράτι', price: 250000, sqm: 80, type: 'Διαμέρισμα', title: 'Διαμέρισμα', deal: 'Πώληση', partner: 'Test Agent', mine: true, available: true }]
+  }, {
+    mktGet: () => ({ code: 'A-12', mine: true, desc: 'Φωτεινό διαμέρισμα 80 τ.μ.', link: 'https://kwac.gr/a12', deal: '', rev: 1, stats: {}, templates: tpls, tags: '', hosts: [], descMax: 260 }),
+    mktAsset: (d) => ({ src: d.kind === 'bg' ? png(tpls.find((t) => t.id === d.tpl).bg) : '' }),
+    media: () => ({ photos: [{ id: 'p1' }, { id: 'p2' }], cover: 'p1', canEdit: true }),
+    mediaImg: (d) => ({ id: d.id, src: photo }),
+    mktLog: (d) => { logged.push(d); return { ok: true }; }
+  });
+  await a.page.evaluate(() => window.openProp('A-12'));
+  await a.page.locator('#tab-pd-mkt').click();
+  await a.page.waitForSelector('.mk-tpl');
+  assert.equal(await a.page.locator('.mk-tpl').count(), tpls.length);
+  await a.page.locator('.mk-tpl[data-id="brochure"]').click();
+  await a.page.waitForFunction(() => document.getElementById('mk-canvas').width > 100, null, { timeout: 10000 });
+  // Πάτημα στον τίτλο («ΠΩΛΕΙΤΑΙ») → εργαλεία κειμένου → A+ μεγαλώνει.
+  const box = await a.page.locator('#mk-canvas').boundingBox();
+  await a.page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.04);
+  await a.page.waitForSelector('#mk-bigger');
+  assert.equal(await a.page.locator('#mk-t').inputValue(), 'ΠΩΛΕΙΤΑΙ');
+  const before = await a.page.locator('#mk-size').innerText();
+  await a.page.locator('#mk-smaller').click();
+  await a.page.waitForTimeout(100);
+  assert.notEqual(await a.page.locator('#mk-size').innerText(), before);
+  const dl = a.page.waitForEvent('download', { timeout: 10000 });
+  await a.page.locator('#mk-dl').click();
+  assert.equal((await dl).suggestedFilename(), 'A-12-brochure.pdf');
+  await a.page.waitForTimeout(300);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0].ev, 'dl');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});

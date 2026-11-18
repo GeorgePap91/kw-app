@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.9.1';
+var APP_VERSION = '2.10';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.22';
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox', 'mktbox'];
 var SHEETS = ['goals', 'review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -737,6 +737,7 @@ function wire() {
     showPane('prop-panes', v);
     S.propPane = v;
     if (v === 'bill' && S.prop) loadDocs(S.prop, 'bill');
+    if (v === 'mkt' && S.prop && window.kwMkt) window.kwMkt.show(S.prop);   // 2.10
   });
   wireTabs('mx-mode', 'mx-body', function (v) { S.mxMode = v; S.mxOpen = ''; renderMetrics(); window.scrollTo(0, 0); });
 
@@ -2284,10 +2285,16 @@ function openProp(code) {
   // Το ακίνητο άλλου μέλους δεν έχει έγγραφα εδώ: μόνο Στοιχεία και Κλήσεις.
   $('tab-pd-docs').hidden = !p.mine;
   $('tab-pd-bill').hidden = !p.mine;
-  $('tabs-prop').classList.toggle('four', !!p.mine);
-  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts') && S.propPane !== 'bill' ? S.propPane : 'facts';
+  // 2.10: Marketing μόνο στα δικά σου, πίσω από το flag marketing.
+  var mkt = !!(p.mine && S.flags && S.flags.marketing && window.kwMkt);
+  $('tab-pd-mkt').hidden = !mkt;
+  $('tabs-prop').classList.toggle('four', !!p.mine && !mkt);
+  $('tabs-prop').classList.toggle('five', mkt);
+  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts') && S.propPane !== 'bill' &&
+    (S.propPane !== 'mkt' || mkt) ? S.propPane : 'facts';
   setTab('tabs-prop', pane);
   showPane('prop-panes', pane);
+  if (pane === 'mkt') window.kwMkt.show(p);
   if (p.mine) loadDocs(p);
   $('pd-bill-count').textContent = '';
 

@@ -7,7 +7,7 @@ import { join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const OUT = join(ROOT, process.argv[2] || 'dist');
-const SKIP_DIRS = new Set(['.git', '.github', '.wrangler', 'node_modules', 'tests', 'apps-script', 'docs', 'scripts', 'dist', '_site']);
+const SKIP_DIRS = new Set(['.git', '.github', '.wrangler', 'node_modules', 'tests', 'apps-script', 'docs', 'scripts', 'dist', '_site', 'marketing']);
 const SKIP_FILES = new Set(['package.json', 'package-lock.json', 'wrangler.jsonc', 'wrangler.toml', '.gitignore', '.assetsignore', '.DS_Store']);
 
 rmSync(OUT, { recursive: true, force: true });
