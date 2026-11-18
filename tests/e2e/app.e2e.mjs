@@ -37,6 +37,7 @@ function bootData(flags) {
 
 async function openApp(flags = { smartMemory: true, oneTapPush: true, swipeRows: true, peekProp: true }, statusReply, boot = {}, replies = {}, opts = {}) {
   const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR', serviceWorkers: 'block' });
+  if (opts.time) await ctx.clock.setFixedTime(opts.time);   // σταθερή «τώρα» για tests που εξαρτώνται από την ώρα
   const sent = [], errors = [];
   await ctx.route(/script\.google\.com/, async (r) => {
     const b = JSON.parse(r.request().postData() || '{}');
@@ -713,6 +714,73 @@ test('Marketing: πρότυπα στο ακίνητο, επεξεργασία κ
   await a.page.waitForTimeout(300);
   assert.equal(logged.length, 1);
   assert.equal(logged[0].ev, 'dl');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+// ── 2.11 · FEAT-29 · Διαδρομή ημέρας ─────────────────────────────
+// Σταθερή ώρα: 12/11/2026 08:00. Υποδείξεις σήμερα στις 07:00 (πέρασε), 10:00 και 11:30.
+const T0 = new Date(2026, 10, 12, 8, 0);
+const showAt = (id, hh, mm, extra = {}) => ({
+  ...lead(id, 'Πελάτης ' + id, 'Υπόδειξη', 'K-' + id), hasEvent: true, showingDate: '2026-11-12',
+  showingTs: new Date(2026, 10, 12, hh, mm).getTime(), showingTime: String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'),
+  showingAt: '12/11/2026 ' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), address: 'Οδός ' + id + ' 1, Αθήνα', ...extra
+});
+const dayLeads = [showAt('P', 7, 0), showAt('B', 10, 0), showAt('C', 11, 30)];
+
+test('2.11: Διαδρομή ημέρας: κουμπί ≥48px, link με όλες τις υποδείξεις που δεν πέρασαν, χωρίς καμία επιπλέον κλήση', { skip }, async () => {
+  const a = await openApp({ dayRoute: true }, null, { leads: dayLeads }, {}, { time: T0 });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  const btn = a.page.locator('#today-body a[data-dayroute]');
+  await btn.waitFor();
+  assert.match(await btn.innerText(), /Διαδρομή ημέρας[\s\S]*2 στάσεις · από 10:00 έως 11:30/);
+  assert.ok((await btn.boundingBox()).height >= 48, 'το κουμπί είναι μικρότερο από 48px');
+  const u = new URL(await btn.getAttribute('href'));
+  assert.equal(u.origin + u.pathname, 'https://www.google.com/maps/dir/');
+  assert.equal(u.searchParams.get('waypoints'), 'Οδός B 1, Αθήνα, Ελλάδα');           // η P (07:00) πέρασε
+  assert.equal(u.searchParams.get('destination'), 'Οδός C 1, Αθήνα, Ελλάδα');
+  assert.equal(await btn.getAttribute('target'), '_blank');
+  assert.match(await a.page.locator('#today-body').innerText(), /φύγε ~09:30/);        // 10:00 − 30′
+  assert.match(await a.page.locator('#today-body').innerText(), /φύγε ~11:00/);        // 11:30 − 30′
+  assert.deepEqual(a.sent.filter((x) => x !== 'bootstrap'), [], 'στάλθηκε κλήση στον server');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.11: Διαδρομή ημέρας: με κλειστό flag ή με 1 υπόδειξη δεν φαίνεται', { skip }, async () => {
+  const off = await openApp({}, null, { leads: dayLeads }, {}, { time: T0 });
+  await off.page.locator('.tab[data-view="today"]').first().click();
+  await off.page.waitForTimeout(300);
+  assert.equal(await off.page.locator('#today-body [data-dayroute]').count(), 0);
+  assert.doesNotMatch(await off.page.locator('#today-body').innerText(), /φύγε ~/);
+  await off.ctx.close();
+  const one = await openApp({ dayRoute: true }, null, { leads: [showAt('B', 10, 0)] }, {}, { time: T0 });
+  await one.page.locator('.tab[data-view="today"]').first().click();
+  await one.page.waitForTimeout(300);
+  assert.equal(await one.page.locator('#today-body [data-dayroute]').count(), 0);
+  await one.ctx.close();
+});
+
+test('2.11: Διαδρομή ημέρας: συντεταγμένες όπου υπάρχουν, και «💡 Νέο» μόνο μία φορά', { skip }, async () => {
+  const props = [{ code: 'K-B', street: 'Οδός B 1', area: 'Αθήνα', price: 1, sqm: 1, title: 'x', mine: true, lat: 37.9715, lng: 23.7257 }];
+  const a = await openApp({ dayRoute: true }, null, { leads: dayLeads, props }, {}, { time: T0 });
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  const btn = a.page.locator('#today-body a[data-dayroute]');
+  await btn.waitFor();
+  assert.equal(new URL(await btn.getAttribute('href')).searchParams.get('waypoints'), '37.9715,23.7257');
+  await a.page.waitForTimeout(1000);
+  assert.match(await a.page.locator('#toast').innerText(), /Νέο: «Διαδρομή ημέρας»/);
+  assert.equal(await a.page.evaluate(() => localStorage.getItem('kw_route_tip')), '1');
+  await a.ctx.close();
+});
+
+test('2.11: Διαδρομή ημέρας: χωρίς σύνδεση το κουμπί υπάρχει από την τοπική cache', { skip }, async () => {
+  const a = await openApp({ dayRoute: true }, null, { leads: dayLeads }, {}, { time: T0 });
+  await a.ctx.setOffline(true);
+  await a.page.locator('.tab[data-view="today"]').first().click();
+  const btn = a.page.locator('#today-body a[data-dayroute]');
+  await btn.waitFor();
+  assert.match(await btn.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\//);
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });

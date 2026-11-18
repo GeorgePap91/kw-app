@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.10';
+var APP_VERSION = '2.11';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.22';
@@ -1556,6 +1556,10 @@ function renderToday() {
     stat('followup', follow.length, 'Follow-up') +
     stat('tasks', open.length, open.length === 1 ? 'Εργασία' : 'Εργασίες') + '</div>';
 
+  // 2.11 · FEAT-29: «Διαδρομή ημέρας» (flag dayRoute). Ένα link Google Maps, υπολογισμένο στο κινητό.
+  var rt = window.kwRoute && S.flags && S.flags.dayRoute ? window.kwRoute.plan(S.leads, S.props, now) : null;
+  if (rt) html += window.kwRoute.html(rt);
+
   // 3. Πρόγραμμα: υποδείξεις + εργασίες της ημέρας, κατά ώρα, ως κάρτες με swipe.
   var plan = showToday.map(function (l) {
     var done = l.showingTs <= now;
@@ -1564,7 +1568,7 @@ function renderToday() {
       time: l.showingTime, done: done && !!oc, kind: 'Υπόδειξη',
       tone: oc ? 'answered' : done ? 'noanswer' : 'showing',
       badge: oc ? '<span class="tag answered">' + esc(oc) + '</span>' : done ? '<span class="tag noanswer">Πώς πήγε;</span>' : '',
-      title: l.name || 'Χωρίς όνομα', sub: [l.address || l.property, l.code ? 'Κωδ. ' + l.code : ''].filter(Boolean).join(' · '),
+      title: l.name || 'Χωρίς όνομα', sub: [l.address || l.property, l.code ? 'Κωδ. ' + l.code : '', rt && rt.today >= 2 && rt.leave[l.id] || ''].filter(Boolean).join(' · '),
       attrs: 'data-id="' + esc(l.id) + '"', nav: l.address && !done ? placeUrlNav(l.address) : '',
       okText: 'Έγινε · πώς πήγε', noteText: 'Σημείωση' }) };
   }).concat(S.tasks.filter(function (t) { return t.date === today; }).map(function (t) {
@@ -1716,6 +1720,7 @@ function renderToday() {
     b.onclick = function () { if (window.kwAuto) window.kwAuto.drop(b.dataset.drop); };
   });
   if (window.kwAuto) window.kwAuto.wireCool(el);
+  if (rt && window.kwRoute) window.kwRoute.wire(el);
   el.querySelectorAll('[data-dayclose]').forEach(function (b) {
     b.onclick = function () { if (window.kwClose) window.kwClose.open(); };
   });
@@ -3638,7 +3643,7 @@ function fillSettings() {
     (server !== API_VERSION ? ' — δεν ταιριάζουν, ολοκλήρωσε την εγκατάσταση' : '');
   v.className = 'version' + (server !== API_VERSION ? ' warn' : '');
   // 2.3.3: ποια νέα features είναι ανοιχτά σε αυτό το κινητό (για έλεγχο μετά από κάθε εγκατάσταση)
-  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up', newPropMatch: 'Νέο ακίνητο → πελάτες', priceDrop: 'Μείωση τιμής', ownerReport: 'Αναφορά ιδιοκτήτη', coolingClients: 'Πάρε σήμερα', dayClose: 'Κλείσιμο ημέρας', usageMail: 'Εβδομαδιαίο email' };
+  var FEAT_NAMES = { smartMemory: '«Συχνά:» στο Προφίλ', oneTapPush: 'Κουμπιά ειδοποίησης', swipeRows: 'Σύρσιμο', peekProp: 'Παρατεταμένο πάτημα', callLadder: 'Σειρά follow-up', newPropMatch: 'Νέο ακίνητο → πελάτες', priceDrop: 'Μείωση τιμής', ownerReport: 'Αναφορά ιδιοκτήτη', coolingClients: 'Πάρε σήμερα', dayClose: 'Κλείσιμο ημέρας', usageMail: 'Εβδομαδιαίο email', dayRoute: 'Διαδρομή ημέρας' };
   var on = Object.keys(S.flags || {}).filter(function (k) { return S.flags[k]; })
     .map(function (k) { return FEAT_NAMES[k] || k; });
   v.textContent += ' · Νέα: ' + (on.length ? on.join(', ') : 'κανένα ανοιχτό');
