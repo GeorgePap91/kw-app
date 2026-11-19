@@ -1658,9 +1658,14 @@ function ladderStep_(tries, now) {
   return { tries: tries, at: null, sms: true, done: true };
 }
 
+// Προεπιλογές για νέες λειτουργίες, ώστε να βγαίνουν χωρίς χειροκίνητο βήμα: πρώτα στους Admin.
+// Ό,τι γράφει η Ιδιότητα σεναρίου FEATURES υπερισχύει (π.χ. "all" ή "off"). Ποτέ email εδώ.
+const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin' };   // 1.23
+
 function featureFlags_(agent) {
   let cfg = {};
   try { cfg = JSON.parse(prop_('FEATURES', '{}')) || {}; } catch (e) { cfg = {}; }
+  cfg = Object.assign({}, FEATURE_DEFAULTS, cfg);
   const email = String((agent && agent.email) || '').toLowerCase();
   const admin = isAdmin_(agent);
   const out = {};
