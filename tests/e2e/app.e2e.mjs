@@ -320,7 +320,8 @@ test('2.7: υπόδειξη που έγινε — ούτε αλλαγή ούτε
   });
   await a.page.evaluate(() => window.openLead('L1', {}));
   await a.page.waitForTimeout(400);
-  assert.equal(await a.page.locator('#btn-showing-text').innerText(), 'Η υπόδειξη έγινε · κλείσε νέα');
+  assert.equal(await a.page.locator('#btn-showing-text').innerText(), 'Υπόδειξη ακινήτου');
+  assert.match(await a.page.locator('#d-showing-sub').innerText(), /νέα υπόδειξη|γράψε πώς πήγε/);
   await a.page.locator('#btn-showing').click();
   await a.page.waitForTimeout(300);
   assert.equal(await a.page.locator('#s-when').isVisible(), false, 'όχι αλλαγή ώρας');
@@ -781,6 +782,87 @@ test('2.11: Διαδρομή ημέρας: χωρίς σύνδεση το κου
   const btn = a.page.locator('#today-body a[data-dayroute]');
   await btn.waitFor();
   assert.match(await btn.getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\//);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+// ── 2.11.1 / 2.12 ──────────────────────────────────────────────
+
+test('2.11.1: σημείωση κλήσης — φεύγει αμέσως στο «Πίσω» και δεν σβήνεται από απάντηση server', { skip }, async () => {
+  const a = await openApp({}, null, {}, { note: (d) => ({}) });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  await a.page.locator('.subtab[data-tab="notes"]').click();
+  await a.page.locator('#d-notes').fill('θέλει μπαλκόνι');
+  assert.ok(!a.sent.includes('note'), 'στάλθηκε πριν το debounce');
+  // απάντηση server (status) με παλιά σημείωση ΔΕΝ πρέπει να σβήσει το κείμενο
+  await a.page.evaluate(() => document.activeElement.blur());
+  await a.page.locator('#btn-noanswer-row').click();
+  await a.page.waitForTimeout(400);
+  assert.ok(a.sent.includes('status'));
+  assert.equal(await a.page.locator('#d-notes').inputValue(), 'θέλει μπαλκόνι');
+  await a.page.locator('#detail-back').click();
+  await a.page.waitForTimeout(150);
+  assert.ok(a.sent.includes('note'), 'δεν στάλθηκε στο «Πίσω»');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.12: «＋» είναι σκέτος κύκλος· tabs Κλήση / Υπόδειξη / Άλλο· μόνο οι τελευταίες 7 ημέρες', { skip }, async () => {
+  const old = { ...lead('L9', 'Παλιός Π.', 'Αναπάντητη', 'B-7'), ts: now - 10 * 864e5 };
+  const fresh = { ...lead('L1', 'Μαρία Π.', 'Αναπάντητη', 'A-12'), ts: now - 3600e3 };
+  const a = await openApp({}, null, { leads: [fresh, old] });
+  assert.equal((await a.page.locator('#fab').innerText()).trim(), '');
+  await a.page.locator('#fab').click();
+  assert.deepEqual(await a.page.locator('#quick-tabs .subtab').allInnerTexts(), ['Κλήση', 'Υπόδειξη', 'Άλλο']);
+  const names = await a.page.locator('#quick-list .mrow b').allInnerTexts();
+  assert.deepEqual(names, ['Μαρία Π.']);
+  await a.page.locator('#quick-tabs [data-qtab="more"]').click();
+  assert.equal(await a.page.locator('#quick-more').isVisible(), true);
+  assert.equal(await a.page.locator('#quick-list').isVisible(), false);
+  await a.page.locator('#quick-tabs [data-qtab="call"]').click();
+  await a.page.locator('#quick-list .mrow').first().click();
+  await a.page.waitForTimeout(200);
+  assert.equal(await a.page.locator('#lp-write').isVisible(), true, 'δεν άνοιξε το πεδίο σημείωσης');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.12: επόμενο βήμα ανά αποτέλεσμα υπόδειξης + μία καρτέλα «Υπόδειξη ακινήτου»', { skip }, async () => {
+  const past = now - 2 * 3600e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const mk = (outcome, extra = {}) => ({ ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: p2(d.getHours()) + ':' + p2(d.getMinutes()),
+    showingAt: p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()),
+    outcome, form: 'Υπογράφηκε', ...extra });
+  const cases = [
+    ['Ενδιαφέρθηκε', /Έντυπο προσφοράς/],
+    ['Θέλει δεύτερη υπόδειξη', /Κλείσε 2η υπόδειξη/],
+    ['Δεν ενδιαφέρθηκε', /Πάρε ζήτηση/],
+    ['Δεν ήρθε', /Νέο ραντεβού/],
+    ['', /Πώς πήγε;/]                         // υπόδειξη έγινε, έντυπο υπογεγραμμένο, χωρίς αποτέλεσμα
+  ];
+  for (const [outcome, re] of cases) {
+    const a = await openApp({}, null, { leads: [mk(outcome)] });
+    await a.page.evaluate(() => window.openLead('L1', {}));
+    await a.page.waitForTimeout(350);
+    const next = await a.page.locator('#d-next').innerText();
+    assert.match(next, re, outcome + ' → ' + next);
+    assert.doesNotMatch(next, /Κλείσε υπόδειξη\b(?! 2)/, 'δεν πρέπει να προτείνεται νέα υπόδειξη');
+    assert.equal(await a.page.locator('#btn-showform').count(), 0, 'έμεινε το ξεχωριστό «Έντυπο υπόδειξης»');
+    assert.equal(await a.page.locator('#btn-showing-text').innerText(), 'Υπόδειξη ακινήτου');
+    assert.deepEqual(a.errors, []);
+    await a.ctx.close();
+  }
+});
+
+test('2.12: «Θέλει διόρθωση» στην αρχική → «Άνοιγμα PDF»', { skip }, async () => {
+  const rv = { id: 'R1', kind: 'showform', title: 'Έντυπο υπόδειξης', note: 'Λείπει υπογραφή', lead: 'L1', url: 'https://drive.google.com/file/d/ABC/view', code: 'A-12' };
+  const a = await openApp({}, null, { reviews: [rv] }, {}, { stay: true });
+  await a.page.evaluate(() => goto('today'));
+  await a.page.waitForTimeout(300);
+  await a.page.locator('[data-fix="R1"]').first().click();
+  await a.page.waitForTimeout(200);
+  assert.match(await a.page.locator('#ask-btns').innerText(), /Άνοιγμα PDF/);
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
