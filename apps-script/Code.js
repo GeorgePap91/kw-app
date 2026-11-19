@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.22';
+const VERSION = '1.23';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -1595,6 +1595,7 @@ function actBootstrap_(agent, d, sess) {
     docSlots: CONFIG.DOCS.map(s => ({ key: s.key, label: s.label, multi: !!s.multi })),
     billSlots: CONFIG.BILLING.DOCS.map(s => ({ key: s.key, label: s.label, multi: !!s.multi,
                                                optional: !!s.optional, from: s.from || '', pick: s.pick || '' })),
+    reqSlots: typeof REQ === 'undefined' ? [] : REQ.DOCS.map(s => ({ key: s.key, label: s.label, multi: true })),   // 1.23
     callLog: { ask: !!CONFIG.CALL_LOG.ASK_NOTE, within: CONFIG.CALL_LOG.ASK_WITHIN_MIN, max: CONFIG.CALL_LOG.NOTE_MAX },
     docsRequires: CONFIG.DOCS_REMINDER.REQUIRES,
     maxUploadMb: CONFIG.MAX_UPLOAD_MB,
@@ -1657,9 +1658,14 @@ function ladderStep_(tries, now) {
   return { tries: tries, at: null, sms: true, done: true };
 }
 
+// Προεπιλογές για νέες λειτουργίες, ώστε να βγαίνουν χωρίς χειροκίνητο βήμα: πρώτα στους Admin.
+// Ό,τι γράφει η Ιδιότητα σεναρίου FEATURES υπερισχύει (π.χ. "all" ή "off"). Ποτέ email εδώ.
+const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin' };   // 1.23
+
 function featureFlags_(agent) {
   let cfg = {};
   try { cfg = JSON.parse(prop_('FEATURES', '{}')) || {}; } catch (e) { cfg = {}; }
+  cfg = Object.assign({}, FEATURE_DEFAULTS, cfg);
   const email = String((agent && agent.email) || '').toLowerCase();
   const admin = isAdmin_(agent);
   const out = {};
@@ -2341,8 +2347,9 @@ function myProp_(agent, code) {
   return p;
 }
 
-function docSet_(set) { return set === 'bill' ? 'bill' : 'live'; }
-function slotsOf_(set) { return set === 'bill' ? CONFIG.BILLING.DOCS : CONFIG.DOCS; }
+// 1.23: 'req' → «Απαραίτητα έγγραφα» (PropExtra.gs).
+function docSet_(set) { return set === 'bill' || set === 'req' ? set : 'live'; }
+function slotsOf_(set) { return set === 'bill' ? CONFIG.BILLING.DOCS : set === 'req' ? REQ.DOCS : CONFIG.DOCS; }
 
 /** Ο φάκελος «Τιμολόγηση» μέσα στον φάκελο του ακινήτου. create=false → null αν δεν υπάρχει. */
 function billFolder_(propF, create) {
@@ -2358,6 +2365,7 @@ function latestMandate_(f) {
 const COPY_TAG = 'Αντίγραφο του ';
 
 function docsResult_(agent, p, f, set) {
+  if (docSet_(set) === 'req') return reqResult_(p, f);     // 1.23
   if (docSet_(set) === 'bill') {
     const bill = billFolder_(f.folder, false);
     const docs = rvAttach_(listDocs_(bill, CONFIG.BILLING.DOCS));
@@ -2459,6 +2467,7 @@ function actUpload_(agent, d) {
   if (!real) throw new Error('Το αρχείο δεν είναι PDF ή φωτογραφία (JPG, PNG, HEIC, WEBP).');
 
   const f = propFolders_(agent, p);
+  if (set === 'req') return reqUpload_(agent, p, f, slot, bytes, real, d);   // 1.23: αρίθμηση (1), (2)…
   const target = set === 'bill' ? billFolder_(f.folder, true) : f.docs;
   const existing = listDocs_(target, slotsOf_(set))[slot.key];
   const mode = d.mode === 'replace' || d.mode === 'keep' ? d.mode : (slot.multi ? 'keep' : 'replace');
@@ -2516,7 +2525,7 @@ function actDocDelete_(agent, d) {
   const p = myProp_(agent, d.code);
   const set = docSet_(d.set);
   const f = propFolders_(agent, p);
-  const folder = set === 'bill' ? billFolder_(f.folder, false) : f.docs;
+  const folder = set === 'bill' ? billFolder_(f.folder, false) : set === 'req' ? reqFolder_(f.folder, false) : f.docs;
   if (!folder) throw new Error('Δεν βρέθηκε ο φάκελος.');
   const file = DriveApp.getFileById(String(d.fileId || ''));
 

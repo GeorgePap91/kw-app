@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.12';
+var APP_VERSION = '2.13';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.22';
+var API_VERSION = '1.23';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -738,7 +738,15 @@ function wire() {
     S.propPane = v;
     if (v === 'bill' && S.prop) loadDocs(S.prop, 'bill');
     if (v === 'mkt' && S.prop && window.kwMkt) window.kwMkt.show(S.prop);   // 2.10
+    if (v === 'pnotes' && S.prop) loadPnotes(S.prop);                       // 2.13
   });
+  // 2.13: «Για live» / «Απαραίτητα» μέσα στα Έγγραφα.
+  wireTabs('tabs-docs', 'docs-panes', function (v) {
+    showPane('docs-panes', v);
+    S.docsPane = v;
+    if (v === 'req' && S.prop) loadDocs(S.prop, 'req');
+  });
+  $('pn-add').onclick = onPnoteAdd;
   wireTabs('mx-mode', 'mx-body', function (v) { S.mxMode = v; S.mxOpen = ''; renderMetrics(); window.scrollTo(0, 0); });
 
   wireTabs('tabs-props', 'props-panes', function (v) { S.propTab = v; resetPage('props:' + v); renderProps(); window.scrollTo(0, 0); });
@@ -2288,14 +2296,29 @@ function openProp(code) {
   // 2.10: Marketing μόνο στα δικά σου, πίσω από το flag marketing.
   var mkt = !!(p.mine && S.flags && S.flags.marketing && window.kwMkt);
   $('tab-pd-mkt').hidden = !mkt;
-  $('tabs-prop').classList.toggle('four', !!p.mine && !mkt);
-  $('tabs-prop').classList.toggle('five', mkt);
-  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts') && S.propPane !== 'bill' &&
-    (S.propPane !== 'mkt' || mkt) ? S.propPane : 'facts';
+  // 2.13: Σημειώσεις σε κάθε ακίνητο που βλέπεις (δικό σου ή της ομάδας), πίσω από το flag propNotes.
+  var pnOn = !!(S.flags && S.flags.propNotes);
+  $('tab-pd-pnotes').hidden = !pnOn;
+  var nTabs = 2 + (p.mine ? 2 : 0) + (mkt ? 1 : 0) + (pnOn ? 1 : 0);
+  $('tabs-prop').classList.toggle('four', nTabs === 4);
+  $('tabs-prop').classList.toggle('five', nTabs >= 5);
+  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts' || S.propPane === 'pnotes') &&
+    S.propPane !== 'bill' && (S.propPane !== 'mkt' || mkt) && (S.propPane !== 'pnotes' || pnOn) ? S.propPane : 'facts';
   setTab('tabs-prop', pane);
   showPane('prop-panes', pane);
   if (pane === 'mkt') window.kwMkt.show(p);
+  $('pd-pnotes-count').textContent = '';
+  $('pn-text').value = '';
+  if (pnOn) loadPnotes(p);           // ένα μικρό αίτημα: ο αριθμός στο tab δείχνει ότι υπάρχουν σημειώσεις
+  // 2.13: «Απαραίτητα έγγραφα», πίσω από το flag reqDocs.
+  var reqOn = !!(p.mine && S.flags && S.flags.reqDocs && (S.boot.reqSlots || []).length);
+  $('tabs-docs').hidden = !reqOn;
+  var dpane = reqOn && S.docsPane === 'req' ? 'req' : 'live';
+  setTab('tabs-docs', dpane);
+  showPane('docs-panes', dpane);
+  $('pd-req-count').textContent = '';
   if (p.mine) loadDocs(p);
+  if (reqOn && dpane === 'req') loadDocs(p, 'req');
   $('pd-bill-count').textContent = '';
 
   var nav = navUrl(p);
@@ -4025,8 +4048,16 @@ function showMissingDocs() {
 //  bill: «Τιμολόγηση» (1.13), τα έντυπα που χρειάζεται το λογιστήριο για την απόδειξη.
 var DOC_SETS = {
   live: { list: 'pd-docs-list', count: 'pd-docs-count', folder: 'pd-docs-folder', slots: function () { return S.boot.docSlots || []; } },
-  bill: { list: 'pd-bill-list', count: 'pd-bill-count', folder: 'pd-bill-folder', slots: function () { return S.boot.billSlots || []; } }
+  bill: { list: 'pd-bill-list', count: 'pd-bill-count', folder: 'pd-bill-folder', slots: function () { return S.boot.billSlots || []; } },
+  // 2.13: «Απαραίτητα έγγραφα» (Τίτλος, Ε9, Κτηματολογικό, Κατόψεις). Πολλά αρχεία ανά θέση.
+  req:  { list: 'pd-req-list',  count: 'pd-req-count',  folder: 'pd-req-folder',  slots: function () { return S.boot.reqSlots || []; } }
 };
+
+/** Απαραίτητα: πόσα από τα 4 έχουν τουλάχιστον ένα αρχείο. */
+function reqDone(counts) {
+  var slots = S.boot.reqSlots || [];
+  return { done: slots.filter(function (s) { return (counts || {})[s.key] > 0; }).length, total: slots.length };
+}
 
 function docKey(set, code) { return set + ':' + code; }
 
@@ -4055,10 +4086,10 @@ function renderDocs(p, res, loading, set) {
   set = set || 'live';
   var cfg = DOC_SETS[set], slots = cfg.slots();
   var counts = res ? res.counts : set === 'live' ? (p.docs || {}) : {};
-  var c = set === 'live' ? slotsDone(counts) : billDone(counts);
-  $(cfg.count).textContent = loading && set === 'bill' ? '' : c.done + '/' + c.total;
+  var c = set === 'live' ? slotsDone(counts) : set === 'req' ? reqDone(counts) : billDone(counts);
+  $(cfg.count).textContent = loading && set !== 'live' ? '' : c.done + '/' + c.total;
   var pct = c.total ? Math.round(c.done / c.total * 100) : 0;
-  var bar = loading && !res && set === 'bill' ? '' :
+  var bar = loading && !res && set !== 'live' ? '' :
     '<div class="progress-wrap"><div class="progress' + (pct === 100 ? ' full' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="' + c.total +
     '" aria-valuenow="' + c.done + '" aria-label="Έγγραφα"><i style="width:' + pct + '%"></i></div>' +
     '<span>' + (pct === 100 ? 'Όλα έτοιμα ✓' : c.done + ' από ' + c.total + (set === 'bill' ? ' υποχρεωτικά' : '')) + '</span></div>';
@@ -4069,7 +4100,7 @@ function renderDocs(p, res, loading, set) {
     // 1.20: Υπόδειξη / Προσφορά → διάλεξε από τα έντυπα του ακινήτου.
     var picks = set === 'bill' && s.pick && res && !loading ? (res.picks || {})[s.key] || [] : null;
     var busy = S.uploading[docKey(set, p.code) + ':' + s.key];
-    var action = busy ? 'Ανέβασμα…' : has ? 'Νέο αρχείο' : 'Ανέβασμα';
+    var action = busy ? 'Ανέβασμα…' : has ? (set === 'req' ? 'Προσθήκη' : 'Νέο αρχείο') : 'Ανέβασμα';
 
     // Εντολή στην Τιμολόγηση: αντίγραφο της τελευταίας από το «Έγγραφα KWAC».
     var copy = '';
@@ -4101,7 +4132,7 @@ function renderDocs(p, res, loading, set) {
           : rv ? '<p class="doc-rv ' + (rv.status === RV_ST.OK ? 'ok' : '') + '">' + esc(rv.status === RV_ST.OK ? '✓ Εγκρίθηκε από το γραφείο' : 'Σε έλεγχο από το γραφείο') + '</p>' : '');
       }).join('')) + copy + (picks ? pickButton(s, picks, has) : '') +
     '</div>';
-  }).join('');
+  }).join('') + (set === 'req' && res && res.other && res.other.length ? otherFilesHtml(res.other) : '');
 
   var folder = $(cfg.folder);
   folder.hidden = !res || !res.docsUrl;
@@ -4113,6 +4144,7 @@ function renderDocs(p, res, loading, set) {
       S.upSlot = b.dataset.up;
       S.upSet = set;
       $('doc-input').value = '';
+      $('doc-input').multiple = set === 'req';     // 2.13: πολλά αρχεία μαζί
       $('doc-input').click();
     };
   });
@@ -4152,6 +4184,7 @@ function onDocFile(e) {
   var file = e.target.files && e.target.files[0];
   var p = S.prop, slot = S.upSlot, set = S.upSet || 'live';
   if (!file || !p || !slot) return;
+  if (set === 'req') return uploadReq(p, slot, Array.prototype.slice.call(e.target.files));
 
   var cfg = DOC_SETS[set];
   var info = cfg.slots().filter(function (s) { return s.key === slot; })[0] || {};
@@ -4198,6 +4231,118 @@ function onDocFile(e) {
       if (S.view === 'props') renderProps();
     });
   });
+}
+
+/** 2.13 · Απαραίτητα: ένα-ένα τα αρχεία που διάλεξε (ο server δίνει (1), (2)… με τη σειρά). */
+function uploadReq(p, slot, files) {
+  var info = (S.boot.reqSlots || []).filter(function (s) { return s.key === slot; })[0] || {};
+  var key = docKey('req', p.code) + ':' + slot;
+  var ok = 0, fail = [];
+  S.uploading[key] = true;
+  renderDocs(p, S.docs[docKey('req', p.code)], false, 'req');
+
+  var chain = Promise.resolve();
+  files.forEach(function (file) {
+    chain = chain.then(function () {
+      return shrink(file).then(function (f) {
+        if (f.size > (S.boot.maxUploadMb || 20) * 1048576) throw new Error('πάνω από ' + S.boot.maxUploadMb + ' MB');
+        return toBase64(f.blob).then(function (data) {
+          return api('upload', { code: p.code, set: 'req', slot: slot, mode: 'keep', name: f.name, mime: f.type, data: data });
+        });
+      }).then(function (r) {
+        ok++;
+        S.docs[docKey('req', p.code)] = r;
+      }).catch(function (err) {
+        fail.push(file.name + ' (' + err.message + ')');
+      });
+    });
+  });
+  chain.then(function () {
+    delete S.uploading[key];
+    if (ok) toast('Ανέβηκ' + (ok === 1 ? 'ε 1 αρχείο' : 'αν ' + ok + ' αρχεία') + ': ' + (info.label || slot) +
+      (fail.length ? ' · δεν ανέβηκαν: ' + fail.join(', ') : ''), !!fail.length);
+    else toast('Δεν ανέβηκε: ' + fail.join(', '), true);
+    if (S.prop && S.prop.code === p.code) renderDocs(p, S.docs[docKey('req', p.code)], false, 'req');
+  });
+}
+
+/** Αρχεία που μπήκαν με το χέρι στον φάκελο και δεν αναγνωρίζονται: φαίνονται, δεν μετράνε. */
+function otherFilesHtml(list) {
+  return '<div class="doc-slot opt"><div class="doc-head"><span class="doc-ico">–</span><b>Άλλα αρχεία στον φάκελο</b></div>' +
+    list.map(function (f) {
+      return '<div class="doc-file"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.name) + '</a>' +
+        '<span>' + esc(f.date.slice(0, 10)) + '</span></div>';
+    }).join('') + '</div>';
+}
+
+// ─────────────────────────────────────────────────────────────
+//  2.13 · ΣΗΜΕΙΩΣΕΙΣ ΑΚΙΝΗΤΟΥ
+// ─────────────────────────────────────────────────────────────
+// Κοινές για όσους βλέπουν το ακίνητο (μεσίτης, ομάδα, Admin): ό,τι πρέπει να ξέρει
+// όποιος σηκώσει το τηλέφωνο. Σβήνει ο συντάκτης ή ο Admin.
+
+function pnWhen(ms) {
+  var d = new Date(ms);
+  return d.toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) +
+    ' ' + d.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function loadPnotes(p) {
+  S.pnotes = S.pnotes || {};
+  renderPnotes(p);
+  api('pnotes', { code: p.code }).then(function (r) {
+    S.pnotes[p.code] = r;
+    if (S.prop && S.prop.code === p.code) renderPnotes(p);
+  }).catch(function (e) {
+    if (S.prop && S.prop.code === p.code && !S.pnotes[p.code]) {
+      $('pn-list').innerHTML = '<p class="save-hint err">Δεν φορτώθηκαν οι σημειώσεις: ' + esc(e.message) + '</p>';
+    }
+  });
+}
+
+function renderPnotes(p) {
+  var r = (S.pnotes || {})[p.code];
+  $('pd-pnotes-count').textContent = r && r.notes.length ? r.notes.length : '';
+  var el = $('pn-list');
+  if (!r) { el.innerHTML = '<div class="skel line"><i></i></div>'; return; }
+  el.innerHTML = r.notes.length ? r.notes.map(function (n) {
+    return '<div class="pn-item"><p>' + esc(n.text).replace(/\n/g, '<br>') + '</p>' +
+      '<div class="pn-meta"><span>' + esc(n.by) + ' · ' + esc(pnWhen(n.at)) + '</span>' +
+      (n.canDel ? '<button class="x" data-pn-del="' + esc(n.id) + '" aria-label="Διαγραφή σημείωσης">' + ico('trash') + '</button>' : '') +
+      '</div></div>';
+  }).join('') : '<div class="empty small"><b>Καμία σημείωση</b>Ό,τι πρέπει να ξέρει όποιος σηκώσει το τηλέφωνο για αυτό το ακίνητο.</div>';
+  el.querySelectorAll('[data-pn-del]').forEach(function (b) {
+    b.onclick = function () {
+      ask('Διαγραφή σημείωσης;', 'Θα σβηστεί για όλους όσοι βλέπουν το ακίνητο.', 'Ναι, διαγραφή').then(function (yes) {
+        if (!yes) return;
+        b.disabled = true;
+        api('pnoteDel', { code: p.code, id: b.dataset.pnDel }).then(function (res) {
+          S.pnotes[p.code] = res;
+          toast('Η σημείωση σβήστηκε');
+        }).catch(function (e) { toast(e.message, true); }).then(function () {
+          if (S.prop && S.prop.code === p.code) renderPnotes(p);
+        });
+      });
+    };
+  });
+}
+
+function onPnoteAdd() {
+  var p = S.prop, ta = $('pn-text'), text = ta.value.trim();
+  if (!p || !text) { ta.focus(); return; }
+  var btn = $('pn-add');
+  btn.disabled = true;
+  // reqId: αν το κακό σήμα στείλει το ίδιο αίτημα δύο φορές, ο server το γράφει μία.
+  var reqId = 'pn' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  api('pnoteAdd', { code: p.code, text: text, reqId: reqId }).then(function (r) {
+    S.pnotes = S.pnotes || {};
+    S.pnotes[p.code] = r;
+    ta.value = '';
+    toast(r.masked ? 'Αποθηκεύτηκε · ΑΦΜ/ταυτότητα σβήστηκαν' : 'Η σημείωση αποθηκεύτηκε');
+    if (S.prop && S.prop.code === p.code) renderPnotes(p);
+  }).catch(function (e) {
+    toast('Δεν αποθηκεύτηκε: ' + e.message, true);
+  }).then(function () { btn.disabled = false; });
 }
 
 /** Φωτογραφίες → JPEG έως 2400px. PDF και ό,τι δεν διαβάζεται → όπως είναι. */
