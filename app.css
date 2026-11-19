@@ -759,8 +759,10 @@ div.mrow{cursor:default}
 
 /* ── ＋ Νέο ── */
 .fab{position:fixed;z-index:35;right:1rem;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + .875rem);
-  display:flex;align-items:center;gap:.375rem;height:3.5rem;padding:0 1.25rem 0 1rem;border:0;border-radius:1.75rem;
-  background:var(--red-solid);color:#fff;font-weight:800;font-size:1.0625rem;cursor:pointer;box-shadow:0 4px 14px rgba(200,16,46,.35)}
+  display:flex;align-items:center;justify-content:center;width:3.5rem;height:3.5rem;padding:0;border:0;border-radius:50%;
+  background:var(--red-solid);color:#fff;cursor:pointer;box-shadow:0 4px 14px rgba(200,16,46,.35)}
+.fab .ico{width:1.75rem;height:1.75rem}
+#quick-tabs{margin:.25rem 0 .75rem}
 .fab:active{transform:scale(.96)}
 .view{padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 5.25rem)}
 

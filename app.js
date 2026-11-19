@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.11';
+var APP_VERSION = '2.12';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.22';
@@ -66,7 +66,7 @@ STATUS_CLASS[ST.CLOSED]    = 'closed';
 var S = {
   boot: null, me: null, leads: [], props: [], lead: null,
   filter: 'new', propFilter: null, view: 'today',
-  noteTimer: null, smsLang: 'el', smsKind: 'intro', cancelled: null, wired: false,
+  noteTimer: null, noteDirty: null, smsLang: 'el', smsKind: 'intro', cancelled: null, wired: false,
   tasks: [], task: null, docs: {}, prop: null, uploading: {}, tplDraft: null, tplLang: {},
   propTab: 'mine', taskTab: 'today', outcome: '',
   mx: null, mxMode: 'month', mxMonth: '', mxYear: '', mxOpen: '', mxLoading: false
@@ -757,7 +757,8 @@ function wire() {
   wireLeadPick();
   wireProfile();                                     // 2.1
   wireOffline();                                     // 2.2
-  document.addEventListener('visibilitychange', function () { if (document.hidden) pfSaveNow(true); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { pfSaveNow(true); flushNote(true); } });
+  window.addEventListener('pagehide', function () { flushNote(true); });
   $$('[data-goto]').forEach(function (b) { b.onclick = function () { goto(b.dataset.goto); }; });
   $$('[data-refresh]').forEach(function (b) { b.onclick = refreshNow; });
   $('map-deal').onchange = function () { MAP.deal = this.value; drawMap(true); };
@@ -788,14 +789,13 @@ function wire() {
   $('btn-referral-more').onclick = function () { openReferral(null); };
   $('btn-new-referral').onclick = function () { openReferral(null); };
   wirePops();
-  $('fab').onclick = function () { openPop('quick'); };
+  $('fab').onclick = function () { openQuick(S.quickTab || 'call'); };
+  $$('#quick-tabs [data-qtab]').forEach(function (b) { b.onclick = function () { setQuickTab(b.dataset.qtab); }; });
   $$('[data-quick]').forEach(function (b) {
     b.onclick = function () {
       closePop('quick');
       var q = b.dataset.quick;
-      if (q === 'note') openLeadPick('note');
-      else if (q === 'outcome') openLeadPick('outcome');
-      else if (q === 'task') openTask(null);
+      if (q === 'task') openTask(null);
       else if (q === 'contact') editContact(null);
       else if (q === 'referral') openReferral(null);
     };
@@ -834,11 +834,6 @@ function wire() {
   $('d-mail').onclick = function (e) { if (!S.lead || !S.lead.email) e.preventDefault(); };
   $('btn-noanswer-row').onclick = onNoAnswer;
   $('btn-showing').onclick = openShowingForm;
-  $('btn-showform').onclick = function () {
-    openShowingForm();
-    // Το έντυπο είναι πάνω-πάνω στο φύλλο της υπόδειξης.
-    $('showing').querySelector('.sheet-body').scrollTop = 0;
-  };
   $('btn-save-showing').onclick = onSaveShowing;
   $('btn-offer').onclick = function () { if (S.lead) openOffer(S.lead); };   // 1.20
   wireCallNote();
@@ -2400,7 +2395,7 @@ function showLead(l, opts) {
   $('detail').querySelector('.sheet-body').scrollTop = 0;
   if (opts.outcome) openShowingForm();
   else if (opts.offer && l.code) openOffer(l);
-  else if (opts.form && hasShowing(l)) $('btn-showform').onclick();
+  else if (opts.form && hasShowing(l)) openShowingTop();
   else if (S.smsKind === 'reminder') openSmsBox('reminder');
 
   if (!l.opened) {
@@ -2411,9 +2406,25 @@ function showLead(l, opts) {
 
 function closeDetail() {
   pfSaveNow();
+  flushNote();
   closeSheet('detail');
   S.lead = null;
   render();
+}
+
+/** 2.12: «Υπόδειξη ακινήτου» = υπόδειξη + έντυπο στο ίδιο φύλλο· το έντυπο είναι πάνω-πάνω. */
+function openShowingTop() {
+  openShowingForm();
+  $('showing').querySelector('.sheet-body').scrollTop = 0;
+}
+
+/** Μία γραμμή κατάστασης για την καρτέλα «Υπόδειξη ακινήτου». */
+function showingSub(l) {
+  var form = l.form ? ' · Έντυπο: ' + l.form.toLowerCase() : '';
+  if (!hasShowing(l)) return 'Ημερομηνία, ώρα και έντυπο υπογραφής.';
+  if (upcoming(l)) return lowerDay(niceDate(l.showingAt)) + ' · αλλαγή ή έντυπο' + form;
+  if (!l.outcome) return 'Έγινε · γράψε πώς πήγε' + form;
+  return l.outcome + ' · νέα υπόδειξη' + form;
 }
 
 function hasShowing(l) { return !!(l && l.hasEvent && l.showingDate); }
@@ -2503,6 +2514,7 @@ function fillDetail(l) {
   $('d-message-wrap').hidden = !l.message;
   $('d-message').textContent = l.message || '';
 
+  if (S.noteDirty && S.noteDirty.id === l.id) l.notes = S.noteDirty.text;   // 2.11.1: ό,τι δεν έφυγε ακόμα, μένει
   if (document.activeElement !== $('d-notes')) $('d-notes').value = l.notes || '';
 
   var tel = l.phoneIntl || '';
@@ -2525,11 +2537,7 @@ function fillDetail(l) {
   fact('d-smsremind-wrap', 'd-smsremind', upcoming(l) ? l.smsRemind : '');
 
   $('btn-noanswer').textContent = l.status === ST.NO_ANSWER ? 'Δεν απάντησε ξανά' : 'Δεν απάντησε';
-  $('btn-showing-text').textContent = needsOutcome(l) ? 'Πώς πήγε η υπόδειξη;'
-    : showingDone(l) ? 'Η υπόδειξη έγινε · κλείσε νέα' : hasShowing(l) ? 'Αλλαγή υπόδειξης' : 'Κλείσε υπόδειξη';
-  // 1.14.1: το έντυπο υπόδειξης έχει δικό του κουμπί, μόλις υπάρχει υπόδειξη.
-  $('btn-showform').hidden = !hasShowing(l);
-  $('d-form-sub').textContent = l.form ? 'Κατάσταση: ' + l.form + '.' : 'Link για τον πελάτη, υπογραφή, PDF.';
+  $('d-showing-sub').textContent = showingSub(l);       // 2.12: μία καρτέλα «Υπόδειξη ακινήτου» (υπόδειξη + έντυπο)
   // 1.20: έντυπο προσφοράς, για κάθε κλήση με κωδικό ακινήτου.
   $('btn-offer').hidden = !l.code;
   $('d-offer-sub').textContent = l.offer === 'Υπογράφηκε' ? 'Υπογράφηκε · άνοιξε το PDF.' :
@@ -2558,21 +2566,41 @@ function renderNext(l) {
   var title, text, btns;
   var formLine = l.form ? ' · Έντυπο: ' + l.form.toLowerCase() : '';
 
-  if (needsOutcome(l)) {
+  // 2.12: υπόδειξη που έγινε χωρίς αποτέλεσμα → πάντα «Πώς πήγε;» (όχι «Κλείσε υπόδειξη»), ακόμα κι αν το έντυπο είναι υπογεγραμμένο.
+  if (needsOutcome(l) || (showingDone(l) && !l.outcome && l.status !== ST.CLOSED)) {
     title = 'Πώς πήγε η υπόδειξη;';
     text = 'Έγινε ' + lowerDay(niceDate(l.showingAt)) + '. Γράψε το αποτέλεσμα όσο το θυμάσαι' + formLine + '.';
-    btns = b('showing', 'Πώς πήγε;', 'check', true) + b('form', 'Έντυπο υπόδειξης', 'form');
+    btns = b('showing', 'Πώς πήγε;', 'check', true);
   } else if (upcoming(l)) {
     title = 'Υπόδειξη ' + lowerDay(niceDate(l.showingAt));
     text = (l.address ? l.address + '. ' : '') + (l.smsRemind ? 'Υπενθύμιση στάλθηκε ' + lowerDay(niceDate(l.smsRemind)) + '.' : 'Στείλε υπενθύμιση στον πελάτη.') + formLine;
     btns = (tel ? b('remind', 'SMS υπενθύμισης', 'sms', true) : '') + b('showing', 'Αλλαγή', 'calendar', !tel);
   } else if (hasShowing(l) && l.outcome) {
-    title = 'Αποτέλεσμα: ' + l.outcome;
-    text = (l.outcomeNote ? l.outcomeNote + ' ' : '') + 'Η υπόδειξη έγινε ' + lowerDay(niceDate(l.showingAt)) + formLine + '.';
-    // 1.20: ενδιαφέρθηκε → η προσφορά είναι το επόμενο βήμα.
-    var keen = l.code && (S.boot.outcomes || [])[0] === l.outcome;
-    btns = keen ? b('offer', l.offer === 'Υπογράφηκε' ? 'Η προσφορά' : 'Έντυπο προσφοράς', 'receipt', true) + b('form', 'Έντυπο υπόδειξης', 'form')
-                : b('form', 'Έντυπο υπόδειξης', 'form', true) + b('showing', 'Υπόδειξη', 'calendar');
+    // 2.12: το επόμενο βήμα ακολουθεί το αποτέλεσμα της υπόδειξης.
+    var oi = (S.boot.outcomes || []).indexOf(l.outcome);
+    var when = 'Η υπόδειξη έγινε ' + lowerDay(niceDate(l.showingAt)) + formLine + '.';
+    var note = l.outcomeNote ? l.outcomeNote + ' ' : '';
+    if (oi === 0 && l.code) {                       // Ενδιαφέρθηκε → προσφορά
+      title = 'Ενδιαφέρθηκε · κάνε προσφορά';
+      text = note + when;
+      btns = b('offer', l.offer === 'Υπογράφηκε' ? 'Η προσφορά' : 'Έντυπο προσφοράς', 'receipt', true) + b('task', 'Εργασία', 'tasks');
+    } else if (oi === 1) {                          // Δεύτερη υπόδειξη
+      title = 'Κλείσε 2η υπόδειξη';
+      text = note + 'Ο πελάτης θέλει δεύτερη υπόδειξη. ' + when;
+      btns = b('second', 'Κλείσε 2η υπόδειξη', 'calendar', true) + b('task', 'Εργασία', 'tasks');
+    } else if (oi === 2) {                          // Δεν ενδιαφέρθηκε → ζήτηση
+      title = 'Πάρε ζήτηση';
+      text = note + 'Δεν ενδιαφέρθηκε για αυτό το ακίνητο. Γράψε τι ψάχνει, για να του βρεις άλλο. ' + when;
+      btns = b('demand', 'Πάρε ζήτηση', 'form', true) + b('task', 'Εργασία', 'tasks');
+    } else if (oi === 3) {                          // Δεν ήρθε → κλήση και νέο ραντεβού
+      title = 'Δεν ήρθε · κάλεσέ τον';
+      text = note + 'Κάλεσε τον πελάτη και κλείσε εκ νέου ραντεβού. ' + when;
+      btns = callBtn('Κλήση') + b('second', 'Νέο ραντεβού', 'calendar');
+    } else {
+      title = 'Αποτέλεσμα: ' + l.outcome;
+      text = note + when;
+      btns = b('showing', 'Νέα υπόδειξη', 'calendar', true) + b('task', 'Εργασία', 'tasks');
+    }
   } else if (l.status === ST.PENDING) {
     title = 'Κάλεσε τον πελάτη';
     text = 'Νέα κλήση, ήρθε ' + lowerDay(niceDate(l.date)) + (l.source ? ' από ' + l.source : '') + '.';
@@ -2604,7 +2632,9 @@ function renderNext(l) {
     x.onclick = act === 'call' ? onTelClick
       : act === 'noanswer' ? onNoAnswer
       : act === 'showing' ? openShowingForm
-      : act === 'form' ? function () { $('btn-showform').onclick(); }
+      : act === 'form' ? openShowingTop
+      : act === 'second' ? function () { openShowingForm(true); }
+      : act === 'demand' ? showProfileTab
       : act === 'offer' ? function () { openOffer(S.lead); }
       : act === 'remind' ? function () { openSmsBox('reminder'); }
       : act === 'task' ? onLeadTask : null;
@@ -2697,6 +2727,7 @@ function onTelClick(e) {
   var l = S.lead;
   if (!l || !l.phoneIntl) { e.preventDefault(); return; }
 
+  flushNote(true);                                // η σημείωση φεύγει πριν ανοίξει το τηλέφωνο
   l.called = nowStamp();
   if (isOpen(l)) {
     l.status = ST.ANSWERED;
@@ -2763,6 +2794,12 @@ function applyStatus(value) {
   });
 }
 
+/**
+ * Σημειώσεις κλήσης. Αποθήκευση 1,2" μετά το τελευταίο γράμμα, ΚΑΙ αμέσως όταν:
+ * κλείνεις την κλήση, πατάς «Κλήση», ή η εφαρμογή πάει στο παρασκήνιο (flushNote).
+ * Το κείμενο που δεν έχει φτάσει ακόμα στον server (S.noteDirty) δεν σβήνεται
+ * ποτέ από απάντηση server (status, SMS κ.λπ.), γιατί η fillDetail το προστατεύει.
+ */
 function onNoteInput() {
   clearTimeout(S.noteTimer);
   var hint = $('save-hint');
@@ -2770,17 +2807,30 @@ function onNoteInput() {
   hint.textContent = 'Αποθήκευση…';
 
   var id = S.lead.id, text = $('d-notes').value;
+  S.noteDirty = { id: id, text: text };
+  var l0 = findLead(id);
+  if (l0) l0.notes = text;                       // κάθε re-render βλέπει ήδη το νέο κείμενο
+  S.noteTimer = setTimeout(function () { flushNote(); }, 1200);
+}
 
-  S.noteTimer = setTimeout(function () {
-    send('note', { id: id, text: text }).then(function (r) {
+/** Στέλνει τώρα ό,τι σημείωση περιμένει. quiet=true → beacon (όταν η σελίδα φεύγει). */
+function flushNote(quiet) {
+  var nd = S.noteDirty;
+  if (!nd) return;
+  clearTimeout(S.noteTimer);
+  S.noteDirty = null;
+  if (quiet === true) { beacon('note', { id: nd.id, text: nd.text }); return; }
+  var hint = $('save-hint');
+  var mine = function () { return !!(S.lead && S.lead.id === nd.id); };
+  send('note', { id: nd.id, text: nd.text }).then(function (r) {
+    if (mine() && !S.noteDirty) {
+      hint.className = 'save-hint';
       hint.textContent = r.queued ? 'Αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα' : 'Αποθηκεύτηκε';
-      var l = findLead(id);
-      if (l) l.notes = text;
-    }).catch(function (e) {
-      hint.className = 'save-hint err';
-      hint.textContent = 'Δεν αποθηκεύτηκε: ' + e.message;
-    });
-  }, 1200);
+    }
+  }).catch(function (e) {
+    if (!S.noteDirty) S.noteDirty = nd;          // ξαναδοκιμάζει στο επόμενο flush
+    if (mine()) { hint.className = 'save-hint err'; hint.textContent = 'Δεν αποθηκεύτηκε: ' + e.message; }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -5248,7 +5298,7 @@ function wireAdmin() {
 
 function fixGoLabel(r) {
   if (r.kind === 'live' || r.kind === 'bill') return 'Ανέβασε το σωστό αρχείο';
-  if (r.kind === 'showform' || r.kind === 'offerform') return 'Άνοιγμα της κλήσης';
+  if (r.kind === 'showform' || r.kind === 'offerform') return r.url ? 'Άνοιγμα PDF' : 'Άνοιγμα της κλήσης';
   if (r.kind === 'referral') return 'Οι συστάσεις μου';
   return 'Άνοιγμα';
 }
@@ -5285,6 +5335,13 @@ function goFix(r) {
       S.propPane = 'bill';
       loadDocs(p, 'bill');
     }
+    return;
+  }
+  // 2.12: το PDF ανοίγει κατευθείαν· ο μεσίτης δεν περνά πρώτα από την κλήση.
+  if ((r.kind === 'showform' || r.kind === 'offerform') && r.url) {
+    var a = document.createElement('a');
+    a.href = r.url; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
     return;
   }
   if (r.kind === 'showform' && r.lead) return openLead(r.lead, { form: true });
@@ -6776,6 +6833,70 @@ function lpLeads(mode) {
   return S.leads.slice().sort(function (a, b) {
     var at = a.showingDate === today ? 1 : 0, bt = b.showingDate === today ? 1 : 0;
     return bt - at || (b.ts || 0) - (a.ts || 0);
+  });
+}
+
+// ── 2.12 · «＋»: Κλήση / Υπόδειξη / Άλλο ──
+// Κλήση και Υπόδειξη δείχνουν μόνο τους πελάτες των τελευταίων 7 ημερών. Πάτημα → σημείωση.
+var QUICK_DAYS = 7;
+
+function openQuick(tab) {
+  openPop('quick');
+  setQuickTab(tab);
+}
+
+function setQuickTab(tab) {
+  S.quickTab = tab;
+  $$('#quick-tabs [data-qtab]').forEach(function (b) {
+    var on = b.dataset.qtab === tab;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  $('quick-pick').hidden = tab === 'more';
+  $('quick-more').hidden = tab !== 'more';
+  if (tab !== 'more') renderQuickList(tab);
+}
+
+/** Η τελευταία δραστηριότητα της κλήσης: πότε ήρθε ή πότε την κάλεσες. */
+function lastTouch(l) {
+  var t = l.ts || 0;
+  (l.calls || []).forEach(function (c) { if (c.ts > t) t = c.ts; });
+  return t;
+}
+
+/** Λίστα για το tab. 'call' = κλήσεις των 7 ημερών· 'show' = υποδείξεις των 7 ημερών (έως το τέλος της σημερινής ημέρας). */
+function quickLeads(tab, now) {
+  var from = now - QUICK_DAYS * 86400000;
+  var eod = new Date(now); eod.setHours(23, 59, 59, 999);
+  if (tab === 'show') {
+    return S.leads.filter(function (l) { return hasShowing(l) && l.showingTs >= from && l.showingTs <= eod.getTime(); })
+      .sort(function (a, b) { return b.showingTs - a.showingTs; });
+  }
+  return S.leads.filter(function (l) { return lastTouch(l) >= from; })
+    .sort(function (a, b) { return lastTouch(b) - lastTouch(a); });
+}
+
+function renderQuickList(tab) {
+  var list = quickLeads(tab, Date.now());
+  $('quick-hint').textContent = tab === 'show' ? 'Υποδείξεις των τελευταίων ' + QUICK_DAYS + ' ημερών. Διάλεξε πελάτη για να γράψεις.'
+    : 'Κλήσεις των τελευταίων ' + QUICK_DAYS + ' ημερών. Διάλεξε πελάτη για να γράψεις σημείωση.';
+  $('quick-list').innerHTML = list.length ? list.slice(0, 40).map(function (l) {
+    var k = STATUS_CLASS[l.status] || 'answered';
+    var sub = tab === 'show'
+      ? (showingDone(l) ? (l.outcome ? l.outcome : 'Πώς πήγε;') : 'Έρχεται') + ' · ' + lowerDay(niceDate(l.showingAt))
+      : statusLine(l) + (l.code ? ' · ' + l.code : '');
+    return '<button class="mrow" data-ql="' + esc(l.id) + '"><span class="avatar ' + k + '" aria-hidden="true">' + esc(initials(l.name)) + '</span>' +
+      '<span class="mrow-body"><b>' + esc(l.name || 'Χωρίς όνομα') + '</b><span>' + esc(sub) + '</span></span>' + ico('next', 'ico chev') + '</button>';
+  }).join('') : '<p class="card-note">' + (tab === 'show' ? 'Καμία υπόδειξη τις τελευταίες ' + QUICK_DAYS + ' ημέρες.' : 'Καμία κλήση τις τελευταίες ' + QUICK_DAYS + ' ημέρες.') + '</p>';
+  $('quick-list').querySelectorAll('[data-ql]').forEach(function (b) {
+    b.onclick = function () {
+      var l = findLead(b.dataset.ql);
+      if (!l) return;
+      closePop('quick');
+      // Υπόδειξη που έγινε: το αποτέλεσμα έχει δικό του πεδίο σημείωσης. Αλλιώς, απλή σημείωση στον πελάτη.
+      if (tab === 'show' && showingDone(l)) openLead(l.id, { outcome: true });
+      else openLeadPick('note', l.id);
+    };
   });
 }
 

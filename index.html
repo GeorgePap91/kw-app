@@ -555,7 +555,7 @@
     </div>
   </section>
 
-  <button class="fab" id="fab" aria-haspopup="dialog" aria-controls="quick"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Καταγραφή</button>
+  <button class="fab" id="fab" aria-label="Νέα καταγραφή" aria-haspopup="dialog" aria-controls="quick"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
   <div class="ptr" id="ptr" aria-hidden="true"><svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg></div>
 
   <!-- 2.0: 4 καρτέλες. Στο κινητό κάτω, στον υπολογιστή στήλη αριστερά. -->
@@ -660,9 +660,8 @@
     <div id="d-more">
     <h3 class="sub-head">Άλλες ενέργειες</h3>
     <div class="mlist">
-      <button class="mrow" id="btn-showform" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="mrow-body"><b>Έντυπο υπόδειξης</b><span id="d-form-sub">Link για τον πελάτη, υπογραφή, PDF.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-offer" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-receipt"/></svg></span><span class="mrow-body"><b>Έντυπο προσφοράς</b><span id="d-offer-sub">Ο πελάτης γράφει τιμή, τρόπο πληρωμής και υπογράφει.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
-      <button class="mrow" id="btn-showing"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b id="btn-showing-text">Υπόδειξη</b><span>Ημερομηνία, ώρα, διεύθυνση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+      <button class="mrow" id="btn-showing"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b id="btn-showing-text">Υπόδειξη ακινήτου</b><span id="d-showing-sub">Ημερομηνία, ώρα και έντυπο υπογραφής.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-noanswer-row"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-phone"/></svg></span><span class="mrow-body"><b id="btn-noanswer">Δεν απάντησε</b><span>Μπαίνει follow-up στο ημερολόγιο.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-lead-task"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg></span><span class="mrow-body"><b>Εργασία</b><span>Υπενθύμιση για αυτή την κλήση.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" id="btn-lead-present" hidden><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-camera"/></svg></span><span class="mrow-body"><b>Παρουσίαση ακινήτου</b><span>Φωτογραφίες και στοιχεία, με WhatsApp ή email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
@@ -845,10 +844,17 @@
 <!-- ΚΑΤΑΓΡΑΦΗ (2.0, πρώην ＋ Νέο) -->
 <div class="pop" id="quick" role="dialog" aria-modal="true" aria-labelledby="quick-title" hidden>
   <div class="pop-box">
-    <div class="pop-head"><h2 id="quick-title">Γρήγορη καταγραφή</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
-    <div class="mlist flat">
-      <button class="mrow" data-quick="note"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-note"/></svg></span><span class="mrow-body"><b>Σημείωση σε πελάτη</b><span>Τι είπατε, σε 10 δευτερόλεπτα. Μπαίνει στις σημειώσεις του.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
-      <button class="mrow" data-quick="outcome"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="mrow-body"><b>Πώς πήγε μια υπόδειξη</b><span>Αποτέλεσμα και σχόλια του πελάτη.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+    <div class="pop-head"><h2 id="quick-title">Νέα καταγραφή</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div class="subtabs chipbar" id="quick-tabs" role="tablist">
+      <button class="subtab is-on" role="tab" data-qtab="call" aria-selected="true"><span>Κλήση</span></button>
+      <button class="subtab" role="tab" data-qtab="show" aria-selected="false"><span>Υπόδειξη</span></button>
+      <button class="subtab" role="tab" data-qtab="more" aria-selected="false"><span>Άλλο</span></button>
+    </div>
+    <div id="quick-pick">
+      <p class="field-hint lp-hint" id="quick-hint"></p>
+      <div class="mlist flat" id="quick-list"></div>
+    </div>
+    <div class="mlist flat" id="quick-more" hidden>
       <button class="mrow" data-quick="task"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-tasks"/></svg></span><span class="mrow-body"><b>Νέα εργασία</b><span>Κάτι που πρέπει να γίνει, με ημερομηνία.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" data-quick="contact"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="mrow-body"><b>Νέα επαφή</b><span>Όνομα, τηλέφωνο, email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       <button class="mrow" data-quick="referral"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-receipt"/></svg></span><span class="mrow-body"><b>Σύσταση ή συνεργασία</b><span>Έντυπο προς συνεργάτη άλλου γραφείου.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
