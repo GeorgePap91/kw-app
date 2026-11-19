@@ -1011,13 +1011,28 @@
       <button class="subtab" role="tab" data-tab="bill" id="tab-pd-bill"><span>Τιμολόγηση</span> <i class="pill" id="pd-bill-count"></i></button>
       <button class="subtab" role="tab" data-tab="leads"><span>Κλήσεις</span> <i class="pill" id="pd-leads-count"></i></button>
       <button class="subtab" role="tab" data-tab="mkt" id="tab-pd-mkt" hidden><span>Marketing</span></button>
+      <button class="subtab" role="tab" data-tab="pnotes" id="tab-pd-pnotes" hidden><span>Σημειώσεις</span> <i class="pill" id="pd-pnotes-count"></i></button>   <!-- 2.13 -->
     </div>
 
     <div id="prop-panes">
       <section class="mk-pane" id="pd-mkt" data-pane="mkt" hidden><div id="pd-mkt-body"></div></section>   <!-- 2.10 -->
       <section class="docs" id="pd-docs" data-pane="docs" hidden>
-        <div id="pd-docs-list"></div>
-        <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
+        <!-- 2.13: δύο ομάδες μέσα στα Έγγραφα · κρυφές χωρίς το flag reqDocs -->
+        <div class="subtabs" id="tabs-docs" role="tablist" aria-label="Έγγραφα" hidden>
+          <button class="subtab is-on" role="tab" data-tab="live"><span>Για live</span></button>
+          <button class="subtab" role="tab" data-tab="req"><span>Απαραίτητα</span> <i class="pill" id="pd-req-count"></i></button>
+        </div>
+        <div id="docs-panes">
+          <div data-pane="live">
+            <div id="pd-docs-list"></div>
+            <a class="link-out" id="pd-docs-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου στο Drive</a>
+          </div>
+          <div data-pane="req" hidden>
+            <p class="note">Μπορείς να βάλεις πολλά αρχεία σε κάθε έγγραφο. Ονομάζονται μόνα τους (1), (2)… και μετά τα μετονομάζεις όπως θέλεις στο Drive.</p>
+            <div id="pd-req-list"></div>
+            <a class="link-out" id="pd-req-folder" href="#" target="_blank" rel="noopener" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg>Άνοιγμα φακέλου «Απαραίτητα έγγραφα»</a>
+          </div>
+        </div>
         <input type="file" id="doc-input" accept="application/pdf,image/*" hidden>
       </section>
       <section class="docs" id="pd-bill" data-pane="bill" hidden>
@@ -1027,6 +1042,14 @@
       </section>
       <div data-pane="facts" hidden>
         <dl class="facts" id="pd-facts"></dl>
+      </div>
+      <div data-pane="pnotes" hidden>   <!-- 2.13 -->
+        <label class="field">
+          <span>Νέα σημείωση</span>
+          <textarea id="pn-text" rows="3" maxlength="1000" placeholder="π.χ. κλειδιά στον θυρωρό, ο ιδιοκτήτης θέλει ενοικιαστή χωρίς κατοικίδιο…"></textarea>
+        </label>
+        <button class="btn primary wide" id="pn-add">Αποθήκευση σημείωσης</button>
+        <div class="pn-list" id="pn-list"></div>
       </div>
       <div data-pane="leads" hidden>
         <div class="card-list" id="pd-leads-list"></div>
