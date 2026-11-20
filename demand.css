@@ -1,0 +1,13 @@
+/* 2.14 · Φόρμα ζήτησης: ό,τι δεν έχει ήδη το offer.css */
+.range{display:grid;grid-template-columns:1fr 1fr;gap:.625rem}
+.money span{font-size:.9375rem}
+.hint{margin:0 0 .5rem}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chips .chip{margin:0;min-width:3.25rem;min-height:3rem}
+.chips .chip[aria-checked="true"],.chips .chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+.check.big{min-height:3rem;align-items:center;margin-top:.25rem;font-size:1.0625rem}
+.check.big input{width:1.75rem;height:1.75rem;margin:0}
+textarea{width:100%;padding:.625rem .75rem;border:1.5px solid #b9b9b9;border-radius:.75rem;font:inherit;font-size:1.0625rem;
+  background:var(--paper);color:var(--ink);resize:vertical;min-height:6rem}
+textarea:focus{outline:3px solid rgba(180,1,1,.25);border-color:var(--red)}
+.field.bad input,.field.bad textarea{border-color:var(--red);background:#fff6f6}

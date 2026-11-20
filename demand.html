@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#b40101">
+<!-- 2.14 · Φόρμα ζήτησης για τον πελάτη. Μόνο δικά μας scripts, χωρίς inline JS/CSS. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<title>Τι ακίνητο ψάχνετε; · KW Athens Center</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="offer.css">
+<link rel="stylesheet" href="demand.css">
+<script src="config.js" defer></script>
+<script src="demand.js" defer></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" id="logo" src="logo-kw.png" alt="Keller Williams · KW Athens Center">
+    <span class="wordmark" id="wordmark" hidden><b>KW</b> Athens Center</span>
+  </div>
+</header>
+
+<main class="wrap" id="main" aria-busy="true">
+  <div class="state" id="loading">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Φορτώνει η φόρμα…</p>
+  </div>
+
+  <div class="state" id="closed" hidden>
+    <h1 id="closed-title">Η φόρμα δεν είναι διαθέσιμη</h1>
+    <p id="closed-text"></p>
+  </div>
+
+  <div class="state done" id="done" hidden>
+    <span class="done-ico" aria-hidden="true">✓</span>
+    <h1>Ευχαριστούμε!</h1>
+    <p id="done-text"></p>
+  </div>
+
+  <form id="form" novalidate hidden>
+    <h1 class="title" id="title">Τι ακίνητο ψάχνετε;</h1>
+    <p class="lead-in" id="lead-in">Συμπληρώστε όσα ξέρετε. Όλα τα πεδία είναι προαιρετικά.</p>
+
+    <section class="card">
+      <h2>Τιμή και μέγεθος</h2>
+      <div class="field" data-f="price">
+        <div class="lab"><span class="lab-t" id="l-price">Τιμή (€)</span></div>
+        <div class="range">
+          <div class="money"><input id="f-priceMin" inputmode="numeric" autocomplete="off" maxlength="15" placeholder="Από" aria-label="Τιμή από"><span>€</span></div>
+          <div class="money"><input id="f-priceMax" inputmode="numeric" autocomplete="off" maxlength="15" placeholder="Έως" aria-label="Τιμή έως"><span>€</span></div>
+        </div>
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="sqm">
+        <div class="lab"><span class="lab-t">Τετραγωνικά</span></div>
+        <div class="range">
+          <div class="money"><input id="f-sqmMin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Από" aria-label="Τετραγωνικά από"><span>τ.μ.</span></div>
+          <div class="money"><input id="f-sqmMax" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Έως" aria-label="Τετραγωνικά έως"><span>τ.μ.</span></div>
+        </div>
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="pps">
+        <div class="lab"><span class="lab-t">Τιμή ανά τετραγωνικό (€/τ.μ.)</span><button type="button" class="i" aria-expanded="false" aria-controls="i-pps" aria-label="Πληροφορίες για την τιμή ανά τετραγωνικό">i</button></div>
+        <p class="info" id="i-pps" hidden>Προαιρετικό. Π.χ. 2.000 €/τ.μ. σημαίνει ότι ένα σπίτι 80 τ.μ. κοστίζει περίπου 160.000 €.</p>
+        <div class="range">
+          <div class="money"><input id="f-ppsMin" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="Από" aria-label="Τιμή ανά τετραγωνικό από"><span>€</span></div>
+          <div class="money"><input id="f-ppsMax" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="Έως" aria-label="Τιμή ανά τετραγωνικό έως"><span>€</span></div>
+        </div>
+        <p class="err" role="alert"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Το σπίτι</h2>
+      <div class="field" data-f="beds">
+        <div class="lab"><span class="lab-t" id="l-beds">Υπνοδωμάτια (τουλάχιστον)</span></div>
+        <div class="chips" id="beds" role="radiogroup" aria-labelledby="l-beds"></div>
+      </div>
+      <div class="field" data-f="floors">
+        <div class="lab"><span class="lab-t" id="l-floors">Όροφος</span></div>
+        <p class="muted small hint">Διαλέξτε όσους σας ταιριάζουν. Κανένας = αδιάφορο.</p>
+        <div class="chips" id="floors" role="group" aria-labelledby="l-floors"></div>
+      </div>
+      <div class="field" data-f="year">
+        <div class="lab"><span class="lab-t">Έτος κατασκευής</span></div>
+        <div class="range">
+          <input id="f-yearMin" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="Από, π.χ. 1990" aria-label="Έτος κατασκευής από">
+          <input id="f-yearMax" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="Έως" aria-label="Έτος κατασκευής έως">
+        </div>
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field">
+        <div class="lab"><span class="lab-t">Θέλετε</span></div>
+        <label class="check big"><input type="checkbox" id="f-parking"><span>Πάρκινγκ</span></label>
+        <label class="check big"><input type="checkbox" id="f-furnished"><span>Επιπλωμένο</span></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Περιοχές</h2>
+      <div class="field" data-f="areas">
+        <div class="lab"><label for="f-areas">Σε ποιες περιοχές ψάχνετε;</label></div>
+        <input id="f-areas" autocomplete="off" maxlength="300" placeholder="π.χ. Κουκάκι, Παγκράτι, Νέος Κόσμος">
+        <p class="err" role="alert"></p>
+      </div>
+      <div class="field" data-f="notes">
+        <div class="lab"><label for="f-notes">Σημειώσεις</label></div>
+        <textarea id="f-notes" rows="4" maxlength="1000" placeholder="Ό,τι άλλο είναι σημαντικό για εσάς: φως, θέα, ασανσέρ, κοντά σε μετρό, κατοικίδιο…"></textarea>
+        <p class="err" role="alert"></p>
+      </div>
+    </section>
+
+    <p class="disclaimer">Οι απαντήσεις σας πηγαίνουν μόνο στον μεσίτη σας, για να σας προτείνει ακίνητα που σας ταιριάζουν (Κανονισμός (ΕΕ) 2016/679 · GDPR). Μην γράφετε ΑΦΜ ή αριθμό ταυτότητας.</p>
+
+    <p class="form-err" id="form-err" role="alert" hidden></p>
+    <button type="submit" class="btn red" id="submit">Αποστολή</button>
+    <p class="muted small center" id="expires"></p>
+  </form>
+</main>
+
+</body>
+</html>

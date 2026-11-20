@@ -86,12 +86,8 @@
 
 <div id="app" hidden>
 
-  <!-- 2.2: κατάσταση σύνδεσης / αλλαγές που περιμένουν να σταλούν -->
-  <div class="offbar" id="offbar" role="status" aria-live="polite" hidden>
-    <span class="offbar-dot" aria-hidden="true"></span>
-    <span class="offbar-text" id="offbar-text"></span>
-    <button type="button" class="offbar-btn" id="offbar-btn">Αποστολή τώρα</button>
-  </div>
+  <!-- 2.14: τελεία σύνδεσης πάνω δεξιά (πορτοκαλί = περιμένει, πράσινη = στάλθηκε) -->
+  <button type="button" class="netdot" id="netdot" role="status" aria-live="polite" aria-label="Σύνδεση" hidden><span aria-hidden="true"></span></button>
 
   <!-- ΣΗΜΕΡΑ -->
   <section class="view" id="view-today">
@@ -838,6 +834,14 @@
   <div class="pop-box">
     <div class="pop-head"><h2 id="offer-title">Έντυπο προσφοράς</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
     <div id="of-body"></div>
+  </div>
+</div>
+
+<!-- 2.14 · ΦΟΡΜΑ ΖΗΤΗΣΗΣ -->
+<div class="pop" id="demand" role="dialog" aria-modal="true" aria-labelledby="demand-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="demand-title">Φόρμα ζήτησης</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="dm-body"></div>
   </div>
 </div>
 
