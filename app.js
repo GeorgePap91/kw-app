@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.13';
+var APP_VERSION = '2.14';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.23';
+var API_VERSION = '1.24';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox', 'mktbox'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox', 'mktbox', 'demand'];
 var SHEETS = ['goals', 'review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -2657,7 +2657,7 @@ function renderNext(l) {
       : act === 'showing' ? openShowingForm
       : act === 'form' ? openShowingTop
       : act === 'second' ? function () { openShowingForm(true); }
-      : act === 'demand' ? showProfileTab
+      : act === 'demand' ? function () { openDemand(S.lead); }
       : act === 'offer' ? function () { openOffer(S.lead); }
       : act === 'remind' ? function () { openSmsBox('reminder'); }
       : act === 'task' ? onLeadTask : null;
@@ -2802,7 +2802,7 @@ function applyStatus(value) {
     if (S.lead && S.lead.id === l.id) fillDetail(l);
     sel.disabled = false;
 
-    if (r.queued) toast(value === ST.NO_ANSWER ? 'Δεν απάντησε · το follow-up θα μπει στο ημερολόγιο μόλις έρθει σήμα' : 'Κατάσταση: ' + value + ' · θα σταλεί μόλις έρθει σήμα');
+    if (r.queued) toast(value === ST.NO_ANSWER ? 'Δεν απάντησε' : 'Κατάσταση: ' + value);   // 2.14: η τελεία πάνω δεξιά δείχνει την αποστολή
     else if (l.warning) toast(l.warning, true);
     else if (value === ST.NO_ANSWER && l.ladder) ladderToast(l, true);      // 2.4 · FEAT-14
     else if (value === ST.NO_ANSWER && l.followUp) {
@@ -2848,7 +2848,7 @@ function flushNote(quiet) {
   send('note', { id: nd.id, text: nd.text }).then(function (r) {
     if (mine() && !S.noteDirty) {
       hint.className = 'save-hint';
-      hint.textContent = r.queued ? 'Αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα' : 'Αποθηκεύτηκε';
+      hint.textContent = 'Αποθηκεύτηκε';
     }
   }).catch(function (e) {
     if (!S.noteDirty) S.noteDirty = nd;          // ξαναδοκιμάζει στο επόμενο flush
@@ -3559,7 +3559,7 @@ function onSaveOutcome() {
     fillDetail(l);
     closeSheet('showing');
     render();
-    toast('Καταχωρήθηκε: ' + l.outcome + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
+    toast('Καταχωρήθηκε: ' + l.outcome);
   }).catch(function (e) {
     hint.className = 'save-hint err';
     hint.textContent = e.message;
@@ -3582,7 +3582,7 @@ function quickOutcome(id, act) {
     merge(x);
     render();
     showLead(findLead(id) || x, {});
-    toast('Καταχωρήθηκε: ' + outcome + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : '') + ' · γράψε σημείωση αν θες');
+    toast('Καταχωρήθηκε: ' + outcome + ' · γράψε σημείωση αν θες');
   }).catch(function (e) {
     toast(e.message, true);
     openLead(id, { outcome: true });                                   // αποτυχία → η κανονική φόρμα
@@ -3627,7 +3627,7 @@ function doCancelShowing() {
     $('detail').querySelector('.sheet-body').scrollTop = 0;
     if (S.smsKind === 'cancel') openSmsBox('cancel', true);
 
-    toast('Η υπόδειξη ακυρώθηκε' + (res.queued ? ' · θα σβηστεί από το ημερολόγιο μόλις έρθει σήμα' : res.eventDeleted ? ' και σβήστηκε από το ημερολόγιο' : '') +
+    toast('Η υπόδειξη ακυρώθηκε' + (res.queued ? '' : res.eventDeleted ? ' και σβήστηκε από το ημερολόγιο' : '') +
           (S.smsKind === 'cancel' ? '. Το SMS ακύρωσης είναι έτοιμο.' : '.'));
   }).catch(function (e) {
     resetCancelBtn();
@@ -3661,7 +3661,7 @@ function onSaveShowing() {
     closeSheet('showing');
     closeDetail();
     toast((res.updated ? 'Η υπόδειξη άλλαξε: ' : 'Υπόδειξη ') + res.when +
-          (rr.queued ? ' · θα μπει στο ημερολόγιο μόλις έρθει σήμα' : res.invited ? ' · ήρθε ως πρόσκληση' : ''));
+          (rr.queued ? '' : res.invited ? ' · ήρθε ως πρόσκληση' : ''));
   }).catch(function (e) {
     btn.disabled = false;
     btn.textContent = label;
@@ -3886,7 +3886,7 @@ function toggleTask(id) {
     var fresh = r.data;
     mergeTask(fresh);
     renderTasks();
-    if (done) toast('Ολοκληρώθηκε' + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : fresh.date ? ' · βγήκε από το ημερολόγιο' : ''));
+    if (done) toast('Ολοκληρώθηκε' + (r.queued ? '' : fresh.date ? ' · βγήκε από το ημερολόγιο' : ''));
   }).catch(function (e) {
     t.done = before.done;
     t.doneTs = before.doneTs;
@@ -3966,7 +3966,7 @@ function onSaveTask() {
     renderTasks();
     closeSheet('task');
     toast((data.id ? 'Η εργασία άλλαξε' : 'Η εργασία καταχωρήθηκε') +
-          (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : t.hasEvent ? (t.invited ? ' · ήρθε ως πρόσκληση' : ' · στο ημερολόγιο') : ''));
+          (r.queued ? '' : t.hasEvent ? (t.invited ? ' · ήρθε ως πρόσκληση' : ' · στο ημερολόγιο') : ''));
   }).catch(function (e) {
     hint.className = 'save-hint err';
     hint.textContent = e.message;
@@ -3995,7 +3995,7 @@ function onDeleteTask() {
       S.tasks = S.tasks.filter(function (t) { return t.id !== id; });
       renderTasks();
       closeSheet('task');
-      toast('Η εργασία διαγράφηκε' + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
+      toast('Η εργασία διαγράφηκε');
     }).catch(function (e) {
       resetDeleteTask();
       toast(e.message, true);
@@ -4603,7 +4603,7 @@ function refreshNow() {
   }).catch(function (e) {
     spin(false);
     offBar();
-    toast(e.net ? 'Χωρίς σύνδεση. Βλέπεις τα τελευταία στοιχεία· οι αλλαγές σου θα σταλούν μόλις έρθει σήμα.' : e.message, !e.net);
+    if (!e.net) toast(e.message, true);   // 2.14: χωρίς σήμα μιλά μόνο η τελεία
   });
 }
 
@@ -6334,8 +6334,7 @@ function onSaveCallNote() {
     closePop('callnote');
     if (S.lead && S.lead.id === res.lead.id) fillDetail(res.lead);
     if (S.view === 'calls' || S.view === 'today') render();
-    toast(rr.queued ? 'Η σημείωση αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα'
-      : res.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Η σημείωση αποθηκεύτηκε', res.masked);
+    toast(res.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Η σημείωση αποθηκεύτηκε', res.masked);
     // «Δεν απάντησε» → όπως το κουμπί: κατάσταση και follow-up στο ημερολόγιο.
     if (noAnswer) {
       return send('status', { id: res.lead.id, status: ST.NO_ANSWER }).then(function (r2) {
@@ -6579,6 +6578,154 @@ function onOfCancel() {
   });
 }
 
+
+// ═════════════════════════════════════════════════════════════
+//  2.14 · ΦΟΡΜΑ ΖΗΤΗΣΗΣ (server: Demand.gs, σελίδα πελάτη: demand.html)
+//  Ο πελάτης δεν ενδιαφέρθηκε → του στέλνουμε link να γράψει τι ψάχνει.
+//  Θέλει σήμα (φτιάχνει link). Η τελευταία εικόνα κρατιέται στη μνήμη, ώστε
+//  χωρίς σήμα να φαίνονται ακόμα τα κριτήρια που έστειλε.
+// ═════════════════════════════════════════════════════════════
+
+S.dmCache = {};
+
+function openDemand(l) {
+  if (!l) return;
+  if (!S.dmLink || S.dmLink.id !== l.id) S.dmLink = null;
+  S.dmLead = l.id;
+  var have = S.dmCache[l.id];
+  if (have) renderDemand(have); else $('dm-body').innerHTML = '<p class="cal-status muted">Φόρτωση…</p>';
+  openPop('demand');
+  api('demandStatus', { id: l.id }).then(function (st) {
+    S.dmCache[l.id] = st;
+    if (S.dmLead === l.id) renderDemand(st);
+  }).catch(function (e) {
+    if (!have) $('dm-body').innerHTML = '<p class="save-hint err">' + esc(e.message) + '</p>' +
+      '<button class="btn wide gap-top" id="dm-self">Γράψε τα κριτήρια μόνος σου (Προφίλ)</button>';
+    var b = $('dm-self'); if (b) b.onclick = dmToProfile;
+  });
+}
+
+function dmToProfile() { closePop('demand'); showProfileTab(); }
+
+function dmCopy(text, msg) {
+  var done = function () { toast(msg); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(function () { copyFallback(text, done); });
+  else copyFallback(text, done);
+}
+
+function renderDemand(st) {
+  S.dmState = st;
+  var el = $('dm-body'), l = findLead(S.dmLead) || S.lead || {}, link = S.dmLink;
+
+  if (st.status === 'Συμπληρώθηκε') {
+    var rows = (st.lines || []).map(function (x) { return sfFact(x[0], x[1]); }).join('');
+    el.innerHTML = '<div class="sf-box ok"><p class="sf-state"><span class="tag showing">Συμπληρώθηκε</span><span>' + esc(st.submitted) + '</span></p>' +
+      '<p class="cal-status muted">' + esc(st.deal || '') + '</p>' +
+      '<dl class="facts sf-facts">' + rows + '</dl>' +
+      '<button class="btn wide" id="dm-copy">' + ico('form') + '<span>Αντιγραφή για το iList</span></button>' +
+      (st.ilist
+        ? '<p class="cal-status ok dm-ilist">✓ Περάστηκε στο iList ' + esc(lowerDay(niceDate(st.ilist))) + ' <button class="link" id="dm-undo">Αναίρεση</button></p>'
+        : '<button class="btn solid-red wide gap-top" id="dm-done">Η ζήτηση περάστηκε στο iList</button>') +
+      '<button class="link gap-top" id="dm-new">Νέα φόρμα στον ίδιο πελάτη</button></div>';
+    $('dm-copy').onclick = function () {
+      var notes = (st.answers && st.answers.notes) ? '\nΣημειώσεις: ' + st.answers.notes : '';
+      dmCopy((l.name ? l.name + ' · ' : '') + st.summary + notes, 'Τα κριτήρια αντιγράφηκαν');
+    };
+    if ($('dm-done')) $('dm-done').onclick = function () { dmIList(true); };
+    if ($('dm-undo')) $('dm-undo').onclick = function () { dmIList(false); };
+    $('dm-new').onclick = function () {
+      ask('Νέα φόρμα;', 'Οι απαντήσεις που έστειλε μένουν στο φύλλο. Θα φτιαχτεί νέο link.', 'Ναι, νέα φόρμα')
+        .then(function (yes) { if (yes) renderDemand({ status: '', deal: st.deal }); });
+    };
+    return;
+  }
+
+  if (link && st.status === 'Στάλθηκε') {
+    var phone = l.phoneIntl || '';
+    el.innerHTML = '<div class="sf-box wait"><p class="sf-state"><span class="tag noanswer">Περιμένει τον πελάτη</span><span>λήγει ' + esc(st.expires) + '</span></p>' +
+      '<p class="cal-status muted of-or">Στείλε το link στον πελάτη:</p>' +
+      '<div class="sf-actions">' +
+        (phone ? '<a class="btn" href="' + esc(smsHref(phone, link.sms)) + '">' + ico('sms') + '<span>SMS</span></a>' : '') +
+        (link.wa ? '<a class="btn" href="https://wa.me/' + esc(link.wa) + '?text=' + encodeURIComponent(link.sms) + '" target="_blank" rel="noopener">' + ico('sms') + '<span>WhatsApp</span></a>' : '') +
+        (link.email.to ? '<a class="btn" href="mailto:' + esc(link.email.to) + '?subject=' + encodeURIComponent(link.email.subject) +
+          '&body=' + encodeURIComponent(link.email.body) + '">' + ico('mail') + '<span>Email</span></a>' : '') +
+        '<button class="btn" id="dm-copylink">Αντιγραφή link</button>' +
+      '</div>' +
+      '<a class="btn wide gap-top" href="' + esc(link.url) + '" target="_blank" rel="noopener">' + ico('form') + '<span>Συμπλήρωση εδώ, μαζί με τον πελάτη</span></a>' +
+      '<button class="link" id="dm-cancel">Ακύρωση link</button></div>';
+    $('dm-copylink').onclick = function () { dmCopy(link.url, 'Το link αντιγράφηκε'); };
+    $('dm-cancel').onclick = onDmCancel;
+    return;
+  }
+
+  if (st.status === 'Στάλθηκε') {
+    el.innerHTML = '<div class="sf-box wait"><p class="sf-state"><span class="tag noanswer">Στάλθηκε ' + esc(st.created) + '</span></p>' +
+      '<p class="cal-status muted">Λήγει ' + esc(st.expires) + (st.opens ? ' · ο πελάτης το άνοιξε ' + st.opens + (st.opens === 1 ? ' φορά' : ' φορές') : ' · δεν έχει ανοιχτεί ακόμα') + '.</p>' +
+      '<div class="sf-actions"><button class="btn" id="dm-again">Στείλε ξανά</button><button class="btn" id="dm-cancel">Ακύρωση link</button></div></div>';
+    $('dm-again').onclick = function () {
+      ask('Νέο link;', 'Το παλιό link σταματά να ισχύει.', 'Ναι, νέο link').then(function (yes) { if (yes) onDmCreate(st.deal); });
+    };
+    $('dm-cancel').onclick = onDmCancel;
+    return;
+  }
+
+  var deal = st.deal || 'Αγορά';
+  el.innerHTML = (st.status === 'Έληξε' || st.status === 'Ακυρώθηκε'
+      ? '<p class="cal-status warn">Το προηγούμενο link ' + (st.status === 'Έληξε' ? 'έληξε' : 'ακυρώθηκε') + '.</p>' : '') +
+    '<p class="cal-status muted">Ο πελάτης γράφει από το κινητό του τι ψάχνει: τιμή, τ.μ., τιμή ανά τ.μ., όροφο, υπνοδωμάτια, περιοχές, έτος κατασκευής, πάρκινγκ, επιπλωμένο. Σου έρχεται ειδοποίηση με τις απαντήσεις.</p>' +
+    '<div class="seg dm-deal" role="radiogroup" aria-label="Ψάχνει για">' +
+      ['Αγορά', 'Ενοικίαση'].map(function (d) {
+        return '<button type="button" role="radio" class="seg-btn' + (d === deal ? ' is-on' : '') + '" aria-checked="' + (d === deal) + '" data-dmdeal="' + d + '">' + d + '</button>';
+      }).join('') + '</div>' +
+    '<button class="btn solid-red wide" id="dm-create">' + ico('form') + '<span>Ετοίμασε τη φόρμα</span></button>' +
+    '<button class="link gap-top" id="dm-self">ή γράψε τα κριτήρια μόνος σου (Προφίλ)</button>';
+  el.querySelectorAll('[data-dmdeal]').forEach(function (b) {
+    b.onclick = function () {
+      deal = b.dataset.dmdeal;
+      el.querySelectorAll('[data-dmdeal]').forEach(function (x) {
+        var on = x === b; x.classList.toggle('is-on', on); x.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    };
+  });
+  $('dm-create').onclick = function () { onDmCreate(deal); };
+  $('dm-self').onclick = dmToProfile;
+}
+
+function onDmCreate(deal) {
+  var id = S.dmLead;
+  var b = $('dm-create') || $('dm-again');
+  if (b) { b.disabled = true; b.textContent = 'Ετοιμάζεται…'; }
+  api('demandCreate', { id: id, deal: deal || '' }).then(function (res) {
+    S.dmLink = { id: id, url: res.url, sms: res.sms, wa: res.wa, email: res.email };
+    S.dmCache[id] = res.form;
+    if (S.dmLead === id) renderDemand(res.form);
+  }).catch(function (e) {
+    if (b) { b.disabled = false; b.textContent = 'Ετοίμασε τη φόρμα'; }
+    toast(e.message, true);
+  });
+}
+
+function onDmCancel() {
+  ask('Ακύρωση link;', 'Ο πελάτης δεν θα μπορεί πια να συμπληρώσει τη φόρμα από αυτό το link.', 'Ναι, ακύρωση').then(function (yes) {
+    if (!yes) return;
+    var id = S.dmLead;
+    api('demandCancel', { id: id }).then(function (st) {
+      S.dmLink = null;
+      S.dmCache[id] = st;
+      if (S.dmLead === id) renderDemand(st);
+      toast('Το link ακυρώθηκε');
+    }).catch(function (e) { toast(e.message, true); });
+  });
+}
+
+function dmIList(on) {
+  var id = S.dmLead;
+  api('demandIList', { id: id, on: on }).then(function (st) {
+    S.dmCache[id] = st;
+    if (S.dmLead === id) renderDemand(st);
+    toast(on ? 'Σημειώθηκε: περάστηκε στο iList' : 'Αναιρέθηκε');
+  }).catch(function (e) { toast(e.message, true); });
+}
 
 // ═════════════════════════════════════════════════════════════
 //  2.0 · ΝΕΟ INTERFACE
@@ -7107,7 +7254,7 @@ function wireLeadPick() {
       l.notes = all;
       if (S.lead && S.lead.id === l.id) $('d-notes').value = all;
       closePop('lpick');
-      toast('Η σημείωση μπήκε στον πελάτη · ' + (l.name || '') + (r.queued ? ' · θα σταλεί μόλις έρθει σήμα' : ''));
+      toast('Η σημείωση μπήκε στον πελάτη · ' + (l.name || ''));
     }).catch(function (e) {
       $('lp-save').disabled = false;
       msg.className = 'save-hint err';
@@ -7256,7 +7403,7 @@ function loadProfile(l) {
     S.pf.loaded = true;
     if (e.net) {                                    // 2.2: χωρίς σήμα συμπληρώνεται κανονικά
       renderProfile(l);
-      pfHint(have ? 'Χωρίς σύνδεση · βλέπεις ό,τι είχε το κινητό. Οι αλλαγές θα σταλούν μετά.' : 'Χωρίς σύνδεση · συμπλήρωσε κανονικά, θα σταλεί μόλις έρθει σήμα.');
+      pfHint('');
       return;
     }
     S.pf.err = /Άγνωστη ενέργεια/.test(e.message)
@@ -7290,8 +7437,7 @@ function pfSaveNow(quiet) {
   send('profileSave', { id: pf.id, p: data, level: sc.level }).then(function (rr) {
     var r = rr.data;
     S.profiles[pf.id].updated = r.saved;
-    if (S.pf === pf) pfHint(rr.queued ? 'Αποθηκεύτηκε στο κινητό · θα σταλεί μόλις έρθει σήμα'
-      : r.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : 'Αποθηκεύτηκε ' + lowerDay(niceDate(r.saved)), r.masked);
+    if (S.pf === pf) pfHint(r.masked ? 'Αποθηκεύτηκε. Αριθμοί ταυτότητας/ΑΦΜ σβήστηκαν.' : rr.queued || !r.saved ? 'Αποθηκεύτηκε' : 'Αποθηκεύτηκε ' + lowerDay(niceDate(r.saved)), r.masked);
     if (S.lead && S.lead.id === pf.id) pfLine(S.lead);
   }).catch(function (e) {
     pf.dirty = true;
@@ -7629,7 +7775,7 @@ function offFlush(manual) {
     offBar();
     if (failed.length) toast('Δεν πέρασαν ' + plural(failed.length, 'αλλαγή', 'αλλαγές') + ': ' + failed.map(offLabel).join(', '), true);
     if (sent && !S.queue.length) {
-      if (!failed.length) toast('✓ ' + (sent === 1 ? 'Στάλθηκε 1 αλλαγή' : 'Στάλθηκαν ' + sent + ' αλλαγές') + ' που έκανες χωρίς σήμα');
+      if (!failed.length) netDotSent();   // 2.14: πράσινη τελεία αντί για μήνυμα
       if (!isAdminMode() && !isCoachMode() && $('detail').hidden && $('showing').hidden) offRefresh();
     }
     if (S.queue.length) offFlushSoon();
@@ -7818,32 +7964,62 @@ function apiRead(action, data) {
     return d;
   }, function (e) {
     if (!e.net) throw e;
-    try { var c = JSON.parse(localStorage.getItem(key) || 'null'); if (c) { toast('Χωρίς σύνδεση · δείχνω ό,τι είχε φορτώσει'); return c.d; } } catch (x) { /* τίποτα */ }
+    try { var c = JSON.parse(localStorage.getItem(key) || 'null'); if (c) return c.d; } catch (x) { /* τίποτα */ }
     throw new Error('Χρειάζεται σύνδεση. Θα φορτώσει μόλις έρθει σήμα.');
   });
 }
 
-// ── Η μπάρα κατάστασης ───────────────────────────────────
+// ── 2.14 · Η τελεία σύνδεσης (πάνω δεξιά) ────────────────
+// Αντί για μπάρα και μηνύματα «θα σταλεί μόλις έρθει σήμα», μία μικρή τελεία:
+//   κρυφή   = όλα σταλμένα, υπάρχει σήμα
+//   πορτοκαλί = χωρίς σήμα ή αλλαγές που περιμένουν (αναβοσβήνει όσο στέλνει)
+//   πράσινη = μόλις στάλθηκαν, σβήνει μόνη της σε λίγα δευτερόλεπτα
+// Πάτημα: λέει σε μία γραμμή τι συμβαίνει και ξαναδοκιμάζει την αποστολή.
+var NETDOT_GREEN_MS = 3500;
+var netDotTimer = null;
+S.netDotGreen = false;
+
+function netDotState() {
+  var n = S.queue.filter(function (o) { return !OFF.QUIET[o.a]; }).length;
+  return { n: n, off: S.netBad || navigator.onLine === false, waiting: n > 0 || S.bootStale };
+}
 
 function offBar() {
-  var bar = $('offbar');
-  if (!bar || !S.boot) return;
-  var n = S.queue.filter(function (o) { return !OFF.QUIET[o.a]; }).length;
-  var off = S.netBad || navigator.onLine === false;
-  bar.hidden = !n && !off && !S.bootStale;
-  var queued = S.queue.length;
-  if (bar.hidden) { document.body.classList.remove('has-offbar'); return; }
-  document.body.classList.add('has-offbar');
-  bar.className = 'offbar' + (off ? ' off' : '') + (S.flushing ? ' busy' : '');
-  var text = off ? 'Χωρίς σύνδεση' : S.flushing ? 'Αποστολή…' : n ? 'Περιμένουν αποστολή' : 'Ενημέρωση…';
-  if (n) text += ' · ' + plural(n, 'αλλαγή', 'αλλαγές');
-  else if (S.bootStale && S.bootAt) text += ' · στοιχεία από ' + lowerDay(niceDate(stampOf(new Date(S.bootAt))));
-  $('offbar-text').textContent = text;
-  $('offbar-btn').hidden = !queued || S.flushing;
+  var dot = $('netdot');
+  if (!dot || !S.boot) return;
+  var st = netDotState();
+  var amber = st.off || st.waiting;
+  if (amber) { S.netDotGreen = false; clearTimeout(netDotTimer); }
+  dot.hidden = !amber && !S.netDotGreen;
+  dot.className = 'netdot' + (amber ? ' wait' : ' ok') + (S.flushing ? ' busy' : '');
+  var label = st.off ? 'Χωρίς σύνδεση' : S.flushing ? 'Αποστολή…' : amber ? 'Περιμένουν αποστολή' : 'Στάλθηκαν';
+  if (st.n) label += ' · ' + plural(st.n, 'αλλαγή', 'αλλαγές');
+  dot.setAttribute('aria-label', label);
+  dot.title = label;
+}
+
+/** Όλες οι αλλαγές έφυγαν: πράσινη για λίγο, μετά κρύβεται. */
+function netDotSent() {
+  S.netDotGreen = true;
+  offBar();
+  clearTimeout(netDotTimer);
+  netDotTimer = setTimeout(function () { S.netDotGreen = false; offBar(); }, NETDOT_GREEN_MS);
+}
+
+function netDotTap() {
+  var st = netDotState();
+  if (!st.off && !st.waiting) return;
+  var msg = st.off ? 'Χωρίς σύνδεση' : 'Στέλνονται';
+  if (st.n) msg += ' · ' + plural(st.n, 'αλλαγή', 'αλλαγές') + ' στο κινητό, φεύγουν μόνες τους';
+  else if (S.bootStale && S.bootAt) msg += ' · στοιχεία από ' + lowerDay(niceDate(stampOf(new Date(S.bootAt))));
+  toast(msg);
+  S.netBad = false;
+  offFlush(true);
+  if (S.bootStale && navigator.onLine !== false) offRefresh();
 }
 
 function wireOffline() {
-  $('offbar-btn').onclick = function () { S.netBad = false; offFlush(true); };
+  $('netdot').onclick = netDotTap;
   window.addEventListener('online', function () { S.netBad = false; offBar(); offFlushSoon(300); if (S.bootStale) offRefresh(); });
   window.addEventListener('offline', function () { S.netBad = true; offBar(); });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) offFlushSoon(800); });

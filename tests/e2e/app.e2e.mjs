@@ -866,3 +866,115 @@ test('2.12: «Θέλει διόρθωση» στην αρχική → «Άνοι
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
+
+// ── 2.14 ─────────────────────────────────────────────────────
+
+test('2.14: χωρίς σήμα → πορτοκαλί τελεία πάνω δεξιά, χωρίς μήνυμα «σήμα»· με σήμα → πράσινη και σβήνει', { skip }, async () => {
+  const a = await openApp();
+  assert.equal(await a.page.locator('#netdot').isHidden(), true, 'η τελεία φαίνεται με σήμα και χωρίς αλλαγές');
+  assert.equal(await a.page.locator('#offbar').count(), 0, 'έμεινε η παλιά μπάρα');
+  await a.ctx.setOffline(true);
+  await a.page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await a.page.waitForTimeout(900);
+  await a.swipe(-220);                                  // «Δεν απάντησε» → μετά από 4″ πάει στην ουρά
+  await a.page.waitForTimeout(4600 + 6500);
+  const dot = a.page.locator('#netdot');
+  assert.equal(await dot.isHidden(), false);
+  assert.match(await dot.getAttribute('class'), /\bwait\b/);
+  assert.match(await dot.getAttribute('aria-label'), /1 αλλαγή/);
+  const box = await dot.boundingBox(), vw = a.page.viewportSize().width;
+  assert.ok(box.x + box.width >= vw - 1 && box.y < 60, 'η τελεία δεν είναι πάνω δεξιά');
+  assert.doesNotMatch(await a.page.locator('#toast').innerText(), /σήμα/);
+  await a.ctx.setOffline(false);
+  await a.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await a.page.waitForTimeout(1500);
+  assert.match(await dot.getAttribute('class'), /\bok\b/, 'δεν πρασίνισε μετά την αποστολή');
+  assert.ok(a.sent.includes('status'));
+  await a.page.waitForTimeout(3800);
+  assert.equal(await dot.isHidden(), true, 'η πράσινη τελεία δεν έσβησε');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.14: «Πάρε ζήτηση» → φόρμα → link για SMS · συμπληρωμένη → κριτήρια + iList', { skip }, async () => {
+  const past = now - 2 * 3600e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const l = { ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: '10:00',
+    showingAt: p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 10:00', outcome: 'Δεν ενδιαφέρθηκε', form: 'Υπογράφηκε' };
+  let state = { status: '', deal: 'Αγορά' }, created = null, ilist = null;
+  const done = { status: 'Συμπληρώθηκε', submitted: '20/11/2026 10:00', deal: 'Αγορά', ilist: '',
+    lines: [['Τιμή', '150.000 – 250.000 €'], ['Περιοχές', 'Παγκράτι']], summary: 'Αγορά · 150.000 – 250.000 € · Περιοχές: Παγκράτι', answers: { notes: '' } };
+  const a = await openApp({}, null, { leads: [l] }, {
+    demandStatus: () => state,
+    demandCreate: (x) => { created = x; return { form: { status: 'Στάλθηκε', expires: '20/12/2026 10:00', deal: x.deal },
+      url: 'https://x/demand.html#' + 'a'.repeat(48), sms: 'Καλησπέρα Μαρία…', wa: '306900000000', email: { to: '', subject: '', body: '' } }; },
+    demandIList: (x) => { ilist = x; return { ...done, ilist: '20/11/2026 11:00' }; }
+  });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(350);
+  await a.page.locator('#d-next [data-next="demand"]').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#demand').isHidden(), false);
+  await a.page.locator('[data-dmdeal="Ενοικίαση"]').click();
+  await a.page.locator('#dm-create').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(created.deal, 'Ενοικίαση');
+  assert.match(await a.page.locator('#dm-body').innerText(), /Περιμένει τον πελάτη[\s\S]*SMS/);
+  await a.page.locator('#demand [data-pop-close]').click();
+  await a.page.waitForTimeout(300);
+  state = done;
+  await a.page.locator('#d-next [data-next="demand"]').click();
+  await a.page.waitForTimeout(400);
+  const txt = await a.page.locator('#dm-body').innerText();
+  assert.match(txt, /150\.000 – 250\.000 €/);
+  assert.match(txt, /Αντιγραφή για το iList/);
+  await a.page.locator('#dm-done').click();
+  await a.page.waitForTimeout(300);
+  assert.deepEqual(ilist, { id: 'L1', on: true });
+  assert.match(await a.page.locator('#dm-body').innerText(), /Περάστηκε στο iList/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.14: σελίδα πελάτη demand.html — συμπλήρωση και αποστολή', { skip }, async () => {
+  const ctx = await browser.newContext({ ...pw.devices['Pixel 7'], locale: 'el-GR' });
+  let got = null; const errors = [];
+  await ctx.route(/script\.google\.com/, async (r) => {
+    const b = JSON.parse(r.request().postData() || '{}');
+    const data = b.action === 'demandOpen'
+      ? { office: 'KW', agent: 'Ξενοφών', first: 'Μαρία', deal: 'Αγορά', area: 'Παγκράτι', expires: '20/12/2026',
+          floors: ['Υπόγειο', 'Ισόγειο', '1ος', '2ος', '3ος', '4ος', '5ος+', 'Ρετιρέ'], beds: ['1', '2', '3', '4+'] }
+      : (got = b.data, { ok: true });
+    await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
+  });
+  await ctx.addInitScript(() => { window.KW_CONFIG = { API_URL: 'https://script.google.com/macros/s/X/exec' }; });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(base + 'demand.html#' + 'b'.repeat(48));
+  await page.waitForSelector('#form:not([hidden])', { timeout: 10000 });
+  assert.match(await page.locator('#lead-in').innerText(), /Μαρία/);
+  await page.fill('#f-priceMin', '150000'); await page.fill('#f-priceMax', '250000');
+  await page.fill('#f-sqmMin', '70'); await page.fill('#f-ppsMax', '2500');
+  await page.locator('#beds .chip', { hasText: '2' }).click();
+  await page.locator('#floors .chip', { hasText: '3ος' }).click();
+  await page.fill('#f-yearMin', '1990');
+  await page.check('#f-parking');
+  await page.fill('#f-areas', 'Παγκράτι, Κουκάκι');
+  await page.fill('#f-notes', 'ασανσέρ');
+  // «από» > «έως»: σφάλμα στη συσκευή, τίποτα δεν στέλνεται
+  await page.fill('#f-sqmMax', '50');
+  await page.locator('#submit').click();
+  assert.match(await page.locator('[data-f="sqm"] .err').innerText(), /μικρότερο/);
+  assert.equal(got, null);
+  await page.fill('#f-sqmMax', '100');
+  await page.locator('#submit').click();
+  await page.waitForSelector('#done:not([hidden])', { timeout: 5000 });
+  assert.equal(got.c.priceMin, '150.000');
+  assert.equal(got.c.beds, '2');
+  assert.deepEqual(got.c.floors, ['3ος']);
+  assert.equal(got.c.parking, true);
+  assert.equal(got.c.furnished, false);
+  assert.equal(got.f, 'b'.repeat(48));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

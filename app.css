@@ -1331,27 +1331,24 @@ html[data-theme="dark"] .seg-btn.is-on{background:var(--card);box-shadow:inset 0
 .pf-hint{text-align:center;margin-top:1.25rem}
 .pf-err{margin-top:.5rem}
 
-/* ── 2.2 Χωρίς σύνδεση: μπάρα πάνω από τα tabs ── */
-:root{--off-h:3.25rem}
-.offbar{position:fixed;left:0;right:0;z-index:38;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom));
-  min-height:var(--off-h);display:flex;align-items:center;gap:.625rem;padding:.25rem .5rem .25rem 1rem;
-  background:var(--card);color:var(--ink);border-top:1px solid var(--line);font-size:1rem;font-weight:700}
-.offbar[hidden]{display:none}
-.offbar-dot{width:.75rem;height:.75rem;border-radius:50%;flex:0 0 auto;background:var(--green-solid,#1f7a3d)}
-.offbar.off{background:var(--a-bg);color:var(--amber)}
-.offbar.off .offbar-dot{background:var(--amber-solid)}
-.offbar.busy .offbar-dot{animation:offpulse 1s ease-in-out infinite}
+/* ── 2.14 Τελεία σύνδεσης πάνω δεξιά (αντί για τη μπάρα της 2.2) ──
+   Το κουμπί είναι 28×28 για να πατιέται, η τελεία μέσα 10px στη γωνία. */
+.netdot{position:fixed;z-index:1001;top:calc(env(safe-area-inset-top) + var(--env-h,0px));right:0;
+  width:1.75rem;height:1.75rem;padding:0;border:0;background:transparent;cursor:pointer;
+  display:flex;align-items:flex-start;justify-content:flex-end;-webkit-tap-highlight-color:transparent}
+.netdot[hidden]{display:none}
+.netdot span{width:.625rem;height:.625rem;margin:.3rem .3rem 0 0;border-radius:50%;
+  box-shadow:0 0 0 2px var(--paper,#fff);transition:background-color .3s ease}
+.netdot.wait span{background:var(--amber-solid,#c77700)}
+.netdot.ok span{background:var(--green-solid,#1f7a3d)}
+.netdot.busy span{animation:offpulse 1s ease-in-out infinite}
 @keyframes offpulse{50%{opacity:.25}}
-.offbar-text{flex:1;min-width:0;line-height:1.25}
-.offbar-btn{flex:0 0 auto;min-height:2.75rem;padding:0 1rem;border:0;border-radius:.75rem;
-  background:var(--ink);color:var(--on-ink);font-weight:700;font-size:1rem;cursor:pointer}
-.offbar-btn[hidden]{display:none}
-body.has-offbar .view{padding-bottom:calc(var(--tab-h) + var(--off-h) + env(safe-area-inset-bottom) + .75rem)}
-body.has-offbar .fab,body.has-offbar .toast{bottom:calc(var(--tab-h) + var(--off-h) + env(safe-area-inset-bottom) + .875rem)}
-@media(min-width:1024px){
-  .offbar{left:var(--side-w);bottom:0}
-  body.has-offbar .view{padding-bottom:calc(var(--off-h) + 1rem)}
-}
+@media (prefers-reduced-motion:reduce){.netdot.busy span{animation:none}}
+
+/* 2.14 · Φόρμα ζήτησης (μέσα στην εφαρμογή) */
+.dm-deal{margin:0 0 1rem}
+.dm-deal .seg-btn{min-height:3.25rem;font-size:1.0625rem}
+.dm-ilist{margin-top:.75rem}
 
 /* 2.3 · FEAT-9 Smart Form Memory: chips «Συχνά:» κάτω από περιοχές / budget */
 .pf-mem{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}

@@ -187,7 +187,7 @@ function gstCommit(job) {
     var l = r.data;
     if (l) merge(l);
     render();
-    if (r.queued) toast('Δεν απάντησε · το follow-up θα μπει στο ημερολόγιο μόλις έρθει σήμα');
+    if (r.queued) toast('Δεν απάντησε');
     else if (l && l.warning) toast(l.warning, true);
     else if (l && l.ladder && window.ladderToast) window.ladderToast(l, false);   // 2.4 · FEAT-14
     else if (l && l.followUp) toast('Follow-up ' + l.followUp + (l.invited ? ' · ήρθε ως πρόσκληση' : ''));
