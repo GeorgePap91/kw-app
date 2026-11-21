@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.15.1';
+var APP_VERSION = '2.16';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.25';
+var API_VERSION = '1.26';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -428,7 +428,7 @@ function start() {
     apiTimed('bootstrap', {}, 20000).then(function (b) {
       S.bootStale = false;
       S.bootAt = Date.now();
-      S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || []; S.drops = b.drops || [];   // 2.3.2: και τα feature flags
+      S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || []; S.dmLocal = {}; S.drops = b.drops || [];   // 2.3.2: και τα feature flags
       applyData(b);
       render();
       fillSettings();
@@ -571,7 +571,7 @@ function bootFail(msg, final) {
 function onBoot(b) {
   S.boot = b;
   S.me = b.agent;
-  S.flags = b.flags || {}; S.matches = b.matches || []; S.drops = b.drops || [];                         // 2.3: feature flags (Ιδιότητα σεναρίου FEATURES)
+  S.flags = b.flags || {}; S.matches = b.matches || []; S.dmLocal = {}; S.drops = b.drops || [];                         // 2.3: feature flags (Ιδιότητα σεναρίου FEATURES)
   applyData(b);
 
   $('env').hidden = b.env === 'prod';
@@ -2612,6 +2612,16 @@ function renderNext(l) {
       title = 'Κλείσε 2η υπόδειξη';
       text = note + 'Ο πελάτης θέλει δεύτερη υπόδειξη. ' + when;
       btns = b('second', 'Κλείσε 2η υπόδειξη', 'calendar', true) + b('task', 'Εργασία', 'tasks');
+    } else if (oi === 2 && dmOf(l.id) && dmOf(l.id).status === 'Συμπληρώθηκε') {   // 2.16: η ζήτηση πάρθηκε
+      var dz = dmOf(l.id), crit = String(dz.summary || '').replace(/^(Αγορά|Ενοικίαση) · /, '');
+      title = dz.ilist ? 'Η ζήτηση πάρθηκε' : 'Πέρασε τη ζήτηση στο iList';
+      text = (crit ? crit + '. ' : '') + (dz.ilist ? 'Περάστηκε στο iList ' + lowerDay(niceDate(dz.ilist)) + '.' : 'Δεν έχει περαστεί ακόμα στο iList.');
+      btns = b('demand', dz.ilist ? 'Η ζήτηση' : 'Πέρασμα στο iList', 'form', true) + b('task', 'Εργασία', 'tasks');
+    } else if (oi === 2 && dmOf(l.id) && dmOf(l.id).status === 'Στάλθηκε') {       // 2.16: η φόρμα περιμένει τον πελάτη
+      var dw = dmOf(l.id);
+      title = 'Περιμένεις τη ζήτηση';
+      text = 'Η φόρμα στάλθηκε ' + lowerDay(niceDate(dw.created)) + '. ' + (dw.opens ? 'Ο πελάτης την άνοιξε.' : 'Δεν την έχει ανοίξει ακόμα.');
+      btns = b('demand', 'Η φόρμα', 'form', true) + b('task', 'Εργασία', 'tasks');
     } else if (oi === 2) {                          // Δεν ενδιαφέρθηκε → ζήτηση
       title = 'Πάρε ζήτηση';
       text = note + 'Δεν ενδιαφέρθηκε για αυτό το ακίνητο. Γράψε τι ψάχνει, για να του βρεις άλλο. ' + when;
@@ -2683,6 +2693,14 @@ function renderHist(l) {
   if (hasShowing(l)) add(l.showingTs, 'Υπόδειξη', l.address || '', 'show');
   add(l.smsRemind, 'SMS υπενθύμισης');
   if (l.outcome) add(l.showingTs ? l.showingTs + 60000 : null, 'Αποτέλεσμα: ' + l.outcome, l.outcomeNote, 'done');
+  var dz = dmOf(l.id);                                     // 2.16: η ζήτηση στο ιστορικό
+  if (dz) {
+    var crit = String(dz.summary || '').replace(/^(Αγορά|Ενοικίαση) · /, '');
+    if (!dz.self) add(dz.created, 'Στάλθηκε φόρμα ζήτησης', dz.status === 'Στάλθηκε' ? (dz.opens ? 'ο πελάτης την άνοιξε' : 'περιμένει τον πελάτη') : '');
+    if (dz.submitted) add(dz.submitted, dz.self ? 'Καταχώρησες τη ζήτηση' : 'Ο πελάτης έστειλε τη ζήτηση', crit);
+    if (dz.edited && dz.edited !== dz.submitted) add(dz.edited, 'Άλλαξες τη ζήτηση', dz.self ? '' : crit);
+    if (dz.ilist) add(dz.ilist, 'Η ζήτηση περάστηκε στο iList', '', 'done');
+  }
   ev.sort(function (a, b) { return a.d - b.d; });
 
   var now = Date.now();
@@ -4592,7 +4610,7 @@ function refreshNow() {
   apiTimed('bootstrap', {}, 20000).then(function (b) {
     S.boot = b;
     S.me = b.agent;
-    S.flags = b.flags || {}; S.matches = b.matches || []; S.drops = b.drops || [];                         // 2.3.2: και τα feature flags
+    S.flags = b.flags || {}; S.matches = b.matches || []; S.dmLocal = {}; S.drops = b.drops || [];                         // 2.3.2: και τα feature flags
     S.bootStale = false;
     S.bootAt = Date.now();
     applyData(b);
@@ -6619,9 +6637,21 @@ function dmCopy(text, msg) {
   else copyFallback(text, done);
 }
 
+/** 2.16 · Η ζήτηση της κλήσης: ό,τι άλλαξε σε αυτή τη χρήση, αλλιώς ό,τι έφερε το bootstrap. */
+S.dmLocal = {};
+function dmOf(id) { return S.dmLocal[id] || (S.boot && S.boot.demands || {})[id] || null; }
+
+/** Μετά από αλλαγή στη ζήτηση: η κάρτα του πελάτη (Επόμενο βήμα + Ιστορικό) δείχνει αμέσως το νέο. */
+function dmTouch(id, st) {
+  if (!id || !st || !st.status) return;
+  S.dmLocal[id] = st;
+  if (S.lead && S.lead.id === id && $('detail') && !$('detail').hidden) { renderNext(S.lead); renderHist(S.lead); }
+}
+
 function renderDemand(st) {
   S.dmState = st;
   dmListUpdate(st);
+  dmTouch(S.dmLead, st);
   var el = $('dm-body'), l = findLead(S.dmLead) || (S.dmItem ? { name: S.dmItem.first } : S.lead) || {}, link = S.dmLink;
 
   if (st.status === 'Συμπληρώθηκε') {
@@ -6629,7 +6659,9 @@ function renderDemand(st) {
     el.innerHTML = '<div class="sf-box ok"><p class="sf-state"><span class="tag showing">Συμπληρώθηκε</span><span>' + esc(st.submitted) + '</span></p>' +
       '<p class="cal-status muted">' + esc(st.deal || '') + '</p>' +
       '<dl class="facts sf-facts">' + rows + '</dl>' +
+      (st.edited ? '<p class="cal-status muted">' + (st.self ? 'Την έγραψες εσύ' : 'Την άλλαξες') + ' ' + esc(lowerDay(niceDate(st.edited))) + '.</p>' : '') +
       '<button class="btn wide" id="dm-copy">' + ico('form') + '<span>Αντιγραφή για το iList</span></button>' +
+      '<button class="btn wide gap-top" id="dm-edit">' + ico('note') + '<span>Αλλαγή ζήτησης</span></button>' +
       (st.ilist
         ? '<p class="cal-status ok dm-ilist">✓ Περάστηκε στο iList ' + esc(lowerDay(niceDate(st.ilist))) + ' <button class="link" id="dm-undo">Αναίρεση</button></p>'
         : '<button class="btn solid-red wide gap-top" id="dm-done">Η ζήτηση περάστηκε στο iList</button>') +
@@ -6640,6 +6672,7 @@ function renderDemand(st) {
       var notes = (st.answers && st.answers.notes) ? '\nΣημειώσεις: ' + st.answers.notes : '';
       dmCopy((l.name ? l.name + ' · ' : '') + st.summary + notes, 'Τα κριτήρια αντιγράφηκαν');
     };
+    $('dm-edit').onclick = function () { renderDemandEdit(st); };
     if ($('dm-done')) $('dm-done').onclick = function () { dmIList(true); };
     if ($('dm-undo')) $('dm-undo').onclick = function () { dmIList(false); };
     if ($('dm-new')) $('dm-new').onclick = function () {
@@ -6661,7 +6694,8 @@ function renderDemand(st) {
         '<button class="btn" id="dm-copylink">Αντιγραφή link</button>' +
       '</div>' +
       '<a class="btn wide gap-top" href="' + esc(link.url) + '" target="_blank" rel="noopener">' + ico('form') + '<span>Συμπλήρωση εδώ, μαζί με τον πελάτη</span></a>' +
-      '<button class="link" id="dm-cancel">Ακύρωση link</button></div>';
+      '<button class="link" id="dm-cancel">Ακύρωση link</button> · <button class="link" id="dm-mine">Τη γράφω εγώ</button></div>';
+    $('dm-mine').onclick = function () { renderDemandEdit(st); };
     $('dm-copylink').onclick = function () { dmCopy(link.url, 'Το link αντιγράφηκε'); };
     $('dm-cancel').onclick = onDmCancel;
     return;
@@ -6670,7 +6704,9 @@ function renderDemand(st) {
   if (st.status === 'Στάλθηκε') {
     el.innerHTML = '<div class="sf-box wait"><p class="sf-state"><span class="tag noanswer">Στάλθηκε ' + esc(st.created) + '</span></p>' +
       '<p class="cal-status muted">Λήγει ' + esc(st.expires) + (st.opens ? ' · ο πελάτης το άνοιξε ' + st.opens + (st.opens === 1 ? ' φορά' : ' φορές') : ' · δεν έχει ανοιχτεί ακόμα') + '.</p>' +
-      '<div class="sf-actions"><button class="btn" id="dm-again">Στείλε ξανά</button><button class="btn" id="dm-cancel">Ακύρωση link</button></div></div>';
+      '<div class="sf-actions"><button class="btn" id="dm-again">Στείλε ξανά</button><button class="btn" id="dm-cancel">Ακύρωση link</button></div>' +
+      '<button class="link gap-top" id="dm-mine">Ο πελάτης μου τα είπε · τη γράφω εγώ</button></div>';
+    $('dm-mine').onclick = function () { renderDemandEdit(st); };
     $('dm-again').onclick = function () {
       ask('Νέο link;', 'Το παλιό link σταματά να ισχύει.', 'Ναι, νέο link').then(function (yes) { if (yes) onDmCreate(st.deal); });
     };
@@ -6687,7 +6723,7 @@ function renderDemand(st) {
         return '<button type="button" role="radio" class="seg-btn' + (d === deal ? ' is-on' : '') + '" aria-checked="' + (d === deal) + '" data-dmdeal="' + d + '">' + d + '</button>';
       }).join('') + '</div>' +
     '<button class="btn solid-red wide" id="dm-create">' + ico('form') + '<span>Ετοίμασε τη φόρμα</span></button>' +
-    '<button class="link gap-top" id="dm-self">ή γράψε τα κριτήρια μόνος σου (Προφίλ)</button>';
+    '<button class="link gap-top" id="dm-self">ή γράψε τη ζήτηση εσύ</button>';
   el.querySelectorAll('[data-dmdeal]').forEach(function (b) {
     b.onclick = function () {
       deal = b.dataset.dmdeal;
@@ -6697,7 +6733,104 @@ function renderDemand(st) {
     };
   });
   $('dm-create').onclick = function () { onDmCreate(deal); };
-  $('dm-self').onclick = dmToProfile;
+  $('dm-self').onclick = function () { renderDemandEdit({ status: '', deal: deal }); };
+}
+
+// ── 2.16 · Ο μεσίτης γράφει / αλλάζει τη ζήτηση ──────────────
+// Ίδια πεδία με τη σελίδα του πελάτη. Ο server κάνει τον ίδιο έλεγχο (dmClean_).
+var DM_FLOORS = ['Υπόγειο', 'Ισόγειο', '1ος', '2ος', '3ος', '4ος', '5ος+', 'Ρετιρέ'];   // ίδια με DEMAND.FLOORS
+var DM_BEDS = ['1', '2', '3', '4+'];
+
+function dmFmtN(n) { n = Number(n) || 0; return n ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''; }
+
+function renderDemandEdit(st) {
+  var a = st.answers || {}, deal = st.deal || 'Αγορά', el = $('dm-body');
+  var pair = function (f, label) {
+    var val = function (k) { return f === 'year' ? (a[k] || '') : dmFmtN(a[k]); };
+    return '<div class="field" data-de="' + f + '"><span>' + esc(label) + '</span><div class="de-range">' +
+      '<input id="de-' + f + 'Min" inputmode="numeric" autocomplete="off" placeholder="Από" aria-label="' + esc(label) + ' από" value="' + esc(val(f + 'Min')) + '">' +
+      '<input id="de-' + f + 'Max" inputmode="numeric" autocomplete="off" placeholder="Έως" aria-label="' + esc(label) + ' έως" value="' + esc(val(f + 'Max')) + '">' +
+      '</div><p class="save-hint err" hidden></p></div>';
+  };
+  var chips = function (id, list, on, multi) {
+    return '<div class="chips" id="' + id + '">' + list.map(function (v) {
+      var sel = multi ? on.indexOf(v) !== -1 : on === v;
+      return '<button type="button" class="chip' + (sel ? ' is-on' : '') + '" data-v="' + esc(v) + '" aria-pressed="' + sel + '">' + esc(v) + '</button>';
+    }).join('') + '</div>';
+  };
+  el.innerHTML = '<p class="cal-status muted">' + (st.status === 'Συμπληρώθηκε' ? 'Άλλαξε ό,τι χρειάζεται.' +
+      (st.ilist ? ' Είχε περαστεί στο iList: μετά την αλλαγή θα θέλει ξανά πέρασμα.' : '') : 'Γράψε ό,τι σου είπε ο πελάτης. Όλα προαιρετικά.') + '</p>' +
+    '<div class="seg dm-deal" role="radiogroup" aria-label="Ψάχνει για">' + ['Αγορά', 'Ενοικίαση'].map(function (d) {
+      return '<button type="button" role="radio" class="seg-btn' + (d === deal ? ' is-on' : '') + '" aria-checked="' + (d === deal) + '" data-dedeal="' + d + '">' + d + '</button>';
+    }).join('') + '</div>' +
+    pair('price', deal === 'Ενοικίαση' ? 'Ενοίκιο (€)' : 'Τιμή (€)') + pair('sqm', 'Τετραγωνικά') + pair('pps', 'Τιμή / τ.μ. (€)') +
+    '<div class="field"><span>Υπνοδωμάτια (τουλάχιστον)</span>' + chips('de-beds', DM_BEDS, a.beds || '', false) + '</div>' +
+    '<div class="field"><span>Όροφος</span>' + chips('de-floors', DM_FLOORS, a.floors || [], true) + '</div>' +
+    pair('year', 'Έτος κατασκευής') +
+    '<div class="de-checks"><label><input type="checkbox" id="de-parking"' + (a.parking ? ' checked' : '') + '> Πάρκινγκ</label>' +
+    '<label><input type="checkbox" id="de-furnished"' + (a.furnished ? ' checked' : '') + '> Επιπλωμένο</label></div>' +
+    '<label class="field" data-de="areas"><span>Περιοχές</span><input id="de-areas" maxlength="300" autocomplete="off" value="' + esc(a.areas || '') + '"><p class="save-hint err" hidden></p></label>' +
+    '<label class="field" data-de="notes"><span>Σημειώσεις</span><textarea id="de-notes" rows="3" maxlength="1000">' + esc(a.notes || '') + '</textarea><p class="save-hint err" hidden></p></label>' +
+    '<p class="save-hint err" id="de-err" hidden></p>' +
+    '<button class="btn solid-red wide" id="de-save">Αποθήκευση ζήτησης</button>' +
+    '<button class="link gap-top" id="de-back">Πίσω</button>';
+  el.querySelectorAll('[data-dedeal]').forEach(function (b) {
+    b.onclick = function () {
+      deal = b.dataset.dedeal;
+      el.querySelectorAll('[data-dedeal]').forEach(function (x) { var on = x === b; x.classList.toggle('is-on', on); x.setAttribute('aria-checked', on ? 'true' : 'false'); });
+      el.querySelector('[data-de="price"] > span').textContent = deal === 'Ενοικίαση' ? 'Ενοίκιο (€)' : 'Τιμή (€)';
+    };
+  });
+  el.querySelectorAll('#de-beds .chip').forEach(function (b) {
+    b.onclick = function () {
+      var on = !b.classList.contains('is-on');
+      el.querySelectorAll('#de-beds .chip').forEach(function (x) { x.classList.remove('is-on'); x.setAttribute('aria-pressed', 'false'); });
+      b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    };
+  });
+  el.querySelectorAll('#de-floors .chip').forEach(function (b) {
+    b.onclick = function () { var on = !b.classList.contains('is-on'); b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+  });
+  ['price', 'sqm', 'pps'].forEach(function (k) {
+    ['Min', 'Max'].forEach(function (m) {
+      var i = $('de-' + k + m);
+      i.onblur = function () { i.value = dmFmtN(String(i.value).replace(/[^\d]/g, '')); };
+    });
+  });
+  $('de-back').onclick = function () { renderDemand(st); };
+  $('de-save').onclick = function () { onDmEditSave(deal); };
+}
+
+function onDmEditSave(deal) {
+  var v = function (id) { return $(id).value; };
+  var pick = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' .chip.is-on'), function (b) { return b.dataset.v; }); };
+  var cur = document.querySelector('#dm-body .dm-deal .is-on');
+  if (cur) deal = cur.dataset.dedeal;
+  var c = {
+    priceMin: v('de-priceMin'), priceMax: v('de-priceMax'), sqmMin: v('de-sqmMin'), sqmMax: v('de-sqmMax'),
+    ppsMin: v('de-ppsMin'), ppsMax: v('de-ppsMax'), yearMin: v('de-yearMin'), yearMax: v('de-yearMax'),
+    beds: pick('#de-beds')[0] || '', floors: pick('#de-floors'),
+    parking: $('de-parking').checked, furnished: $('de-furnished').checked,
+    areas: v('de-areas'), notes: v('de-notes')
+  };
+  document.querySelectorAll('#dm-body .save-hint.err').forEach(function (x) { x.hidden = true; });
+  var btn = $('de-save');
+  btn.disabled = true; btn.textContent = 'Αποθήκευση…';
+  var id = S.dmLead;
+  api('demandEdit', S.dmItem ? { dm: S.dmItem.id, deal: deal, c: c } : { id: id, deal: deal, c: c }).then(function (res) {
+    S.dmLink = null;
+    S.dmCache[id] = res;
+    S.dmListAt = 0;                                        // η οθόνη «Ζητήσεις» ξαναφορτώνει στο επόμενο άνοιγμα
+    if (S.dmItem) Object.assign(S.dmItem, res);
+    if (S.dmLead === id) renderDemand(res);
+    toast(res.reset ? 'Η ζήτηση άλλαξε · πέρασέ την ξανά στο iList' : 'Η ζήτηση αποθηκεύτηκε');
+  }).catch(function (e) {
+    btn.disabled = false; btn.textContent = 'Αποθήκευση ζήτησης';
+    var m = /^field:(\w+)$/.exec(e.code || '');
+    var box = m && document.querySelector('#dm-body [data-de="' + m[1] + '"] .err');
+    if (box) { box.textContent = e.message; box.hidden = false; box.parentNode.scrollIntoView({ block: 'center' }); }
+    else { $('de-err').textContent = e.message; $('de-err').hidden = false; }
+  });
 }
 
 function onDmCreate(deal) {
@@ -8027,7 +8160,7 @@ function offReapply() {
 
 function offRefresh() {
   apiTimed('bootstrap', {}, 15000).then(function (b) {
-    S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || []; S.drops = b.drops || [];   // 2.3.2: και τα feature flags
+    S.boot = b; S.me = b.agent; S.flags = b.flags || {}; S.matches = b.matches || []; S.dmLocal = {}; S.drops = b.drops || [];   // 2.3.2: και τα feature flags
     S.bootStale = false; S.bootAt = Date.now(); S.netBad = false;
     applyData(b);
     offSnapshot();

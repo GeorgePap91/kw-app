@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.25';
+const VERSION = '1.26';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -1629,7 +1629,8 @@ function actBootstrap_(agent, d, sess) {
     reviews: agentRole ? myReviews_(agent) : [],
     flags: featureFlags_(agent),
     matches: agentRole && typeof matchesFor_ === 'function' ? matchesFor_(agent) : [],
-    drops: agentRole && typeof dropsFor_ === 'function' ? dropsFor_(agent) : []
+    drops: agentRole && typeof dropsFor_ === 'function' ? dropsFor_(agent) : [],
+    demands: agentRole && typeof dmLeadMap_ === 'function' ? dmLeadMap_(agent) : {}   // 1.26: κλήση → ζήτηση
   };
 }
 

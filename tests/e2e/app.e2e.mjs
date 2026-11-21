@@ -1040,3 +1040,66 @@ test('2.15: Περισσότερα → Ζητήσεις: μετρητής, κα�
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
+
+test('2.16: ζήτηση που πάρθηκε → όχι «Πάρε ζήτηση», φαίνεται στο ιστορικό, «Αλλαγή ζήτησης» γράφει στον server', { skip }, async () => {
+  const past = now - 2 * 86400e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const st = (t) => p2(t.getDate()) + '/' + p2(t.getMonth() + 1) + '/' + t.getFullYear() + ' ' + p2(t.getHours()) + ':' + p2(t.getMinutes());
+  const l = { ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: p2(d.getHours()) + ':' + p2(d.getMinutes()),
+    showingAt: st(d), outcome: 'Δεν ενδιαφέρθηκε', form: 'Υπογράφηκε' };
+  const sent = st(new Date(past + 3600e3)), got = st(new Date(past + 7200e3)), ed = st(new Date(now - 60e3));
+  const done = { id: 'DM-1', lead: 'L1', status: 'Συμπληρώθηκε', created: sent, submitted: got, ilist: '', opens: 1, deal: 'Αγορά', edited: '', self: false,
+    summary: 'Αγορά · έως 250.000 € · Περιοχές: Παγκράτι', lines: [['Τιμή', 'έως 250.000 €'], ['Περιοχές', 'Παγκράτι']],
+    answers: { priceMax: 250000, areas: 'Παγκράτι', floors: ['2ος'], beds: '2', parking: true } };
+  let edit = null;
+  const a = await openApp({ demandForm: true }, null, { leads: [l], demands: { L1: done } }, {
+    demandStatus: () => done,
+    demandEdit: (x) => { edit = x; return { ...done, edited: ed, summary: 'Αγορά · έως 250.000 € · Περιοχές: Κουκάκι', lines: [['Περιοχές', 'Κουκάκι']], answers: { areas: 'Κουκάκι' }, reset: false }; }
+  });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  let next = await a.page.locator('#d-next').innerText();
+  assert.doesNotMatch(next, /Πάρε ζήτηση/);
+  assert.match(next, /Πέρασε τη ζήτηση στο iList[\s\S]*Παγκράτι/);
+  let hist = await a.page.locator('#d-hist').innerText();
+  assert.match(hist, /Στάλθηκε φόρμα ζήτησης[\s\S]*Ο πελάτης έστειλε τη ζήτηση/);
+  // Αλλαγή ζήτησης
+  await a.page.locator('#d-next [data-next="demand"]').click();
+  await a.page.waitForTimeout(400);
+  await a.page.locator('#dm-edit').click();
+  assert.equal(await a.page.locator('#de-priceMax').inputValue(), '250.000');                 // προσυμπληρωμένο
+  assert.equal(await a.page.locator('#de-floors .chip.is-on').innerText(), '2ος');
+  assert.equal(await a.page.locator('#de-parking').isChecked(), true);
+  await a.page.fill('#de-areas', 'Κουκάκι');
+  await a.page.locator('#de-save').click();
+  await a.page.waitForTimeout(400);
+  assert.equal(edit.id, 'L1');
+  assert.equal(edit.c.areas, 'Κουκάκι');
+  assert.equal(edit.c.priceMax, '250.000');
+  assert.deepEqual(edit.c.floors, ['2ος']);
+  assert.match(await a.page.locator('#dm-body').innerText(), /Την άλλαξες/);
+  await a.page.locator('#demand [data-pop-close]').click();
+  await a.page.waitForTimeout(300);
+  hist = await a.page.locator('#d-hist').innerText();
+  assert.match(hist, /Άλλαξες τη ζήτηση/);
+  next = await a.page.locator('#d-next').innerText();
+  assert.match(next, /Κουκάκι/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.16: η φόρμα περιμένει τον πελάτη → «Περιμένεις τη ζήτηση», όχι «Πάρε ζήτηση»', { skip }, async () => {
+  const past = now - 2 * 3600e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const l = { ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: '10:00',
+    showingAt: p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 10:00', outcome: 'Δεν ενδιαφέρθηκε', form: 'Υπογράφηκε' };
+  const a = await openApp({ demandForm: true }, null, { leads: [l], demands: { L1: { id: 'DM-2', status: 'Στάλθηκε', created: l.showingAt, opens: 0 } } });
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(400);
+  const next = await a.page.locator('#d-next').innerText();
+  assert.match(next, /Περιμένεις τη ζήτηση[\s\S]*Δεν την έχει ανοίξει/);
+  assert.doesNotMatch(next, /Πάρε ζήτηση/);
+  assert.match(await a.page.locator('#d-hist').innerText(), /Στάλθηκε φόρμα ζήτησης/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
