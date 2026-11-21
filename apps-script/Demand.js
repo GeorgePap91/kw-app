@@ -17,7 +17,8 @@
  * GDPR: στο φύλλο μένουν κριτήρια ακινήτου και μόνο το μικρό όνομα του πελάτη (για την
  * ειδοποίηση). Αριθμοί που μοιάζουν με ΑΦΜ / ταυτότητα / τηλέφωνο σβήνονται από τις σημειώσεις.
  *
- * Ενέργειες μεσίτη:  demandStatus { id } · demandCreate { id } · demandCancel { id } · demandIList { id, on }
+ * Ενέργειες μεσίτη:  demandStatus { id } · demandCreate { id } · demandCancel { id } · demandIList { id | dm, on }
+ *                    demandList (1.25: οθόνη «Ζητήσεις», με cache ανά μεσίτη)
  * Ενέργειες πελάτη:  demandOpen { f } · demandSubmit { f, c }
  */
 
@@ -30,7 +31,12 @@ const DEMAND = {
   NOTES_MAX: 1000,
   AREAS_MAX: 300,
   FLOORS: ['Υπόγειο', 'Ισόγειο', '1ος', '2ος', '3ος', '4ος', '5ος+', 'Ρετιρέ'],
-  BEDS: ['1', '2', '3', '4+']
+  BEDS: ['1', '2', '3', '4+'],
+  ARCHIVE_SHEET: 'Αρχείο φορμών ζήτησης',
+  ARCHIVE_DONE_DAYS: 60,     // περασμένες στο iList πριν από 60 ημέρες → αρχείο
+  ARCHIVE_DEAD_DAYS: 30,     // ακυρωμένες / ληγμένες πριν από 30 ημέρες → αρχείο
+  LIST_CACHE_SEC: 21600,     // 6 ώρες· κάθε αλλαγή του μεσίτη τη σβήνει
+  LIST_MAX: 300
 };
 const DMC = { ID: 1, HASH: 2, LEAD: 3, AGENT: 4, CODE: 5, DEAL: 6, CREATED: 7, EXPIRES: 8, STATUS: 9, OPENS: 10,
               SUBMITTED: 11, ANSWERS: 12, SUMMARY: 13, ILIST: 14, CTX: 15, UPDATED: 16 };
@@ -42,6 +48,7 @@ const DM = { SENT: 'Στάλθηκε', DONE: 'Συμπληρώθηκε', CANCELL
     ACTIONS.demandCreate = actDemandCreate_;
     ACTIONS.demandCancel = actDemandCancel_;
     ACTIONS.demandIList = actDemandIList_;
+    ACTIONS.demandList = actDemandList_;
     PUBLIC_ACTIONS.demandOpen = actDemandOpen_;
     PUBLIC_ACTIONS.demandSubmit = actDemandSubmit_;
   } catch (e) {
@@ -70,6 +77,7 @@ function dmWrite_(sh, r, changes) {
   Object.keys(changes).forEach(col => { r.v[Number(col) - 1] = changes[col]; });
   r.v[DMC.UPDATED - 1] = new Date();
   sh.getRange(r.row, 1, 1, DEMAND.HEADERS.length).setValues([safeRow_(r.v)]);
+  dmDropCache_(r.v[DMC.AGENT - 1]);
 }
 
 function dmGet_(r, col) { return r.v[col - 1]; }
@@ -101,6 +109,8 @@ function dmView_(r) {
   if (!r) return { status: '' };
   const il = dmGet_(r, DMC.ILIST);
   return {
+    id: String(dmGet_(r, DMC.ID) || ''),
+    lead: String(dmGet_(r, DMC.LEAD) || ''),
     status: dmStatus_(r),
     created: stamp_(dmGet_(r, DMC.CREATED)),
     expires: stamp_(dmGet_(r, DMC.EXPIRES)),
@@ -190,6 +200,7 @@ function actDemandCreate_(agent, d) {
     });
     sh.appendRow(safeRow_(['DM-' + randomHex_(10), sha256_(token), l.id, agent.name, l.code || '', deal,
                            now, expires, DM.SENT, 0, '', '', '', '', JSON.stringify(ctx), now]));
+    dmDropCache_(agent.name);
   } finally {
     lock.releaseLock();
   }
@@ -220,14 +231,118 @@ function actDemandCancel_(agent, d) {
   return dmView_(dmLatest_(sh, l.id));
 }
 
-/** «Η ζήτηση περάστηκε στο iList» (on) ή αναίρεση (on = false). */
+/** «Η ζήτηση περάστηκε στο iList» (on) ή αναίρεση (on = false).
+ *  Από την κλήση: { id }. Από την οθόνη «Ζητήσεις»: { dm } (δουλεύει και για κλήσεις
+ *  παλαιότερες από 2 μήνες· ο έλεγχος ιδιοκτησίας γίνεται στη στήλη Μεσίτης). */
 function actDemandIList_(agent, d) {
-  const l = findMyLead_(agent, d.id);
   const sh = dmSheet_();
-  const r = dmLatest_(sh, l.id);
+  let r;
+  if (d.dm) {
+    const rows = dmFind_(sh, DMC.ID, String(d.dm));
+    r = rows.length ? dmRead_(sh, rows[0]) : null;
+    if (!r || norm_(dmGet_(r, DMC.AGENT)) !== norm_(agent.name)) throw new Error('Δεν βρέθηκε η ζήτηση.');
+  } else {
+    r = dmLatest_(sh, findMyLead_(agent, d.id).id);
+  }
   if (!r || dmStatus_(r) !== DM.DONE) throw new Error('Ο πελάτης δεν έχει συμπληρώσει ακόμα τη φόρμα.');
   dmWrite_(sh, r, { [DMC.ILIST]: d.on === false ? '' : new Date() });
   return dmView_(r);
+}
+
+// ═══ 1.25 · Οθόνη «Ζητήσεις» ════════════════════════════════
+// Οι γραμμές του μεσίτη βρίσκονται με TextFinder στη στήλη Μεσίτης και διαβάζεται μόνο
+// το κομμάτι ανάμεσα στην πρώτη και την τελευταία. Το αποτέλεσμα μένει σε cache 6 ωρών,
+// που σβήνει σε κάθε αλλαγή (νέο link, άνοιγμα, υποβολή, iList, ακύρωση).
+
+function dmCacheKey_(name) { return 'dm:list:' + sha256_(norm_(name || '')).slice(0, 24); }
+function dmDropCache_(name) {
+  try { CacheService.getScriptCache().remove(dmCacheKey_(name)); } catch (e) { /* τίποτα */ }
+}
+
+/** Το στοιχείο της λίστας: ό,τι χρειάζεται η οθόνη και το παράθυρο, χωρίς τηλέφωνο / email. */
+function dmItem_(v) {
+  const r = { v: v };
+  const ctx = dmJson_(r, DMC.CTX);
+  const view = dmView_(r);
+  view.first = ctx.first || '';
+  view.code = String(dmGet_(r, DMC.CODE) || '');
+  view.submittedTs = ts_(dmGet_(r, DMC.SUBMITTED)) || 0;
+  view.createdTs = ts_(dmGet_(r, DMC.CREATED)) || 0;
+  return view;
+}
+
+function actDemandList_(agent) {
+  const cache = CacheService.getScriptCache();
+  const key = dmCacheKey_(agent.name);
+  const hit = cache.get(key);
+  if (hit) { try { return JSON.parse(hit); } catch (e) { /* ξαναχτίζεται */ } }
+
+  const sh = dmSheet_();
+  const rows = dmFind_(sh, DMC.AGENT, agent.name);
+  let items = [];
+  if (rows.length) {
+    const lo = Math.min.apply(null, rows), hi = Math.max.apply(null, rows);
+    const block = sh.getRange(lo, 1, hi - lo + 1, DEMAND.HEADERS.length).getValues();
+    const want = {};
+    rows.forEach(n => { want[n] = 1; });
+    block.forEach((v, i) => { if (want[lo + i]) items.push(dmItem_(v)); });
+  }
+  items = items.filter(x => x.status !== DM.CANCELLED)
+    .sort((a, b) => (b.submittedTs || b.createdTs) - (a.submittedTs || a.createdTs))
+    .slice(0, DEMAND.LIST_MAX);
+  const out = {
+    items: items,
+    counts: {
+      toPass: items.filter(x => x.status === DM.DONE && !x.ilist).length,
+      passed: items.filter(x => x.status === DM.DONE && x.ilist).length,
+      waiting: items.filter(x => x.status === DM.SENT).length,
+      received: items.filter(x => x.status === DM.DONE).length
+    },
+    at: stamp_(new Date())
+  };
+  try { cache.put(key, JSON.stringify(out), DEMAND.LIST_CACHE_SEC); } catch (e) { /* πάνω από 100 KB: χωρίς cache */ }
+  return out;
+}
+
+/** ▶ Κάθε νύχτα (setup125): ό,τι τελείωσε φεύγει στο «Αρχείο φορμών ζήτησης».
+ *  Τίποτα δεν σβήνεται· απλώς βγαίνει από το φύλλο που ψάχνει η εφαρμογή. */
+function dmArchive() {
+  const sh = dmSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return 0;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const now = Date.now(), day = 86400000;
+    const all = sh.getRange(2, 1, last - 1, DEMAND.HEADERS.length).getValues();
+    const keep = [], move = [], touched = {};
+    all.forEach(v => {
+      const r = { v: v }, st = dmStatus_(r);
+      const old = (col, days) => { const t = ts_(dmGet_(r, col)); return t && now - t > days * day; };
+      const go = (st === DM.DONE && dmGet_(r, DMC.ILIST) && old(DMC.ILIST, DEMAND.ARCHIVE_DONE_DAYS)) ||
+                 ((st === DM.CANCELLED || st === DM.EXPIRED) && old(DMC.UPDATED, DEMAND.ARCHIVE_DEAD_DAYS));
+      (go ? move : keep).push(v);
+      if (go) touched[v[DMC.AGENT - 1]] = 1;
+    });
+    if (!move.length) return 0;
+    const ar = ensureSheet_(DEMAND.ARCHIVE_SHEET, DEMAND.HEADERS);
+    ar.getRange(ar.getLastRow() + 1, 1, move.length, DEMAND.HEADERS.length).setValues(move.map(safeRow_));
+    sh.getRange(2, 1, last - 1, DEMAND.HEADERS.length).clearContent();
+    if (keep.length) sh.getRange(2, 1, keep.length, DEMAND.HEADERS.length).setValues(keep);
+    Object.keys(touched).forEach(dmDropCache_);
+    log_('Φόρμες ζήτησης: αρχείο', 'σύστημα', move.length + ' γραμμές');
+    return move.length;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** ▶ Μία φορά μετά την 1.25: νυχτερινή αρχειοθέτηση στις 03:00. */
+function setup125() {
+  dmSheet_();
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'dmArchive').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('dmArchive').timeBased().everyDays(1).atHour(3).create();
+  console.log('1.25 έτοιμη: οθόνη «Ζητήσεις» και νυχτερινή αρχειοθέτηση (03:00).');
 }
 
 // ═══ Πελάτης (χωρίς σύνδεση, μόνο με το κλειδί του link) ═════

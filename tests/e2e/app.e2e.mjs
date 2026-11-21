@@ -978,3 +978,40 @@ test('2.14: σελίδα πελάτη demand.html — συμπλήρωση κα�
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('2.15: Περισσότερα → Ζητήσεις: μετρητής, καρτέλες, πάτημα → iList με το id της ζήτησης', { skip }, async () => {
+  const it = (id, status, ilist, extra = {}) => ({ id, lead: 'OLD-' + id, status, ilist, first: 'Πελάτης ' + id, code: 'A-1', deal: 'Αγορά',
+    created: '01/11/2026 10:00', submitted: status === 'Συμπληρώθηκε' ? '02/11/2026 10:00' : '', expires: '01/12/2026 10:00', opens: 1,
+    summary: 'Αγορά · έως 200.000 € · Περιοχές: Παγκράτι', lines: [['Περιοχές', 'Παγκράτι']], answers: { notes: '' }, ...extra });
+  const list = { items: [it('A', 'Συμπληρώθηκε', ''), it('B', 'Συμπληρώθηκε', '03/11/2026 10:00'), it('C', 'Στάλθηκε', '')],
+                 counts: { toPass: 1, passed: 1, waiting: 1, received: 2 } };
+  let il = null;
+  const a = await openApp({}, null, {}, {
+    demandList: () => list,
+    demandIList: (x) => { il = x; return { ...it('A', 'Συμπληρώθηκε', '21/11/2026 18:00') }; }
+  });
+  await a.page.evaluate(() => goto('more'));
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.locator('#dm-badge').innerText(), '1');
+  await a.page.locator('[data-goto="demands"]').click();
+  await a.page.waitForTimeout(400);
+  assert.match(await a.page.locator('.dm-tiles').innerText(), /1\s*Προς iList[\s\S]*1\s*Σε αναμονή[\s\S]*1\s*Περάστηκαν/);
+  assert.match(await a.page.locator('#dm-list').innerText(), /50%/);
+  assert.equal(await a.page.locator('[data-dm]').count(), 1);
+  await a.page.locator('[data-dmtab="waiting"]').click();
+  assert.match(await a.page.locator('#dm-list').innerText(), /Πελάτης C[\s\S]*Στάλθηκε/);
+  await a.page.locator('[data-dmtab="toPass"]').click();
+  await a.page.locator('[data-dm="A"]').click();
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#demand').isHidden(), false);
+  assert.equal(await a.page.locator('#dm-new').count(), 0, 'από τη λίστα δεν προτείνεται νέα φόρμα');
+  await a.page.locator('#dm-done').click();
+  await a.page.waitForTimeout(400);
+  assert.deepEqual(il, { dm: 'A', on: true });
+  assert.equal(await a.page.locator('#dm-badge').isHidden(), true, 'ο μετρητής δεν μηδένισε');
+  await a.page.locator('#demand [data-pop-close]').click();
+  await a.page.waitForTimeout(300);
+  assert.match(await a.page.locator('.dm-tiles').innerText(), /0\s*Προς iList[\s\S]*2\s*Περάστηκαν/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
