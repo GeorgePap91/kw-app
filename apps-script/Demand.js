@@ -51,7 +51,9 @@ const DM = { SENT: 'Στάλθηκε', DONE: 'Συμπληρώθηκε', CANCELL
     ACTIONS.demandList = actDemandList_;
     // 2.15.1: flag demandForm (προεπιλογή admin). ΕΞΑΙΡΕΣΗ: η ακύρωση μένει πάντα ελεύθερη, ώστε να κλείνει
     // ένα link που έχει ήδη φύγει σε πελάτη ακόμα κι αν κλείσει το flag. Ο πελάτης (demandOpen/Submit) δεν έχει μεσίτη/flag.
-    FLAG_ACTIONS.demandStatus = FLAG_ACTIONS.demandCreate = FLAG_ACTIONS.demandIList = FLAG_ACTIONS.demandList = 'demandForm';
+    ACTIONS.demandEdit = actDemandEdit_;            // 1.26: ο μεσίτης γράφει / αλλάζει τη ζήτηση
+    FLAG_ACTIONS.demandStatus = FLAG_ACTIONS.demandCreate = FLAG_ACTIONS.demandIList = FLAG_ACTIONS.demandList =
+      FLAG_ACTIONS.demandEdit = 'demandForm';
     PUBLIC_ACTIONS.demandOpen = actDemandOpen_;
     PUBLIC_ACTIONS.demandSubmit = actDemandSubmit_;
   } catch (e) {
@@ -145,7 +147,9 @@ function dmView_(r) {
     answers: dmStatus_(r) === DM.DONE ? dmJson_(r, DMC.ANSWERS) : null,
     lines: dmStatus_(r) === DM.DONE ? dmLines_(dmJson_(r, DMC.ANSWERS), String(dmGet_(r, DMC.DEAL) || '')) : [],
     summary: String(dmGet_(r, DMC.SUMMARY) || ''),
-    ilist: il ? stamp_(il) : ''
+    ilist: il ? stamp_(il) : '',
+    edited: dmJson_(r, DMC.CTX).edited || '',          // 1.26: πότε την άλλαξε ο μεσίτης
+    self: !!dmJson_(r, DMC.CTX).self                   // 1.26: τη γράφει ο μεσίτης, χωρίς φόρμα στον πελάτη
   };
 }
 
@@ -276,6 +280,73 @@ function actDemandIList_(agent, d) {
     dmSet_(sh, r, { [DMC.ILIST]: d.on === false ? '' : new Date() });
     return dmView_(r);
   });
+}
+
+// ═══ 1.26 · Ο μεσίτης γράφει / αλλάζει τη ζήτηση ════════════
+// { id | dm, deal, c }. Ίδιος έλεγχος πεδίων με τη φόρμα του πελάτη (dmClean_).
+//   · συμπληρωμένη → αλλάζουν τα κριτήρια· αν είχε περαστεί στο iList, το σημάδι φεύγει
+//     (θέλει ξανά πέρασμα με τα νέα κριτήρια)
+//   · σε αναμονή → τη συμπληρώνει ο μεσίτης· το link του πελάτη κλείνει («έχει ήδη σταλεί»)
+//   · καμία / ακυρωμένη / ληγμένη → νέα γραμμή χωρίς link (self)
+function actDemandEdit_(agent, d) {
+  const clean = dmClean_(d.c);                       // λάθος πεδίο = γρήγορη απάντηση, πριν το κλείδωμα
+  const sh = dmSheet_();
+  const lead = d.dm ? null : findMyLead_(agent, d.id);
+  const res = dmLocked_(() => {
+    let r = null;
+    if (d.dm) {
+      const rows = dmFind_(sh, DMC.ID, String(d.dm));
+      r = rows.length ? dmRead_(sh, rows[0]) : null;
+      if (!r || norm_(dmGet_(r, DMC.AGENT)) !== norm_(agent.name)) throw new Error('Δεν βρέθηκε η ζήτηση.');
+    } else {
+      r = dmLatest_(sh, lead.id);
+    }
+    const st = r ? dmStatus_(r) : '';
+    const now = new Date();
+    const deal = d.deal === 'Ενοικίαση' || d.deal === 'Αγορά' ? d.deal
+      : (r && dmGet_(r, DMC.DEAL)) || (lead ? dmDeal_(lead) : 'Αγορά');
+    const summary = dmSummary_(clean, deal);
+    if (r && (st === DM.DONE || st === DM.SENT)) {
+      const ctx = dmJson_(r, DMC.CTX);
+      const hadIList = !!dmGet_(r, DMC.ILIST);
+      ctx.edited = stamp_(now);
+      if (st === DM.SENT) ctx.self = true;
+      const ch = { [DMC.STATUS]: DM.DONE, [DMC.DEAL]: deal, [DMC.ANSWERS]: JSON.stringify(clean),
+                   [DMC.SUMMARY]: summary, [DMC.CTX]: JSON.stringify(ctx) };
+      if (!dmGet_(r, DMC.SUBMITTED)) ch[DMC.SUBMITTED] = now;
+      if (hadIList) ch[DMC.ILIST] = '';
+      dmSet_(sh, r, ch);
+      return { r: r, reset: hadIList };
+    }
+    if (!lead) throw new Error('Η ζήτηση έχει κλείσει. Άνοιξε τον πελάτη για νέα.');
+    const first = String(lead.name || '').trim().split(/\s+/)[0] || '';
+    const ctx = { first: first.slice(0, 40), code: lead.code || '', area: String(lead.location || '').slice(0, 80),
+                  self: true, edited: stamp_(now) };
+    sh.appendRow(safeRow_(['DM-' + randomHex_(10), '', lead.id, agent.name, lead.code || '', deal, now, '', DM.DONE, 0,
+                           now, JSON.stringify(clean), summary, '', JSON.stringify(ctx), now]));
+    dmDropCache_(agent.name);
+    return { r: dmLatest_(sh, lead.id), reset: false };
+  });
+  log_('Φόρμα ζήτησης: αλλαγή από μεσίτη', agent.name, 'κλήση ' + String(dmGet_(res.r, DMC.LEAD)));
+  const view = dmView_(res.r);
+  view.reset = res.reset;
+  return view;
+}
+
+/** 1.26 · Για το bootstrap: κλήση → η πιο πρόσφατη ζήτηση (από τη λίστα σε cache, χωρίς νέα ανάγνωση).
+ *  Μόνο ό,τι χρειάζεται η κάρτα και το ιστορικό, χωρίς απαντήσεις. */
+function dmLeadMap_(agent) {
+  if (!featureFlags_(agent).demandForm) return {};
+  const out = {};
+  try {
+    actDemandList_(agent).items.forEach(x => {
+      const cur = out[x.lead];
+      if (cur && (cur.createdTs || 0) >= (x.createdTs || 0)) return;
+      out[x.lead] = { id: x.id, status: x.status, created: x.created, submitted: x.submitted, ilist: x.ilist,
+                      opens: x.opens, edited: x.edited, self: x.self, summary: x.summary, createdTs: x.createdTs || 0 };
+    });
+  } catch (e) { console.error('dmLeadMap_: ' + e.message); }
+  return out;
 }
 
 // ═══ 1.25 · Οθόνη «Ζητήσεις» ════════════════════════════════

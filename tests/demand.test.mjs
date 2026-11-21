@@ -115,3 +115,51 @@ test('λίστα: μόνο του μεσίτη, χωρίς ακυρωμένες,
   const L2 = JSON.parse(run(`JSON.stringify(actDemandList_({ name: 'Γιώργος' }))`));
   assert.deepEqual(L2.counts, { toPass: 0, passed: 2, waiting: 1, received: 2 });
 });
+
+// ── 1.26 · Ο μεσίτης γράφει / αλλάζει τη ζήτηση ─────────────
+test('αλλαγή ζήτησης: συμπληρωμένη (και περασμένη) · σε αναμονή · καμία · ξένη · λάθος πεδίο', () => {
+  run(`
+    __sheet.appendRow = function (v) { __rows.push(v); };
+    findMyLead_ = function (agent, id) {
+      if (id === 'L-X') throw new Error('Δεν βρέθηκε η κλήση.');
+      return { id: id, name: 'Ελένη Κ.', code: '2210', location: 'Παγκράτι', deal: 'Πώληση' };
+    };
+    randomHex_ = function (n) { return 'r' + __rows.length; };
+    log_ = function () {};
+    __rows = [__row('A', 'Γιώργος', DM.DONE, true, 5), __row('D', 'Γιώργος', DM.SENT)];
+  `);
+  // 1) συμπληρωμένη και περασμένη στο iList → νέα κριτήρια, φεύγει το iList, reset = true
+  let v = JSON.parse(run(`JSON.stringify(actDemandEdit_({ name: 'Γιώργος' }, { dm: 'A', deal: 'Ενοικίαση', c: { priceMax: '900', areas: 'Κυψέλη' } }))`));
+  assert.equal(v.status, 'Συμπληρώθηκε');
+  assert.equal(v.reset, true);
+  assert.equal(v.ilist, '');
+  assert.equal(v.summary, 'Ενοικίαση · έως 900 € · Περιοχές: Κυψέλη');
+  assert.ok(v.edited);
+  assert.equal(v.self, false);                      // την είχε στείλει ο πελάτης
+  // 2) σε αναμονή → τη γράφει ο μεσίτης, κλείνει το link (status DONE), self = true
+  v = JSON.parse(run(`JSON.stringify(actDemandEdit_({ name: 'Γιώργος' }, { id: 'L-D', c: { areas: 'Νέος Κόσμος' } }))`));
+  assert.equal(v.status, 'Συμπληρώθηκε');
+  assert.equal(v.self, true);
+  assert.equal(v.deal, 'Αγορά');
+  assert.ok(v.submitted);
+  // 3) καμία ζήτηση → νέα γραμμή χωρίς link
+  const before = run('__rows.length');
+  v = JSON.parse(run(`JSON.stringify(actDemandEdit_({ name: 'Γιώργος' }, { id: 'L-NEW', c: { sqmMin: 60 } }))`));
+  assert.equal(run('__rows.length'), before + 1);
+  assert.equal(run(`__rows[__rows.length - 1][DMC.HASH - 1]`), '');
+  assert.equal(v.lead, 'L-NEW');
+  assert.equal(v.self, true);
+  assert.equal(v.summary, 'Αγορά · από 60 τ.μ.');
+  // 4) ξένη ζήτηση / λάθος πεδίο
+  const err = (d) => run(`(function(){ try { actDemandEdit_({ name: 'Άλλος' }, ${JSON.stringify(d)}); return ''; } catch (e) { return e.code || e.message; } })()`);
+  assert.equal(err({ dm: 'A', c: { areas: 'x' } }), 'Δεν βρέθηκε η ζήτηση.');
+  assert.equal(err({ dm: 'A', c: { priceMin: 5, priceMax: 1 } }), 'field:price');
+  // 5) χάρτης για το bootstrap: κλήση → πιο πρόσφατη ζήτηση, χωρίς απαντήσεις
+  run(`featureFlags_ = function () { return { demandForm: true }; };`);
+  const m = JSON.parse(run(`JSON.stringify(dmLeadMap_({ name: 'Γιώργος' }))`));
+  assert.deepEqual(Object.keys(m).sort(), ['L-A', 'L-D', 'L-NEW']);
+  assert.equal(m['L-A'].summary, 'Ενοικίαση · έως 900 € · Περιοχές: Κυψέλη');
+  assert.equal(m['L-A'].answers, undefined);
+  run(`featureFlags_ = function () { return { demandForm: false }; };`);
+  assert.equal(run(`JSON.stringify(dmLeadMap_({ name: 'Γιώργος' }))`), '{}');
+});
