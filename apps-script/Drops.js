@@ -137,7 +137,7 @@ function priceDropCheck() {
   const drops = dropFind_(last, props);
   if (!drops.length) return console.log('Μείωση τιμής: καμία.');
 
-  const agents = readAgents_().filter(isAgent_).filter(a => featureFlags_(a).priceDrop);
+  const agents = readAgents_().filter(a => a.active && isAgent_(a)).filter(a => featureFlags_(a).priceDrop);
   const profiles = typeof matchProfiles_ === 'function' ? matchProfiles_() : {};
   const outcome = id => String(appGet_(id, ACOL.OUTCOME) || '');
   const now = Date.now();

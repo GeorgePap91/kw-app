@@ -904,7 +904,7 @@ test('2.14: «Πάρε ζήτηση» → φόρμα → link για SMS · συ
   let state = { status: '', deal: 'Αγορά' }, created = null, ilist = null;
   const done = { status: 'Συμπληρώθηκε', submitted: '20/11/2026 10:00', deal: 'Αγορά', ilist: '',
     lines: [['Τιμή', '150.000 – 250.000 €'], ['Περιοχές', 'Παγκράτι']], summary: 'Αγορά · 150.000 – 250.000 € · Περιοχές: Παγκράτι', answers: { notes: '' } };
-  const a = await openApp({}, null, { leads: [l] }, {
+  const a = await openApp({ demandForm: true }, null, { leads: [l] }, {
     demandStatus: () => state,
     demandCreate: (x) => { created = x; return { form: { status: 'Στάλθηκε', expires: '20/12/2026 10:00', deal: x.deal },
       url: 'https://x/demand.html#' + 'a'.repeat(48), sms: 'Καλησπέρα Μαρία…', wa: '306900000000', email: { to: '', subject: '', body: '' } }; },
@@ -932,6 +932,20 @@ test('2.14: «Πάρε ζήτηση» → φόρμα → link για SMS · συ
   await a.page.waitForTimeout(300);
   assert.deepEqual(ilist, { id: 'L1', on: true });
   assert.match(await a.page.locator('#dm-body').innerText(), /Περάστηκε στο iList/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.14.1: χωρίς flag demandForm δεν φαίνεται το «Πάρε ζήτηση»', { skip }, async () => {
+  const past = now - 2 * 3600e3, d = new Date(past), p2 = (n) => String(n).padStart(2, '0');
+  const l = { ...lead('L1', 'Μαρία Π.', 'Υπόδειξη', 'A-12'), hasEvent: true, showingTs: past,
+    showingDate: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()), showingTime: '10:00',
+    showingAt: p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' 10:00', outcome: 'Δεν ενδιαφέρθηκε', form: 'Υπογράφηκε' };
+  const a = await openApp({}, null, { leads: [l] }, {});
+  await a.page.evaluate(() => window.openLead('L1', {}));
+  await a.page.waitForTimeout(350);
+  assert.equal(await a.page.locator('#d-next [data-next="demand"]').count(), 0);
+  assert.equal(await a.page.locator('#d-next [data-next="task"]').count(), 1, 'η «Εργασία» μένει');
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
@@ -979,6 +993,17 @@ test('2.14: σελίδα πελάτη demand.html — συμπλήρωση κα�
   await ctx.close();
 });
 
+test('2.15.1: χωρίς flag demandForm δεν φαίνεται η επιλογή «Ζητήσεις» και δεν ζητείται η λίστα', { skip }, async () => {
+  let asked = 0;
+  const a = await openApp({}, null, {}, { demandList: () => { asked++; return { items: [], counts: {} }; } });
+  await a.page.evaluate(() => window.go ? window.go('more') : document.querySelector('[data-goto="more"]').click());
+  await a.page.waitForTimeout(350);
+  assert.equal(await a.page.locator('#more-demands').isVisible(), false);
+  assert.equal(asked, 0);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
 test('2.15: Περισσότερα → Ζητήσεις: μετρητής, καρτέλες, πάτημα → iList με το id της ζήτησης', { skip }, async () => {
   const it = (id, status, ilist, extra = {}) => ({ id, lead: 'OLD-' + id, status, ilist, first: 'Πελάτης ' + id, code: 'A-1', deal: 'Αγορά',
     created: '01/11/2026 10:00', submitted: status === 'Συμπληρώθηκε' ? '02/11/2026 10:00' : '', expires: '01/12/2026 10:00', opens: 1,
@@ -986,7 +1011,7 @@ test('2.15: Περισσότερα → Ζητήσεις: μετρητής, κα�
   const list = { items: [it('A', 'Συμπληρώθηκε', ''), it('B', 'Συμπληρώθηκε', '03/11/2026 10:00'), it('C', 'Στάλθηκε', '')],
                  counts: { toPass: 1, passed: 1, waiting: 1, received: 2 } };
   let il = null;
-  const a = await openApp({}, null, {}, {
+  const a = await openApp({ demandForm: true }, null, {}, {
     demandList: () => list,
     demandIList: (x) => { il = x; return { ...it('A', 'Συμπληρώθηκε', '21/11/2026 18:00') }; }
   });

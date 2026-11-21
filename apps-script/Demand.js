@@ -49,6 +49,9 @@ const DM = { SENT: 'Στάλθηκε', DONE: 'Συμπληρώθηκε', CANCELL
     ACTIONS.demandCancel = actDemandCancel_;
     ACTIONS.demandIList = actDemandIList_;
     ACTIONS.demandList = actDemandList_;
+    // 2.15.1: flag demandForm (προεπιλογή admin). ΕΞΑΙΡΕΣΗ: η ακύρωση μένει πάντα ελεύθερη, ώστε να κλείνει
+    // ένα link που έχει ήδη φύγει σε πελάτη ακόμα κι αν κλείσει το flag. Ο πελάτης (demandOpen/Submit) δεν έχει μεσίτη/flag.
+    FLAG_ACTIONS.demandStatus = FLAG_ACTIONS.demandCreate = FLAG_ACTIONS.demandIList = FLAG_ACTIONS.demandList = 'demandForm';
     PUBLIC_ACTIONS.demandOpen = actDemandOpen_;
     PUBLIC_ACTIONS.demandSubmit = actDemandSubmit_;
   } catch (e) {
@@ -72,12 +75,34 @@ function dmRead_(sh, row) {
   return { row: row, v: sh.getRange(row, 1, 1, DEMAND.HEADERS.length).getValues()[0] };
 }
 
-/** Μία εγγραφή = ένα setValues (όλη η γραμμή). */
+/**
+ * Μία εγγραφή = ένα setValues (όλη η γραμμή).
+ * ⚠ ΜΟΝΟ μέσα σε κλείδωμα και με ανάγνωση της γραμμής ΜΕΣΑ στο ίδιο κλείδωμα: γράφει και τις στήλες
+ * που δεν άλλαξαν, άρα με παλιά ανάγνωση θα έσβηνε μια ταυτόχρονη υποβολή. Αλλού χρησιμοποίησε το dmSet_.
+ */
 function dmWrite_(sh, r, changes) {
   Object.keys(changes).forEach(col => { r.v[Number(col) - 1] = changes[col]; });
   r.v[DMC.UPDATED - 1] = new Date();
   sh.getRange(r.row, 1, 1, DEMAND.HEADERS.length).setValues([safeRow_(r.v)]);
   dmDropCache_(r.v[DMC.AGENT - 1]);
+}
+
+/** Γράφει ΜΟΝΟ τα κελιά που αλλάζουν (+ «Ενημέρωση»): δεν πατά ποτέ τις υπόλοιπες στήλες (όπως το sfSet_). */
+function dmSet_(sh, r, changes) {
+  Object.keys(changes).forEach(col => {
+    r.v[Number(col) - 1] = changes[col];
+    sh.getRange(r.row, Number(col)).setValue(safe_(changes[col]));
+  });
+  r.v[DMC.UPDATED - 1] = new Date();
+  sh.getRange(r.row, DMC.UPDATED).setValue(r.v[DMC.UPDATED - 1]);
+  dmDropCache_(r.v[DMC.AGENT - 1]);   // η οθόνη «Ζητήσεις» (1.25) να μη δείχνει παλιά κατάσταση
+}
+
+/** Τρέχει το fn μέσα στο γενικό κλείδωμα. Ό,τι διαβάζεται και αποφασίζεται, γίνεται ΜΕΣΑ εδώ. */
+function dmLocked_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return fn(); } finally { lock.releaseLock(); }
 }
 
 function dmGet_(r, col) { return r.v[col - 1]; }
@@ -226,8 +251,10 @@ function actDemandCreate_(agent, d) {
 function actDemandCancel_(agent, d) {
   const l = findMyLead_(agent, d.id);
   const sh = dmSheet_();
-  const r = dmLatest_(sh, l.id);
-  if (r && dmStatus_(r) === DM.SENT) dmWrite_(sh, r, { [DMC.STATUS]: DM.CANCELLED });
+  dmLocked_(() => {
+    const r = dmLatest_(sh, l.id);                    // φρέσκια ανάγνωση ΜΕΣΑ στο κλείδωμα
+    if (r && dmStatus_(r) === DM.SENT) dmSet_(sh, r, { [DMC.STATUS]: DM.CANCELLED });
+  });
   return dmView_(dmLatest_(sh, l.id));
 }
 
@@ -236,17 +263,19 @@ function actDemandCancel_(agent, d) {
  *  παλαιότερες από 2 μήνες· ο έλεγχος ιδιοκτησίας γίνεται στη στήλη Μεσίτης). */
 function actDemandIList_(agent, d) {
   const sh = dmSheet_();
-  let r;
-  if (d.dm) {
-    const rows = dmFind_(sh, DMC.ID, String(d.dm));
-    r = rows.length ? dmRead_(sh, rows[0]) : null;
-    if (!r || norm_(dmGet_(r, DMC.AGENT)) !== norm_(agent.name)) throw new Error('Δεν βρέθηκε η ζήτηση.');
-  } else {
-    r = dmLatest_(sh, findMyLead_(agent, d.id).id);
-  }
-  if (!r || dmStatus_(r) !== DM.DONE) throw new Error('Ο πελάτης δεν έχει συμπληρώσει ακόμα τη φόρμα.');
-  dmWrite_(sh, r, { [DMC.ILIST]: d.on === false ? '' : new Date() });
-  return dmView_(r);
+  return dmLocked_(() => {                          // 2.15.1: φρέσκια ανάγνωση ΜΕΣΑ στο κλείδωμα, γράφει μόνο το κελί του
+    let r;
+    if (d.dm) {
+      const rows = dmFind_(sh, DMC.ID, String(d.dm));
+      r = rows.length ? dmRead_(sh, rows[0]) : null;
+      if (!r || norm_(dmGet_(r, DMC.AGENT)) !== norm_(agent.name)) throw new Error('Δεν βρέθηκε η ζήτηση.');
+    } else {
+      r = dmLatest_(sh, findMyLead_(agent, d.id).id);
+    }
+    if (!r || dmStatus_(r) !== DM.DONE) throw new Error('Ο πελάτης δεν έχει συμπληρώσει ακόμα τη φόρμα.');
+    dmSet_(sh, r, { [DMC.ILIST]: d.on === false ? '' : new Date() });
+    return dmView_(r);
+  });
 }
 
 // ═══ 1.25 · Οθόνη «Ζητήσεις» ════════════════════════════════
@@ -348,9 +377,9 @@ function setup125() {
 // ═══ Πελάτης (χωρίς σύνδεση, μόνο με το κλειδί του link) ═════
 
 function dmOpenRow_(sh, token) {
-  sfGuard_();
+  sfGuard_(token);
   const r = dmByToken_(sh, token);
-  if (!r) { sfBad_(); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
+  if (!r) { sfBad_(token); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
   const st = dmStatus_(r);
   if (st === DM.DONE) throw err_('Η φόρμα έχει ήδη σταλεί. Ευχαριστούμε!', 'done');
   if (st === DM.EXPIRED) throw err_('Το link έληξε. Ζητήστε νέο από τον μεσίτη σας.', 'closed');
@@ -364,8 +393,12 @@ function dmOpenRow_(sh, token) {
 /** Ο πελάτης ανοίγει τη φόρμα: μόνο όνομα μεσίτη / γραφείου και αν είναι αγορά ή ενοικίαση. */
 function actDemandOpen_(d) {
   const sh = dmSheet_();
-  const r = dmOpenRow_(sh, d.f);
-  dmWrite_(sh, r, { [DMC.OPENS]: (Number(dmGet_(r, DMC.OPENS)) || 0) + 1 });
+  dmOpenRow_(sh, d.f);                      // γρήγορος έλεγχος ΕΞΩ από το κλείδωμα: άκυρα links δεν το απασχολούν
+  const r = dmLocked_(() => {
+    const row = dmOpenRow_(sh, d.f);        // ξανά, μέσα στο κλείδωμα: μπορεί να μπήκε υποβολή στο μεταξύ
+    dmSet_(sh, row, { [DMC.OPENS]: (Number(dmGet_(row, DMC.OPENS)) || 0) + 1 });
+    return row;
+  });
   const ctx = dmJson_(r, DMC.CTX);
   let agentName = String(dmGet_(r, DMC.AGENT) || '');
   try { const a = sfAgent_(agentName); agentName = a.smsName || a.name; } catch (e) { /* όνομα από το φύλλο */ }
@@ -422,7 +455,7 @@ function dmClean_(c) {
 
 /** Ο πελάτης στέλνει: { f, c }. Λάθος σε πεδίο δεν καίει το link. */
 function actDemandSubmit_(d) {
-  sfGuard_();
+  sfGuard_(d.f);
   const tries = CacheService.getScriptCache();
   const key = 'dm:try:' + sha256_(String(d.f || '')).slice(0, 20);
   const n = Number(tries.get(key) || 0);
@@ -449,6 +482,7 @@ function actDemandSubmit_(d) {
 
   try {
     const agent = sfAgent_(dmGet_(r, DMC.AGENT));
+    if (!agent.active) { dmNotifyAdmins_(agent, leadId); return { ok: true }; }   // ο μεσίτης έφυγε: ούτε push ούτε email
     const title = 'Νέα ζήτηση' + (ctx.first ? ' · ' + ctx.first : '');
     const sent = pushToAgent_(agent, { type: 'demand', id: leadId, tag: 'dm-' + leadId,
       url: '?lead=' + encodeURIComponent(leadId), title: title, body: summary.slice(0, 180) });
@@ -460,6 +494,20 @@ function actDemandSubmit_(d) {
   } catch (e) { console.error('Φόρμα ζήτησης: ειδοποίηση μεσίτη (' + e.message + ')'); }
 
   return { ok: true };
+}
+
+/**
+ * Η φόρμα στάλθηκε για μεσίτη που δεν είναι πια ενεργός. Ειδοποιούνται οι ενεργοί Admin, ΧΩΡΙΣ
+ * τα κριτήρια ή το όνομα του πελάτη (αυτά μένουν στο φύλλο και στην κλήση): μόνο «ποιος μεσίτης, ποια κλήση».
+ */
+function dmNotifyAdmins_(agent, leadId) {
+  const title = 'Ζήτηση για ανενεργό μεσίτη';
+  const body = 'Ο πελάτης συμπλήρωσε τη φόρμα ζήτησης για την κλήση ' + leadId + ' του ανενεργού μεσίτη ' + agent.name +
+               '. Χρειάζεται να την αναλάβει κάποιος άλλος.';
+  readAgents_().filter(a => a.active && isAdmin_(a)).forEach(admin => {
+    const sent = pushToAgent_(admin, { type: 'demand', id: leadId, tag: 'dm-admin-' + leadId, title: title, body: body });
+    if (!sent && admin.email) MailApp.sendEmail({ to: admin.email, subject: title, name: 'KW App', body: body });
+  });
 }
 
 /** ▶ Μία φορά μετά την 1.24: φτιάχνει το φύλλο και ελέγχει ότι οι ενέργειες γράφτηκαν. */

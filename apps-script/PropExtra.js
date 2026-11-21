@@ -43,6 +43,7 @@ const PNOTE = {
     ACTIONS.pnotes = actPnotes_;
     ACTIONS.pnoteAdd = actPnoteAdd_;
     ACTIONS.pnoteDel = actPnoteDel_;
+    FLAG_ACTIONS.pnotes = FLAG_ACTIONS.pnoteAdd = FLAG_ACTIONS.pnoteDel = 'propNotes';   // 2.14.1: έλεγχος και στον server
   } catch (e) {
     console.error('PropExtra.gs: μετακίνησέ το ΚΑΤΩ από το Code.gs (⋮ → Μετακίνηση κάτω).');
   }
@@ -89,6 +90,7 @@ function reqList_(folder) {
   while (it.hasNext()) {
     const f = it.next();
     if (f.isTrashed()) continue;
+    if (String(f.getName()).indexOf(REQ_TMP) === 0) continue;   // ανεβαίνει ακόμα (ή κόπηκε): δεν μετρά
     let desc = '';
     try { desc = f.getDescription(); } catch (e) { /* χωρίς περιγραφή */ }
     const slot = reqSlotOf_(desc, f.getName());
@@ -112,30 +114,53 @@ function reqResult_(p, f) {
            docs: l.docs, other: l.other, counts: counts };
 }
 
-/** Από το actUpload_ του Code.gs, αφού έχουν ελεγχθεί δικαίωμα, μέγεθος και τύπος. */
+/** 2.14.1 · Προσωρινό όνομα αρχείου που ανεβαίνει ακόμα. Το reqList_ το αγνοεί, άρα δεν μετρά στην αρίθμηση. */
+const REQ_TMP = '~ανεβαίνει-';
+
+/**
+ * Από το actUpload_ του Code.gs, αφού έχουν ελεγχθεί δικαίωμα, μέγεθος και τύπος.
+ * 2.14.1 · QA W47 #6: το αργό κομμάτι (createFile έως 20MB) γίνεται ΕΞΩ από το γενικό κλείδωμα, με προσωρινό
+ * όνομα. Μέσα στο κλείδωμα μόνο τα γρήγορα: λίστα του φακέλου, αρίθμηση, μετονομασία. Έτσι οι εγγραφές των
+ * άλλων μεσιτών δεν περιμένουν το ανέβασμα και δύο ανεβάσματα μαζί δεν παίρνουν ποτέ τον ίδιο αριθμό.
+ */
 function reqUpload_(agent, p, f, slot, bytes, mime, d) {
+  const ext = EXT_BY_MIME[mime];
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);        // δύο ανεβάσματα μαζί δεν παίρνουν τον ίδιο αριθμό
+
+  lock.waitLock(20000);        // σύντομο: μόνο για να μη φτιαχτούν δύο φάκελοι «Απαραίτητα» μαζί
+  let folder;
+  try { folder = reqFolder_(f.folder, true); } finally { lock.releaseLock(); }
+
+  const file = folder.createFile(Utilities.newBlob(bytes, mime, REQ_TMP + Utilities.getUuid() + ext));   // χωρίς κλείδωμα
+
   try {
-    const folder = reqFolder_(f.folder, true);
+    lock.waitLock(20000);
+  } catch (e) {
+    try { file.setTrashed(true); } catch (x) { /* θα το αγνοεί η λίστα */ }
+    throw e;
+  }
+  let named = false;
+  try {
     const existing = reqList_(folder).docs[slot.key];
     const nm = reqNames_(slot.file, existing.map(x => x.name));
 
     if (nm.first) {
       const old = existing.find(x => x.name.replace(/\.[^.]+$/, '') === slot.file);
       try {
-        const ext = (old.name.match(/\.[^.]+$/) || [''])[0];
-        DriveApp.getFileById(old.id).setName(slot.file + ' (1)' + ext);
+        const oext = (old.name.match(/\.[^.]+$/) || [''])[0];
+        DriveApp.getFileById(old.id).setName(slot.file + ' (1)' + oext);
       } catch (e) { console.warn('Μετονομασία «(1)»: ' + e.message); }
     }
 
-    const file = folder.createFile(Utilities.newBlob(bytes, mime, nm.name + EXT_BY_MIME[mime]));
+    file.setName(nm.name + ext);
+    named = true;
     try {
       file.setDescription('[KW:' + slot.key + '] ' + slot.label + ' · ανέβηκε από ' + agent.name + ' στις ' +
                           stamp_(new Date()) + (d.name ? ' · αρχικό όνομα: ' + String(d.name).slice(0, 120) : ''));
     } catch (e) { /* όχι κρίσιμο: θα αναγνωριστεί από το όνομα */ }
   } finally {
     lock.releaseLock();
+    if (!named) { try { file.setTrashed(true); } catch (x) { /* η λίστα το αγνοεί ούτως ή άλλως */ } }
   }
   return reqResult_(p, f);
 }
@@ -196,8 +221,10 @@ function pnWrite_(code, cur, notes) {
 function pnClean_(s) {
   let t = String(s || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, PNOTE.TEXT_MAX);
   const before = t;
-  t = t.replace(/(^|[^A-Za-zΑ-Ωα-ωΆ-Ώά-ώ0-9])[A-Za-zΑ-Ωα-ω]{1,2}[\s-]?\d{6}(?!\d)/g, '$1•••')   // Α.Δ.Τ.
-       .replace(/(^|[^\d])\d{9}(?!\d)/g, '$1•••');                                              // ΑΦΜ
+  // 2.14.1: ίδιος κανόνας Α.Δ.Τ. με το scrubIds_ (ΚΕΦΑΛΑΙΑ, αρχή λέξης, όχι δίπλα σε €), ώστε «σε 180000» να μένει
+  t = t.replace(ID_ADT_RX, (m, pre, at, all) => idIsMoney_(all, at, m.length) ? m : pre + '•••')       // Α.Δ.Τ.
+       .replace(/(^|[^\d])\d{9}(?!\d)/g, (m, pre, at, all) =>                                          // ΑΦΜ
+         idIsMoney_(all, at + pre.length, m.length - pre.length) ? m : pre + '•••');
   return { text: t, masked: t !== before };
 }
 

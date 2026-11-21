@@ -120,7 +120,7 @@ function usageWeeklyMail(force) {
     if (prop_(OPS.MAIL_KEY, '') === today) return;
   }
   const agents = readAgents_().filter(a => a.email);
-  const admins = agents.filter(a => isAdmin_(a) && featureFlags_(a).usageMail);
+  const admins = agents.filter(a => a.active && isAdmin_(a) && featureFlags_(a).usageMail);   // 2.14.1
   if (!admins.length) return;
 
   const sp = PropertiesService.getScriptProperties();

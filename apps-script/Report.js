@@ -48,11 +48,14 @@ function reportBuild_(p, monthLabel, rows, prevCount, shows, over) {
   };
 }
 
+/** 2.14.1 · «για τον Νοέμβριο», όχι «για τον Νοέμβριος». Όλοι οι μήνες σε -ος: αιτιατική = χωρίς το τελικό ς. */
+function reportMonthAcc_(label) { return String(label || '').replace(/^(\S+?)ς(?=\s|$)/, '$1'); }
+
 /** Απλό κείμενο (WhatsApp / Viber / αντιγραφή). */
 function reportText_(r, ownerName, agentName) {
   const L = [];
   L.push((ownerName ? 'Καλησπέρα ' + ownerName.split(' ')[0] + ',' : 'Καλησπέρα,'), '');
-  L.push('Η ενημέρωση για το ακίνητό σας «' + r.title + '» για τον ' + r.month + ':', '');
+  L.push('Η ενημέρωση για το ακίνητό σας «' + r.title + '» για τον ' + reportMonthAcc_(r.month) + ':', '');
   L.push('📞 Τηλεφωνήματα: ' + r.calls + (r.trend ? ' (' + r.trend + ')' : ''));
   r.sources.forEach(s => L.push('   · ' + s.name + ': ' + s.n));
   L.push('🏠 Υποδείξεις: ' + r.showings);
@@ -68,7 +71,7 @@ function reportHtml_(r, ownerName, agentName) {
   const row = (a, b) => '<tr><td style="padding:6px 16px 6px 0;color:#555">' + e(a) + '</td><td style="padding:6px 0;font-weight:bold">' + e(b) + '</td></tr>';
   return '<div style="font:16px Arial,sans-serif;color:#111;max-width:560px">' +
     '<p>' + (ownerName ? 'Καλησπέρα ' + e(ownerName.split(' ')[0]) + ',' : 'Καλησπέρα,') + '</p>' +
-    '<p>η ενημέρωση για το ακίνητό σας <b>«' + e(r.title) + '»</b> για τον <b>' + e(r.month) + '</b>:</p>' +
+    '<p>η ενημέρωση για το ακίνητό σας <b>«' + e(r.title) + '»</b> για τον <b>' + e(reportMonthAcc_(r.month)) + '</b>:</p>' +
     '<table style="border-collapse:collapse;margin:8px 0 16px">' +
       row('Τηλεφωνήματα', r.calls + (r.trend ? ' (' + r.trend + ')' : '')) +
       r.sources.map(s => row('· ' + s.name, s.n)).join('') +
