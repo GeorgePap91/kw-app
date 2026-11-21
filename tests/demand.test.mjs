@@ -88,6 +88,7 @@ test('λίστα: μόνο του μεσίτη, χωρίς ακυρωμένες,
         return {
           getValues: function () { return __rows.slice(r - 2, r - 2 + nr).map(function (v) { return v.slice(c - 1, c - 1 + nc); }); },
           setValues: function (vals) { vals.forEach(function (v, i) { __rows[r - 2 + i] = v; }); },
+          setValue: function (x) { __rows[r - 2][c - 1] = x; },   // 2.15.1: dmSet_ γράφει μόνο το κελί του
           createTextFinder: function (q) { return { matchEntireCell: function () { return this; }, matchCase: function () { return this; },
             findAll: function () { var out = []; __rows.forEach(function (v, i) { if (String(v[c - 1]) === q) out.push({ getRow: function () { return i + 2; } }); }); return out; } }; }
         };

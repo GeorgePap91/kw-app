@@ -226,7 +226,7 @@ function actMatchDone_(agent, d) {
 // ── Το πρωινό πέρασμα ────────────────────────────────────────────────
 
 function newPropMatch() {
-  const agents = readAgents_().filter(isAgent_).filter(a => featureFlags_(a).newPropMatch);
+  const agents = readAgents_().filter(a => a.active && isAgent_(a)).filter(a => featureFlags_(a).newPropMatch);
   const props = readProps_();
   const avail = Object.keys(props).filter(k => props[k].available);
   const seen = matchSeenGet_();

@@ -23,7 +23,7 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.15';
+var APP_VERSION = '2.15.1';
 
 /** Έκδοση server που περιμένει η σελίδα. */
 var API_VERSION = '1.25';
@@ -2615,7 +2615,7 @@ function renderNext(l) {
     } else if (oi === 2) {                          // Δεν ενδιαφέρθηκε → ζήτηση
       title = 'Πάρε ζήτηση';
       text = note + 'Δεν ενδιαφέρθηκε για αυτό το ακίνητο. Γράψε τι ψάχνει, για να του βρεις άλλο. ' + when;
-      btns = b('demand', 'Πάρε ζήτηση', 'form', true) + b('task', 'Εργασία', 'tasks');
+      btns = (S.flags && S.flags.demandForm ? b('demand', 'Πάρε ζήτηση', 'form', true) : '') + b('task', 'Εργασία', 'tasks');   // 2.14.1: πίσω από το flag demandForm
     } else if (oi === 3) {                          // Δεν ήρθε → κλήση και νέο ραντεβού
       title = 'Δεν ήρθε · κάλεσέ τον';
       text = note + 'Κάλεσε τον πελάτη και κλείσε εκ νέου ραντεβού. ' + when;
@@ -4645,7 +4645,9 @@ function renderMore() {
   $('more-name').textContent = me.name || '';
   $('more-sub').textContent = [roles().super ? 'Super Admin · λειτουργία μεσίτη' : '', S.boot && S.boot.office && S.boot.office.name, 'Προφίλ και ρυθμίσεις'].filter(Boolean).join(' · ');
   if (window.kwDash) kwDash.sync();                      // 2.9: «Η πορεία μου» μόνο με το flag dashboard
-  demandBadge(); loadDemands(false, true);               // 2.15: μετρητής «Ζητήσεις»
+  var dmOn = !!(S.flags && S.flags.demandForm);         // 2.15.1: «Ζητήσεις» μόνο με το flag demandForm
+  $('more-demands').hidden = !dmOn;
+  if (dmOn) { demandBadge(); loadDemands(false, true); }  // 2.15: μετρητής «Ζητήσεις»
   if (S.mx) renderMoreMx();
   else {
     $('more-mx').innerHTML = '<span class="mx-mini">' + [1, 2, 3].map(function () { return '<span class="skel tile"><i></i><i></i></span>'; }).join('') + '</span>';
@@ -6752,6 +6754,7 @@ var DM_TABS = [
 S.dmTab = 'toPass';
 
 function loadDemands(force, quiet) {
+  if (!(S.flags && S.flags.demandForm)) return;          // 2.15.1: ο server θα το απέρριπτε ούτως ή άλλως
   var fresh = S.dmList && Date.now() - S.dmListAt < 120000;
   if (fresh && !force) { if (!quiet) renderDemands(); return; }
   if (!S.dmList && !quiet) $('dm-list').innerHTML = skel(4);

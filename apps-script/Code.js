@@ -487,6 +487,18 @@ const ADMIN_ACTIONS = {
 /** 2.9 · Μόνο για Coach. Γεμίζει από το Goals.js. Ο έλεγχος ρόλου γίνεται στον server, σε κάθε αίτημα. */
 const COACH_ACTIONS = {};
 
+/**
+ * 2.14.1 · Ενέργεια → flag που τη ζητά. Γεμίζει από τα Demand.js / PropExtra.js / Marketing.js. Ο έλεγχος γίνεται στον
+ * server, σε κάθε αίτημα (όπως ο ρόλος): το flag δεν είναι μόνο ζήτημα εμφάνισης στο κινητό. Ένα παλιό ή «πειραγμένο»
+ * αντίγραφο της εφαρμογής δεν ανοίγει λειτουργία που δεν έχει κυκλοφορήσει ακόμα στον μεσίτη.
+ */
+const FLAG_ACTIONS = {};
+
+/** Σφάλμα (code 'flag') αν η λειτουργία δεν είναι ενεργή για τον μεσίτη. Για ενέργειες που δεν χωρούν στον πίνακα. */
+function requireFlag_(agent, name) {
+  if (!featureFlags_(agent)[name]) throw err_('Η λειτουργία δεν είναι ακόμα ενεργή για τον λογαριασμό σου.', 'flag');
+}
+
 /** Ενέργειες χωρίς σύνδεση: η σύνδεση νέας συσκευής και η φόρμα του πελάτη (με link μίας χρήσης). */
 const PUBLIC_ACTIONS = {
   presOpen:   actPresOpen_,          // 1.19: η σελίδα του πελάτη
@@ -531,6 +543,7 @@ function doPost(e) {
       return json_({ ok: false, code: 'role', error: 'Η ενέργεια είναι μόνο για μεσίτες.' });
     }
     if (!fn) return json_({ ok: false, error: 'Άγνωστη ενέργεια.' });
+    if (FLAG_ACTIONS[req.action]) requireFlag_(sess.agent, FLAG_ACTIONS[req.action]);
 
     return json_({ ok: true, data: fn(sess.agent, req.data || {}, sess) });
   } catch (err) {
@@ -1660,7 +1673,7 @@ function ladderStep_(tries, now) {
 
 // Προεπιλογές για νέες λειτουργίες, ώστε να βγαίνουν χωρίς χειροκίνητο βήμα: πρώτα στους Admin.
 // Ό,τι γράφει η Ιδιότητα σεναρίου FEATURES υπερισχύει (π.χ. "all" ή "off"). Ποτέ email εδώ.
-const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin' };   // 1.23
+const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin', demandForm: 'admin' };   // 1.23 · 2.14 (φόρμα ζήτησης)
 
 function featureFlags_(agent) {
   let cfg = {};
@@ -2397,6 +2410,7 @@ function docsResult_(agent, p, f, set) {
 /** Τα έγγραφα ενός ακινήτου, ζωντανά από το Drive. Φτιάχνει τους φακέλους αν λείπουν
  *  (όχι όμως την «Τιμολόγηση»: αυτή φτιάχνεται με το πρώτο αρχείο). */
 function actDocs_(agent, d) {
+  if (docSet_(d.set) === 'req') requireFlag_(agent, 'reqDocs');   // 2.14.1: flag και στον server
   const p = myProp_(agent, d.code);
   return docsResult_(agent, p, propFolders_(agent, p), d.set);
 }
@@ -2448,8 +2462,9 @@ function trashFile_(file, folder) {
  *  χωρίς mode (παλιές εκδόσεις σελίδας): μονά έγγραφα → replace, πολλαπλά → keep.
  */
 function actUpload_(agent, d) {
-  const p = myProp_(agent, d.code);
   const set = docSet_(d.set);
+  if (set === 'req') requireFlag_(agent, 'reqDocs');
+  const p = myProp_(agent, d.code);
   const slot = slotsOf_(set).find(s => s.key === d.slot);
   if (!slot) throw new Error('Άγνωστο έγγραφο: ' + d.slot);
 
@@ -2522,8 +2537,9 @@ function actBillMandate_(agent, d) {
 
 /** Σβήνει ένα αρχείο από το «Έγγραφα KWAC» ή την «Τιμολόγηση» του ακινήτου (στον κάδο του Drive). */
 function actDocDelete_(agent, d) {
-  const p = myProp_(agent, d.code);
   const set = docSet_(d.set);
+  if (set === 'req') requireFlag_(agent, 'reqDocs');
+  const p = myProp_(agent, d.code);
   const f = propFolders_(agent, p);
   const folder = set === 'bill' ? billFolder_(f.folder, false) : set === 'req' ? reqFolder_(f.folder, false) : f.docs;
   if (!folder) throw new Error('Δεν βρέθηκε ο φάκελος.');
@@ -2619,7 +2635,7 @@ function docsReminder() {
   _agents = null; _docs = null;
   const props = readProps_();
 
-  readAgents_().filter(isAgent_).forEach(agent => {
+  readAgents_().filter(a => a.active && isAgent_(a)).forEach(agent => {   // 2.14.1: ανενεργός → ούτε email
     const missing = [];
     const seen = { props: 0, folder: 0, mandate: 0 };
 
@@ -3151,7 +3167,8 @@ function actContactMail_(agent, d) {
 /** Trigger κάθε πρωί: πρώτα οι εντολές που λήγουν, μετά η σύνοψη της ημέρας. */
 function morningBrief() {
   _agents = null;
-  mandateReminder();
+  // 2.14.1: ένα σφάλμα στις εντολές δεν σταματά πια τα ταιριάσματα, τις μειώσεις και τη σύνοψη της ημέρας
+  try { mandateReminder(); } catch (e) { console.warn('Λήξεις εντολών: ' + e.message); }
   // 2.5 · FEAT-11: νέα ακίνητα → πελάτες που ταιριάζουν (μόνο σε όσους έχουν το flag)
   if (typeof newPropMatch === 'function') {
     try { newPropMatch(); } catch (e) { console.warn('Ταιριάσματα: ' + e.message); }
@@ -3169,14 +3186,21 @@ function morningBrief() {
   const today = fmtIso_(new Date());
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
-  readAgents_().filter(isAgent_).forEach(agent => {
+  // 2.14.1: ΜΙΑ ανάγνωση του φύλλου «Εργασίες» για όλους (πριν: μία ανά μεσίτη, + αναζήτηση κλήσης ανά εργασία).
+  // Μετράμε μόνο ανοιχτές με ημερομηνία ≤ σήμερα, άρα δεν χρειάζεται το serializeTask_.
+  const dueBy = {};
+  readTasks_().forEach(t => {
+    if (!t.done && t.date && t.date <= today) dueBy[norm_(t.agent)] = (dueBy[norm_(t.agent)] || 0) + 1;
+  });
+
+  readAgents_().filter(a => a.active && isAgent_(a)).forEach(agent => {
     const leads = myLeads_(agent);
     const status = s => leads.filter(l => statusOf_(l.id) === s).length;
     const showings = leads.filter(l => {
       const at = appGet_(l.id, ACOL.SHOW_AT);
       return statusOf_(l.id) === STATUS.SHOWING && at && ts_(at) && fmtIso_(at) === today;
     }).length;
-    const tasks = tasksFor_(agent).filter(t => !t.done && t.date && t.date <= today).length;
+    const tasks = dueBy[norm_(agent.name)] || 0;
 
     const parts = [];
     if (showings) parts.push(plural(showings, 'υπόδειξη', 'υποδείξεις'));
@@ -3196,7 +3220,7 @@ function morningBrief() {
 /** Εντολές που λήγουν σε 30, 15, 7 ή 0 μέρες. Χωρίς ειδοποιήσεις: email. */
 function mandateReminder() {
   const props = readProps_();
-  readAgents_().filter(isAgent_).forEach(agent => {
+  readAgents_().filter(a => a.active && isAgent_(a)).forEach(agent => {   // ανενεργός μεσίτης: ούτε email
     Object.keys(props).map(k => props[k])
       .filter(p => p.available && norm_(p.partner) === norm_(agent.name) &&
                    CONFIG.MANDATE_ALERT_DAYS.indexOf(p.mandateDays) !== -1)
@@ -4245,21 +4269,33 @@ function actFormCancel_(agent, d) {
 
 // ── Ενέργειες πελάτη (χωρίς σύνδεση, μόνο με το κλειδί του link) ─
 
-/** Φρένο σε όποιον δοκιμάζει τυχαία κλειδιά: 40 λάθος σε 15' → κλείνει για όλους για 15'. */
-function sfGuard_() {
-  const n = Number(CacheService.getScriptCache().get('sf:bad') || 0);
-  if (n >= 40) throw new Error('Πολλές λάθος προσπάθειες. Δοκιμάστε ξανά σε 15 λεπτά.');
-}
-function sfBad_() {
+/**
+ * Φρένο σε όποιον δοκιμάζει λάθος κλειδιά. Δύο μετρητές, μόνο για ΛΑΘΟΣ κλειδιά (τα έγκυρα δεν μετρούν ποτέ):
+ *  · ανά κλειδί που στάλθηκε: 8 λάθη σε 15' → κόβεται ΜΟΝΟ αυτό το κλειδί (π.χ. κομμένο link που ανανεώνεται).
+ *  · γενικός: 400 λάθη σε 15' (διαφορετικά κλειδιά) → φρένο για όλους. Δίχτυ ασφαλείας, όχι καθημερινό φρένο:
+ *    το API URL είναι δημόσιο και τα κλειδιά των 48 hex δεν μαντεύονται, άρα δεν χρειάζεται πιο στενό.
+ * Με τον παλιό κοινό μετρητή των 40, ένα μόνο κομμένο link έκλεινε όλες τις φόρμες του γραφείου.
+ */
+const SF_GUARD = { KEY_MAX: 8, ALL_MAX: 400, TTL: 900 };
+function sfBadKey_(token) { return 'sf:bad:' + sha256_(String(token == null ? '' : token).slice(0, 200)).slice(0, 20); }
+function sfGuard_(token) {
   const c = CacheService.getScriptCache();
-  c.put('sf:bad', String(Number(c.get('sf:bad') || 0) + 1), 900);
+  if (Number(c.get(sfBadKey_(token)) || 0) >= SF_GUARD.KEY_MAX || Number(c.get('sf:bad') || 0) >= SF_GUARD.ALL_MAX) {
+    throw new Error('Πολλές λάθος προσπάθειες. Δοκιμάστε ξανά σε 15 λεπτά.');
+  }
+}
+function sfBad_(token) {
+  const c = CacheService.getScriptCache();
+  const k = sfBadKey_(token);
+  c.put(k, String(Number(c.get(k) || 0) + 1), SF_GUARD.TTL);
+  c.put('sf:bad', String(Number(c.get('sf:bad') || 0) + 1), SF_GUARD.TTL);
 }
 
 /** Το link, αν ισχύει. Αλλιώς σφάλμα με ήπιο μήνυμα για τον πελάτη. */
 function sfOpenRow_(token) {
-  sfGuard_();
+  sfGuard_(token);
   const r = sfByToken_(token);
-  if (!r) { sfBad_(); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
+  if (!r) { sfBad_(token); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
   const st = sfStatus_(r);
   if (st === SF.SIGNED || st === SF.PRINT) throw err_('Το έντυπο έχει ήδη υποβληθεί. Ευχαριστούμε!', 'done');
   if (st === SF.EXPIRED) throw err_('Το link έληξε. Ζητήστε νέο από τον μεσίτη σας.', 'closed');
@@ -4349,7 +4385,7 @@ function sfDevice_(ua) {
  * Σφάλμα στα πεδία δεν καίει το link. Επιτυχία το κλειδώνει.
  */
 function actFormSubmit_(d) {
-  sfGuard_();
+  sfGuard_(d.f);
   const tries = CacheService.getScriptCache();
   const key = 'sf:try:' + sha256_(String(d.f || '')).slice(0, 20);
   const n = Number(tries.get(key) || 0);
@@ -4992,11 +5028,33 @@ function actReviewSeen_(agent, d) {
   return myReviews_(agent);
 }
 
-/** Α.Δ.Τ., ΑΦΜ, τηλέφωνα, IBAN: δεν γράφονται ποτέ σε φύλλο ή ειδοποίηση. */
+/**
+ * 2.14.1 · Κοινοί κανόνες για αριθμούς ταυτότητας (scrubIds_ εδώ, pnClean_ στο PropExtra).
+ * Α.Δ.Τ.: 1–2 ΚΕΦΑΛΑΙΑ γράμματα στην ΑΡΧΗ λέξης + 6 ψηφία («ΑΚ 123456», «Χ-123456»). Παλιά έπιανε και πεζά
+ * χωρίς όριο λέξης, οπότε «έως 250000» → «έ•••» και «σε 180000» → «•••». Το ΑΝΤΙΤΙΜΟ: ταυτότητα γραμμένη με
+ * πεζά («ακ 123456») δεν σβήνεται πια. Το δεχόμαστε: τα ποσά σε ζήτηση/σημείωση είναι πολύ πιο συχνά.
+ */
+const ID_ADT_RX = /(^|[^A-Za-zΑ-Ωα-ωΆ-Ώά-ώ0-9])[A-ZΑ-Ω]{1,2}[\s-]?\d{6}(?!\d)/g;
+const ID_WORD_ = '[A-Za-zΑ-Ωα-ωΆ-Ώά-ώ]';
+
+/** Είναι ποσό; € / «ευρώ» / «eur» ακριβώς πριν ή μετά τον αριθμό. */
+function idIsMoney_(src, at, len) {
+  const before = src.slice(Math.max(0, at - 6), at), after = src.slice(at + len, at + len + 6);
+  return /(€|ευρ\S*|eur\S*)\s*$/i.test(before) || /^\s*(€|ευρ|eur)/i.test(after);
+}
+
+/** Τελείες χιλιάδων («1.250.000») έως 8 ψηφία = ποσό. Με 9 ψηφία μπορεί να είναι ΑΦΜ με τελείες: σβήνεται. */
+function idIsThousands_(m) {
+  return /^\d{1,3}(\.\d{3})+$/.test(m) && m.replace(/\D/g, '').length <= 8;
+}
+
+/** Α.Δ.Τ., ΑΦΜ, τηλέφωνα, IBAN: δεν γράφονται ποτέ σε φύλλο ή ειδοποίηση. Τα ποσά μένουν. */
 function scrubIds_(s) {
-  return String(s || '')
-    .replace(/[A-Za-zΑ-Ωα-ω]{1,2}[\s-]?\d{6}(?!\d)/g, '•••')     // Α.Δ.Τ. όπως «ΑΚ 123456»
-    .replace(/\d(?:[\s.\-]?\d){6,}/g, '•••');                    // 7+ ψηφία: ΑΦΜ, τηλέφωνο, λογαριασμός
+  const src = String(s || '');
+  return src
+    .replace(ID_ADT_RX, (m, pre, at, all) => idIsMoney_(all, at, m.length) ? m : pre + '•••')
+    .replace(/\d(?:[\s.\-]?\d){6,}/g, (m, at, all) =>                  // 7+ ψηφία: ΑΦΜ, τηλέφωνο, λογαριασμός
+      (idIsThousands_(m) || idIsMoney_(all, at, m.length)) ? m : '•••');
 }
 
 // ── Φάκελοι και αρχεία, μόνο ανάγνωση ──────────────────────
@@ -6610,9 +6668,9 @@ function actOfferCancel_(agent, d) {
 // ── Πελάτης (χωρίς σύνδεση, μόνο με το κλειδί του link) ───
 
 function ofOpenRow_(token) {
-  sfGuard_();
+  sfGuard_(token);
   const r = ofByToken_(token);
-  if (!r) { sfBad_(); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
+  if (!r) { sfBad_(token); throw err_('Το link δεν είναι έγκυρο. Ζητήστε νέο από τον μεσίτη σας.', 'closed'); }
   const st = ofStatus_(r);
   if (st === SF.SIGNED) throw err_('Η προσφορά έχει ήδη υποβληθεί. Ευχαριστούμε!', 'done');
   if (st === SF.EXPIRED) throw err_('Το link έληξε. Ζητήστε νέο από τον μεσίτη σας.', 'closed');
@@ -6703,7 +6761,7 @@ function ofNextAa_(now) {
 
 /** Ο πελάτης υποβάλλει: { f, c, sig, consent, ua }. Λάθος σε πεδίο δεν καίει το link. */
 function actOfferSubmit_(d) {
-  sfGuard_();
+  sfGuard_(d.f);
   const tries = CacheService.getScriptCache();
   const key = 'of:try:' + sha256_(String(d.f || '')).slice(0, 20);
   const n = Number(tries.get(key) || 0);

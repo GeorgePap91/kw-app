@@ -39,6 +39,7 @@ const MKT = {
     ACTIONS.mktSave = actMktSave_;
     ACTIONS.mktAsset = actMktAsset_;
     ACTIONS.mktLog = actMktLog_;
+    FLAG_ACTIONS.mktGet = FLAG_ACTIONS.mktSave = FLAG_ACTIONS.mktAsset = FLAG_ACTIONS.mktLog = 'marketing';   // 2.14.1
   } catch (e) {
     console.error('Marketing.gs: μετακίνησέ το ΚΑΤΩ από το Code.gs.');
   }
