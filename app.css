@@ -1350,6 +1350,17 @@ html[data-theme="dark"] .seg-btn.is-on{background:var(--card);box-shadow:inset 0
 .dm-deal .seg-btn{min-height:3.25rem;font-size:1.0625rem}
 .dm-ilist{margin-top:.75rem}
 
+/* 2.15 · Οθόνη «Ζητήσεις»: τρεις αριθμοί που είναι και καρτέλες */
+.dm-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:0 0 .75rem}
+.dm-tile{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;min-height:4.25rem;padding:.625rem .75rem;
+  border:1.5px solid transparent;border-radius:.875rem;background:var(--wash);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.dm-tile b{font-size:1.5rem;line-height:1.1}
+.dm-tile span{font-size:.875rem;color:var(--ink-2)}
+.dm-tile.hot b{color:var(--red)}
+.dm-tile.is-on{border-color:var(--ink);background:var(--paper)}
+.dm-rate{margin:0 0 .75rem;border-style:solid}
+.dm-what{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
 /* 2.3 · FEAT-9 Smart Form Memory: chips «Συχνά:» κάτω από περιοχές / budget */
 .pf-mem{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
 .pf-mem-l{font-size:.875rem;font-weight:700;color:var(--ink-2)}

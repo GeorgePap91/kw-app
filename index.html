@@ -251,6 +251,7 @@
       <h2 class="group-title">Πελάτες και συνεργάτες</h2>
       <div class="mlist">
         <button class="mrow" data-goto="contacts"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-people"/></svg></span><span class="mrow-body"><b>Επαφές</b><span>Πελάτες, τι τους ενδιέφερε, email.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="mrow" data-goto="demands"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg></span><span class="mrow-body"><b>Ζητήσεις <span class="pill" id="dm-badge" hidden>0</span></b><span>Τι ψάχνουν οι πελάτες σου, πέρασμα στο iList.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" data-goto="referrals"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-receipt"/></svg></span><span class="mrow-body"><b>Οι συστάσεις μου</b><span>Τα έντυπα που έστειλες, με το PDF.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
         <button class="mrow" id="btn-referral-more"><span class="mrow-ico"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span><span class="mrow-body"><b>Νέα σύσταση ή συνεργασία</b><span>Έντυπο προς συνεργάτη άλλου γραφείου KW.</span></span><svg class="ico chev" aria-hidden="true"><use href="#i-next"/></svg></button>
       </div>
@@ -294,6 +295,16 @@
       </div>
     </header>
     <div class="list" id="ref-list"></div>
+  </section>
+
+  <!-- ΖΗΤΗΣΕΙΣ (2.15) -->
+  <section class="view" id="view-demands" hidden>
+    <header class="head">
+      <div class="head-row">
+        <div class="head-title"><button class="icon-btn head-back" data-goto="more" aria-label="Πίσω στα Άλλα"><svg class="ico" aria-hidden="true"><use href="#i-back"/></svg></button><h1>Ζητήσεις</h1></div>
+      </div>
+    </header>
+    <div class="list" id="dm-list"></div>
   </section>
 
   <!-- ΕΠΑΦΕΣ (1.10) -->

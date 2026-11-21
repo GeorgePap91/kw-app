@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.14';
+var APP_VERSION = '2.15';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.24';
+var API_VERSION = '1.25';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -886,10 +886,10 @@ function wire() {
   });
 }
 
-var VIEWS = ['today', 'calls', 'props', 'alerts', 'more', 'tasks', 'contacts', 'referrals', 'metrics', 'forms',
+var VIEWS = ['today', 'calls', 'props', 'alerts', 'more', 'tasks', 'contacts', 'referrals', 'demands', 'metrics', 'forms',
              'dash', 'a-review', 'a-calls', 'a-props', 'a-more', 'c-team', 'c-more'];
 // Ποιο κουμπί του μενού φωτίζεται. Τα «Περισσότερα» φαίνονται ως κουμπί μόνο στον υπολογιστή.
-var NAV_OF = { dash: 'more', metrics: 'more', forms: 'more', contacts: 'more', referrals: 'more', tasks: 'more' };
+var NAV_OF = { dash: 'more', metrics: 'more', forms: 'more', contacts: 'more', referrals: 'more', demands: 'more', tasks: 'more' };
 // Οι 4 καρτέλες: σε αυτές γυρίζει το «Πίσω» των υπόλοιπων οθονών.
 var MAIN_VIEWS = { today: 1, calls: 1, props: 1, alerts: 1 };
 
@@ -916,6 +916,7 @@ function goto(view) {
   if (view === 'alerts') renderAlerts();
   if (view === 'calls') renderCalls();
   if (view === 'referrals') loadReferrals();
+  if (view === 'demands') loadDemands(false);
   if (view === 'a-review') renderReviews();
   if (view === 'a-calls') renderACalls();
   if (view === 'a-props') renderAProps();
@@ -4644,6 +4645,7 @@ function renderMore() {
   $('more-name').textContent = me.name || '';
   $('more-sub').textContent = [roles().super ? 'Super Admin · λειτουργία μεσίτη' : '', S.boot && S.boot.office && S.boot.office.name, 'Προφίλ και ρυθμίσεις'].filter(Boolean).join(' · ');
   if (window.kwDash) kwDash.sync();                      // 2.9: «Η πορεία μου» μόνο με το flag dashboard
+  demandBadge(); loadDemands(false, true);               // 2.15: μετρητής «Ζητήσεις»
   if (S.mx) renderMoreMx();
   else {
     $('more-mx').innerHTML = '<span class="mx-mini">' + [1, 2, 3].map(function () { return '<span class="skel tile"><i></i><i></i></span>'; }).join('') + '</span>';
@@ -4716,7 +4718,7 @@ function renderReferrals() {
 //  Στην κορυφή μιας λίστας, τράβα προς τα κάτω και άφησε: ίδιο με το ↻.
 // ─────────────────────────────────────────────────────────────
 
-var PTR_VIEWS = { today: 1, calls: 1, tasks: 1, props: 1, more: 1, alerts: 1, referrals: 1, 'a-review': 1, 'a-calls': 1, 'a-props': 1 };
+var PTR_VIEWS = { today: 1, calls: 1, tasks: 1, props: 1, more: 1, alerts: 1, referrals: 1, demands: 1, 'a-review': 1, 'a-calls': 1, 'a-props': 1 };
 var PTR_MAX = 72;
 
 function wirePullToRefresh() {
@@ -4745,7 +4747,8 @@ function wirePullToRefresh() {
     var go = ind.classList.contains('ready');
     reset();
     if (go) {
-      if (S.view === 'more' || S.view === 'referrals') { S.mx = null; if (S.view === 'more') renderMore(); else loadReferrals(true); }
+      if (S.view === 'demands') loadDemands(true);
+      else if (S.view === 'more' || S.view === 'referrals') { S.mx = null; if (S.view === 'more') renderMore(); else loadReferrals(true); }
       else refreshNow();
     }
   }, { passive: true });
@@ -6592,6 +6595,7 @@ function openDemand(l) {
   if (!l) return;
   if (!S.dmLink || S.dmLink.id !== l.id) S.dmLink = null;
   S.dmLead = l.id;
+  S.dmItem = null;
   var have = S.dmCache[l.id];
   if (have) renderDemand(have); else $('dm-body').innerHTML = '<p class="cal-status muted">Φόρτωση…</p>';
   openPop('demand');
@@ -6615,7 +6619,8 @@ function dmCopy(text, msg) {
 
 function renderDemand(st) {
   S.dmState = st;
-  var el = $('dm-body'), l = findLead(S.dmLead) || S.lead || {}, link = S.dmLink;
+  dmListUpdate(st);
+  var el = $('dm-body'), l = findLead(S.dmLead) || (S.dmItem ? { name: S.dmItem.first } : S.lead) || {}, link = S.dmLink;
 
   if (st.status === 'Συμπληρώθηκε') {
     var rows = (st.lines || []).map(function (x) { return sfFact(x[0], x[1]); }).join('');
@@ -6626,14 +6631,16 @@ function renderDemand(st) {
       (st.ilist
         ? '<p class="cal-status ok dm-ilist">✓ Περάστηκε στο iList ' + esc(lowerDay(niceDate(st.ilist))) + ' <button class="link" id="dm-undo">Αναίρεση</button></p>'
         : '<button class="btn solid-red wide gap-top" id="dm-done">Η ζήτηση περάστηκε στο iList</button>') +
-      '<button class="link gap-top" id="dm-new">Νέα φόρμα στον ίδιο πελάτη</button></div>';
+      (S.dmItem && findLead(S.dmLead) ? '<button class="btn wide gap-top" id="dm-lead">' + ico('people') + '<span>Άνοιγμα πελάτη</span></button>' : '') +
+      (S.dmItem ? '' : '<button class="link gap-top" id="dm-new">Νέα φόρμα στον ίδιο πελάτη</button>') + '</div>';
+    if ($('dm-lead')) $('dm-lead').onclick = function () { closePop('demand'); openLead(S.dmLead, {}); };
     $('dm-copy').onclick = function () {
       var notes = (st.answers && st.answers.notes) ? '\nΣημειώσεις: ' + st.answers.notes : '';
       dmCopy((l.name ? l.name + ' · ' : '') + st.summary + notes, 'Τα κριτήρια αντιγράφηκαν');
     };
     if ($('dm-done')) $('dm-done').onclick = function () { dmIList(true); };
     if ($('dm-undo')) $('dm-undo').onclick = function () { dmIList(false); };
-    $('dm-new').onclick = function () {
+    if ($('dm-new')) $('dm-new').onclick = function () {
       ask('Νέα φόρμα;', 'Οι απαντήσεις που έστειλε μένουν στο φύλλο. Θα φτιαχτεί νέο link.', 'Ναι, νέα φόρμα')
         .then(function (yes) { if (yes) renderDemand({ status: '', deal: st.deal }); });
     };
@@ -6720,11 +6727,117 @@ function onDmCancel() {
 
 function dmIList(on) {
   var id = S.dmLead;
-  api('demandIList', { id: id, on: on }).then(function (st) {
+  api('demandIList', S.dmItem ? { dm: S.dmItem.id, on: on } : { id: id, on: on }).then(function (st) {
     S.dmCache[id] = st;
     if (S.dmLead === id) renderDemand(st);
     toast(on ? 'Σημειώθηκε: περάστηκε στο iList' : 'Αναιρέθηκε');
   }).catch(function (e) { toast(e.message, true); });
+}
+
+// ═════════════════════════════════════════════════════════════
+//  2.15 · ΟΘΟΝΗ «ΖΗΤΗΣΕΙΣ» (Περισσότερα → Ζητήσεις)
+//  Πάνω τρεις αριθμοί: «Προς iList» (συμπληρωμένες που δεν περάστηκαν), «Σε αναμονή»,
+//  «Περάστηκαν». Από κάτω τρεις καρτέλες με τις ζητήσεις. Πάτημα = το παράθυρο της ζήτησης.
+//  Ο server κρατά cache ανά μεσίτη· εδώ δεν ξαναρωτάμε αν η λίστα είναι κάτω από 2 λεπτών.
+// ═════════════════════════════════════════════════════════════
+
+var DM_TABS = [
+  { k: 'toPass', label: 'Προς iList', empty: 'Όλες οι ζητήσεις έχουν περαστεί στο iList. 👍',
+    on: function (x) { return x.status === 'Συμπληρώθηκε' && !x.ilist; } },
+  { k: 'waiting', label: 'Σε αναμονή', empty: 'Καμία φόρμα δεν περιμένει τον πελάτη.',
+    on: function (x) { return x.status === 'Στάλθηκε'; } },
+  { k: 'passed', label: 'Περάστηκαν', empty: 'Δεν έχεις περάσει ακόμα ζήτηση στο iList.',
+    on: function (x) { return x.status === 'Συμπληρώθηκε' && !!x.ilist; } }
+];
+S.dmTab = 'toPass';
+
+function loadDemands(force, quiet) {
+  var fresh = S.dmList && Date.now() - S.dmListAt < 120000;
+  if (fresh && !force) { if (!quiet) renderDemands(); return; }
+  if (!S.dmList && !quiet) $('dm-list').innerHTML = skel(4);
+  apiRead('demandList').then(function (d) {
+    S.dmList = d || { items: [], counts: {} };
+    S.dmListAt = Date.now();
+    demandBadge();
+    if (S.view === 'demands') renderDemands();
+  }).catch(function (e) {
+    if (quiet) return;
+    if (!S.dmList) $('dm-list').innerHTML = '<div class="empty"><b>Δεν φορτώθηκαν</b>' + esc(e.message) + '</div>';
+    else toast(e.message, true);
+  });
+}
+
+function demandBadge() {
+  var b = $('dm-badge');
+  if (!b) return;
+  var n = S.dmList && S.dmList.counts ? S.dmList.counts.toPass || 0 : 0;
+  b.hidden = !n;
+  b.textContent = n;
+}
+
+function dmRecount() {
+  var items = S.dmList.items;
+  var c = {};
+  DM_TABS.forEach(function (t) { c[t.k] = items.filter(t.on).length; });
+  c.received = c.toPass + c.passed;
+  S.dmList.counts = c;
+  demandBadge();
+}
+
+/** Μετά από ενέργεια στο παράθυρο: ενημερώνει το στοιχείο της λίστας χωρίς νέα κλήση στον server. */
+function dmListUpdate(st) {
+  if (!S.dmList || !st || !st.id) return;
+  var it = S.dmList.items.filter(function (x) { return x.id === st.id; })[0];
+  if (!it) { S.dmListAt = 0; return; }                    // νέο link: η λίστα ξαναφορτώνει στο επόμενο άνοιγμα
+  ['status', 'ilist', 'submitted', 'expires', 'opens', 'lines', 'summary', 'answers'].forEach(function (k) { if (k in st) it[k] = st[k]; });
+  dmRecount();
+  if (S.view === 'demands') renderDemands();
+}
+
+function renderDemands() {
+  var d = S.dmList || { items: [], counts: {} }, c = d.counts || {}, el = $('dm-list');
+  if (!d.items.length) {
+    el.innerHTML = '<div class="empty"><b>Καμία ζήτηση ακόμα</b>Όταν ένας πελάτης δεν ενδιαφερθεί, άνοιξέ τον και πάτα «Πάρε ζήτηση». ' +
+      'Ό,τι συμπληρώσει θα το βρίσκεις εδώ.</div>';
+    return;
+  }
+  var tab = DM_TABS.filter(function (t) { return t.k === S.dmTab; })[0] || DM_TABS[0];
+  var list = d.items.filter(tab.on);
+  var tiles = '<div class="dm-tiles">' + DM_TABS.map(function (t) {
+    return '<button type="button" class="dm-tile' + (t.k === tab.k ? ' is-on' : '') + (t.k === 'toPass' && c.toPass ? ' hot' : '') +
+      '" data-dmtab="' + t.k + '" aria-pressed="' + (t.k === tab.k) + '"><b>' + (c[t.k] || 0) + '</b><span>' + t.label + '</span></button>';
+  }).join('') + '</div>' +
+    (c.received ? '<p class="card-note dm-rate">Στο iList: ' + (c.passed || 0) + ' από ' + c.received + ' συμπληρωμένες (' +
+      Math.round(100 * (c.passed || 0) / c.received) + '%).</p>' : '');
+  var key = 'dm-' + tab.k;
+  var rows = list.length ? listMeta(list.length, key, 'ζήτηση', 'ζητήσεις') + pageOf(list, key).map(function (x) {
+    var when = x.status === 'Στάλθηκε'
+      ? 'Στάλθηκε ' + lowerDay(niceDate(x.created)) + (x.opens ? ' · άνοιξε' : ' · δεν άνοιξε ακόμα')
+      : x.ilist ? 'Περάστηκε ' + lowerDay(niceDate(x.ilist)) : 'Ήρθε ' + lowerDay(niceDate(x.submitted));
+    var what = x.status === 'Στάλθηκε' ? (x.deal || '') : String(x.summary || '').replace(/^(Αγορά|Ενοικίαση) · /, '');
+    return '<button class="mrow" data-dm="' + esc(x.id) + '"><span class="mrow-ico">' + ico('form') + '</span><span class="mrow-body">' +
+      '<b>' + esc((x.first || 'Πελάτης') + (x.code ? ' · ' + x.code : '')) + '</b>' +
+      '<span class="dm-what">' + esc(what) + '</span><span class="muted">' + esc(when) + '</span></span>' + ico('next', 'ico chev') + '</button>';
+  }).join('') + pagerHtml(list.length, key) : '<div class="empty">' + esc(tab.empty) + '</div>';
+  el.innerHTML = tiles + rows;
+  el.querySelectorAll('[data-dmtab]').forEach(function (b) {
+    b.onclick = function () { S.dmTab = b.dataset.dmtab; renderDemands(); };
+  });
+  el.querySelectorAll('[data-dm]').forEach(function (b) {
+    b.onclick = function () { openDemandItem(b.dataset.dm); };
+  });
+  wirePager(el, key, renderDemands);
+}
+
+/** Από τη λίστα: το παράθυρο ανοίγει αμέσως με τα στοιχεία που ήδη έχουμε. */
+function openDemandItem(id) {
+  var it = (S.dmList && S.dmList.items || []).filter(function (x) { return x.id === id; })[0];
+  if (!it) return;
+  S.dmItem = it;
+  S.dmLead = it.lead;
+  if (!S.dmLink || S.dmLink.id !== it.lead) S.dmLink = null;
+  renderDemand(it);
+  openPop('demand');
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -7950,7 +8063,7 @@ function offProfilesLoad() {
 
 /** Σβήνει ό,τι κρατά το κινητό για τους πελάτες. Αποσύνδεση, ανάκληση, 14 ημέρες. */
 function offForget() {
-  ['kw_boot', 'kw_prof', 'kw_queue', 'kw_cache_contacts', 'kw_cache_referrals', 'kw_cache_metrics', 'kw_call', 'kw_mem'].forEach(function (k) {
+  ['kw_boot', 'kw_prof', 'kw_queue', 'kw_cache_contacts', 'kw_cache_referrals', 'kw_cache_demandList', 'kw_cache_metrics', 'kw_call', 'kw_mem'].forEach(function (k) {
     try { localStorage.removeItem(k); } catch (e) { /* ιδιωτική περιήγηση */ }
   });
   S.queue = [];
