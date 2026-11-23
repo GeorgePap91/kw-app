@@ -28,3 +28,4 @@ rm .clasp.json                               # το φτιάχνει μόνο τ
 | `METRICS_SPREADSHEET_ID` | απαντήσεις «Μετρησιμότητα» | ίδιο ή κενό |
 | `PROD_SPREADSHEET_IDS` | παραγωγικά workbooks (κόμμα) — το Demo δεν τα αγγίζει | ίδιο με PROD |
 | `DRIVE_ROOT_ID`, `OF_TPL`, `REF_TPL_*`, `FCM_SERVICE_ACCOUNT` | όπως πριν | βλ. docs/PIPELINE.md |
+| `PERF` | 2.18: `off` σταματά τη μέτρηση χρόνων (Perf.js). Κενό = ενεργή | κενό |

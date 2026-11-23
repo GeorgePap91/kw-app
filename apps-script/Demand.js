@@ -406,7 +406,12 @@ function actDemandList_(agent) {
 
 /** ▶ Κάθε νύχτα (setup125): ό,τι τελείωσε φεύγει στο «Αρχείο φορμών ζήτησης».
  *  Τίποτα δεν σβήνεται· απλώς βγαίνει από το φύλλο που ψάχνει η εφαρμογή. */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το dmArchiveRun_. */
 function dmArchive() {
+  return perf_('t:dmArchive', () => dmArchiveRun_());
+}
+
+function dmArchiveRun_() {
   const sh = dmSheet_();
   const last = sh.getLastRow();
   if (last < 2) return 0;
