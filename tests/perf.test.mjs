@@ -223,10 +223,11 @@ test('flush: σβήνει ημέρες εκτός διατήρησης', () => {
   assert.ok('PERF_DAY:29991231' in w.sp);
 });
 
-test('η ενέργεια perfStats είναι μόνο για Admin', () => {
+test('τα νούμερα απόδοσης δεν εκτίθενται σε κανέναν ρόλο του πελάτη (ούτε Admin)', () => {
   const w = world();
-  assert.equal(w.run(`typeof ADMIN_ACTIONS.perfStats`), 'function');
-  assert.equal(w.run(`typeof ACTIONS.perfStats`), 'undefined');
+  const exposed = w.run(`[ACTIONS, ADMIN_ACTIONS, COACH_ACTIONS, PUBLIC_ACTIONS, SHARED_ACTIONS]
+    .some(function (m) { return Object.keys(m).some(function (k) { return /perf/i.test(k); }); })`);
+  assert.equal(exposed, false);
 });
 
 test('χωρίς το Perf.js (μόνο Code.js) όλα τρέχουν κανονικά', () => {

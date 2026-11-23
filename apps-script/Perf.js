@@ -18,6 +18,11 @@
  *   - Τα εκατοστημόρια βγαίνουν από κάδους, άρα δίνουν «το πολύ Χ ms» (το άνω όριο του κάδου).
  *
  * Διακόπτης: Ιδιότητα σεναρίου PERF = off σταματά τη μέτρηση αμέσως, χωρίς νέα έκδοση.
+ *
+ * Ποιος βλέπει τα νούμερα: ΜΟΝΟ ο developer, από τον editor (▶ perfReport / ▶ perfNow).
+ * Σκόπιμα δεν υπάρχει ενέργεια στο API ούτε οθόνη στην εφαρμογή: κανένας ρόλος (Admin, Super Admin,
+ * Coach) του πελάτη δεν τα βλέπει. Η μελλοντική αποστολή στην κονσόλα του προϊόντος
+ * (ARCHITECTURE §14.5) θα στέλνει μόνο αριθμούς προς τον λογαριασμό του developer.
  */
 
 const PERF = {
@@ -271,12 +276,6 @@ function perfDays_(n) {
   return days;
 }
 
-/** Admin: αναφορά για την εφαρμογή (μόνο αριθμοί). */
-function actPerfStats_(agent, d) {
-  const n = Math.min(Math.max(Number(d && d.days) || 7, 1), PERF.KEEP_DAYS);
-  return perfSummary_(perfDays_(n));
-}
-
 /**
  * ▶ Τρέξε από τον editor: γράφει στο αρχείο καταγραφής την αναφορά των τελευταίων 7 ημερών.
  * Η σημερινή ημέρα δεν μπαίνει (είναι μισή). Για την τρέχουσα ώρα: ▶ perfNow.
@@ -305,11 +304,3 @@ function perfNow() {
   r.rows.forEach(x => console.log(x.name + ' · ' + x.n + ' φορές · μέσος ' + x.avg + ' ms · max ' + x.max + ' ms'));
   return r;
 }
-
-(function () {
-  try {
-    ADMIN_ACTIONS.perfStats = actPerfStats_;
-  } catch (e) {
-    console.error('Perf.gs: μετακίνησέ το ΚΑΤΩ από το Code.gs.');
-  }
-})();
