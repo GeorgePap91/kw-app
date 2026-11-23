@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.16';
+var APP_VERSION = '2.17';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.26';
+var API_VERSION = '1.27';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -177,7 +177,7 @@ function showPane(container, value) {
 // αποφασίζουμε εμείς: κλείνει το ανοιχτό φύλλο, γυρίζει στο Σήμερα ή ρωτά για έξοδο.
 // Το κλείσιμο από τις Πρόσφατες δεν φτάνει ποτέ στη σελίδα, και αυτό δεν αλλάζει.
 
-var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox', 'mktbox', 'demand'];
+var POPS = ['present', 'smsbox', 'quick', 'pick', 'callnote', 'offer', 'lpick', 'matchbox', 'dropbox', 'reportbox', 'propedit', 'usagebox', 'closebox', 'mktbox', 'demand', 'pcbox'];
 var SHEETS = ['goals', 'review', 'alead', 'aprop', 'referral', 'contact-edit', 'templates', 'task', 'settings', 'showing', 'propdetail', 'contact', 'detail'];
 var exiting = false;
 
@@ -1312,6 +1312,7 @@ function contactPasses(c) {
 /** Αναζήτηση σε όνομα, τηλέφωνο, email, κωδικό. Χωρίς τόνους, ελληνικά ή λατινικά. */
 
 function renderContacts() {
+  if (window.kwPc) window.kwPc.card();                 // 2.17: κάρτα «Επαφές κινητού»
   var list = S.contacts;
   if (!list) return;
   fillContactFilters();
@@ -1398,6 +1399,7 @@ function showContact(c) {
     return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>';
   }).join('');
   label($('btn-edit-contact'), 'form', 'Επεξεργασία επαφής');
+  if (window.kwPc) window.kwPc.contact(c);             // 2.17: «Αποθήκευση στο κινητό»
 
   var tel = intlPhone(phones[0]);
   $('ct-tel').href = tel ? 'tel:' + tel : '#';
@@ -2290,6 +2292,7 @@ function openProp(code) {
   $('pd-report').onclick = function () { if (window.kwAuto) window.kwAuto.report(p.code); };
   $('pd-edit').hidden = !p.mine;                     // 2.7: ο μεσίτης διορθώνει το δικό του ακίνητο
   $('pd-edit').onclick = function () { openPropEdit(p); };
+  if (window.kwPc) window.kwPc.prop(p); else $('pd-interest').hidden = true;   // 2.17: Ενδιαφερόμενοι
   used('', true);                // 1.18: εξώφυλλο και φωτογραφίες
   // Το ακίνητο άλλου μέλους δεν έχει έγγραφα εδώ: μόνο Στοιχεία και Κλήσεις.
   $('tab-pd-docs').hidden = !p.mine;
@@ -2385,6 +2388,7 @@ function routeTo(where, opts) {
   if (where === 'match') { goto('today'); if (window.kwMatch) window.kwMatch.open(); return; }   // 2.5 · FEAT-11
   if (where === 'dayclose') { goto('today'); if (window.kwClose) window.kwClose.open(); return; }   // 2.8 · FEAT-25
   if (where === 'drop') { goto('today'); if (window.kwAuto) window.kwAuto.drop(); return; }       // 2.6 · FEAT-12
+  if (where === 'phonecontacts') { goto('contacts'); if (window.kwPc) window.kwPc.open(); return; }   // 2.17
   if (where.indexOf('prop:') === 0) {
     S.propTab = 'mine';
     goto('props');
@@ -8295,6 +8299,7 @@ window.beacon = beacon; window.used = used;                               // 2.7
 window.needsOutcome = needsOutcome; window.niceDate = niceDate; window.lowerDay = lowerDay; window.isoDate = isoDate;   // 2.8
 window.skel = skel; window.initials = initials; window.fillInitials = fillInitials; window.roles = roles;      // 2.9
 window.openSheet = openSheet; window.closeSheet = closeSheet; window.goto = goto;
+window.loadContacts = loadContacts; window.openContact = openContact; window.intlPhone = intlPhone; window.label = label;   // 2.17 · phonecontacts.js
 window.smsHref = smsHref; window.callLead = callLead; window.parseStamp = parseStamp; window.ST_ANSWERED = ST.ANSWERED;   // 2.6
 
 // ── Εκκίνηση (τελευταία, αφού έχουν οριστεί όλα) ──

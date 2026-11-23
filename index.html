@@ -329,6 +329,7 @@
         <button class="link" id="contact-fclear" hidden>Καθαρισμός φίλτρων</button>
       </div>
     </header>
+    <button type="button" class="pc-card" id="pc-card" hidden></button>   <!-- 2.17 · Επαφές κινητού -->
     <div class="list" id="contact-list"></div>
   </section>
 
@@ -710,6 +711,14 @@
 </div>
 
 <!-- 2.8 · FEAT-25: ΚΛΕΙΣΙΜΟ ΗΜΕΡΑΣ -->
+<!-- 2.17 · ΕΠΑΦΕΣ ΚΙΝΗΤΟΥ -->
+<div class="pop" id="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcbox-title" hidden>
+  <div class="pop-box">
+    <div class="pop-head"><h2 id="pcbox-title">Επαφές κινητού</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
+    <div id="pc-body"></div>
+  </div>
+</div>
+
 <div class="pop" id="closebox" role="dialog" aria-modal="true" aria-labelledby="closebox-title" hidden>
   <div class="pop-box">
     <div class="pop-head"><h2 id="closebox-title">Κλείσε τη μέρα σου</h2><button class="x" data-pop-close aria-label="Κλείσιμο">✕</button></div>
@@ -899,6 +908,7 @@
         </div>
         <dl class="facts" id="ct-facts"></dl>
         <button class="btn wide" id="btn-edit-contact">Επεξεργασία επαφής</button>
+        <button class="btn wide" id="btn-ct-phone" hidden></button>   <!-- 2.17 -->
       </div>
       <div data-pane="mail" hidden><div id="ct-mail"></div></div>
     </div>
@@ -1017,6 +1027,7 @@
     <div class="pd-chips" id="pd-chips"></div>
     <button class="btn solid-red wide pd-present" id="pd-present" hidden><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span>Στείλε στον πελάτη</span></button>
     <button class="btn wide pd-present" id="pd-report" hidden><svg class="ico" aria-hidden="true"><use href="#i-mail"/></svg><span>Αναφορά ιδιοκτήτη</span></button>
+    <button class="btn wide pd-present" id="pd-interest" hidden></button>   <!-- 2.17 · Ενδιαφερόμενοι -->
     <button class="btn wide pd-present" id="pd-edit" hidden><svg class="ico" aria-hidden="true"><use href="#i-form"/></svg><span>Διόρθωση στοιχείων</span></button>
     <div class="stats" id="pd-stats"></div>
 
@@ -1418,5 +1429,6 @@
 <script src="dash.js"></script>
 <script src="vendor/qrcode.js"></script>
 <script src="mkt.js"></script>
+<script src="phonecontacts.js"></script>
 </body>
 </html>

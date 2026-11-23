@@ -74,8 +74,8 @@ test('backend: feature flags (all / admin / off / λίστα email)', { skip: !h
   const agent = { email: 'me@x.gr', roles: { agent: true, admin: false } };
   const admin = { email: 'boss@x.gr', roles: { agent: true, admin: true } };
   ctx.A = agent; ctx.B = admin;
-  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(A))', ctx), JSON.stringify({ reqDocs: false, propNotes: true, demandForm: false, a: true, b: false, c: false, d: true, e: false }));   // προεπιλογή admin · FEATURES υπερισχύει
-  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(B))', ctx), JSON.stringify({ reqDocs: true, propNotes: true, demandForm: true, a: true, b: true, c: false, d: false, e: false }));
+  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(A))', ctx), JSON.stringify({ reqDocs: false, propNotes: true, demandForm: false, phoneContacts: false, a: true, b: false, c: false, d: true, e: false }));   // προεπιλογή admin · FEATURES υπερισχύει
+  assert.equal(vm.runInContext('JSON.stringify(featureFlags_(B))', ctx), JSON.stringify({ reqDocs: true, propNotes: true, demandForm: true, phoneContacts: true, a: true, b: true, c: false, d: false, e: false }));
 });
 
 test('backend: κουμπιά «Πώς πήγε;» = 2 έγκυρα αποτελέσματα', { skip: !has }, () => {

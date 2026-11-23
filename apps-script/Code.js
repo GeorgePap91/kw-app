@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.26';
+const VERSION = '1.27';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -1674,7 +1674,7 @@ function ladderStep_(tries, now) {
 
 // Προεπιλογές για νέες λειτουργίες, ώστε να βγαίνουν χωρίς χειροκίνητο βήμα: πρώτα στους Admin.
 // Ό,τι γράφει η Ιδιότητα σεναρίου FEATURES υπερισχύει (π.χ. "all" ή "off"). Ποτέ email εδώ.
-const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin', demandForm: 'admin' };   // 1.23 · 2.14 (φόρμα ζήτησης)
+const FEATURE_DEFAULTS = { reqDocs: 'admin', propNotes: 'admin', demandForm: 'admin', phoneContacts: 'admin' };   // 2.17: επαφές κινητού   // 1.23 · 2.14 (φόρμα ζήτησης)
 
 function featureFlags_(agent) {
   let cfg = {};
@@ -1972,6 +1972,10 @@ function actSettings_(agent, d) {
 // ═════════════════════════════════════════════════════════════
 
 function sendShowingReminders() {
+  // 2.17: ειδοποίηση το βράδυ «Ν νέοι πελάτες για το κινητό» (μία φορά την ημέρα, μόνο όσοι διάλεξαν «Με ένα πάτημα»)
+  if (typeof pcEveningPush === 'function') {
+    try { pcEveningPush(); } catch (e) { console.warn('Επαφές κινητού: ' + e.message); }
+  }
   // 2.8 · FEAT-25: «Κλείσε τη μέρα σου» (ελέγχει μόνο την ώρα· διαβάζει φύλλα μία φορά την ημέρα)
   if (typeof dayClosePush === 'function') {
     try { dayClosePush(); } catch (e) { console.warn('Κλείσιμο ημέρας: ' + e.message); }
@@ -2718,7 +2722,12 @@ const CONTACT_COLS = [
   ['NOTES', 'Σημειώσεις', /^σημειωσεις/],
   ['FIRST', 'Πρώτη κλήση', /^πρωτη κληση/],
   ['LAST', 'Τελευταία κλήση', /^τελευταια κληση/],
-  ['EDITED', 'Διορθώθηκε', /^διορθωθηκε/]      // 2.7: ο μεσίτης άλλαξε όνομα / τηλέφωνο / email από την εφαρμογή
+  ['EDITED', 'Διορθώθηκε', /^διορθωθηκε/],     // 2.7: ο μεσίτης άλλαξε όνομα / τηλέφωνο / email από την εφαρμογή
+  // 2.17 · Επαφές κινητού (PhoneContacts.js)
+  ['XPHONES', 'Άλλα τηλέφωνα', /^αλλα τηλεφωνα/], // από συγχώνευση: δεν αλλάζουμε ποτέ το κύριο τηλέφωνο
+  ['XEMAILS', 'Άλλα email', /^αλλα e-?mail/],
+  ['SRC', 'Πηγή εφαρμογής', /^πηγη εφαρμογης/],  // Google / iPhone / Κλήση
+  ['PSYNC', 'Στο κινητό', /^στο κινητο/]          // hash του τι γράφτηκε στις επαφές του κινητού
 ];
 
 let _contacts = null;   // γραμμές του «Επαφές εφαρμογής»
@@ -2847,7 +2856,9 @@ function readContacts_() {
       row: i + 2, id: id, crmId: crmId, agent: cellText_(at(r, 'AGENT')) || me, name: name, phone: phone, email: email,
       codes: cellText_(at(r, 'CODES')).split(/[,;]/).map(x => x.trim()).filter(Boolean),
       notes: cellText_(at(r, 'NOTES')), first: at(r, 'FIRST'), last: at(r, 'LAST'),
-      edited: !!at(r, 'EDITED')
+      edited: !!at(r, 'EDITED'),
+      xphones: phoneList_(at(r, 'XPHONES')), xemails: emailList_(at(r, 'XEMAILS')),
+      src: cellText_(at(r, 'SRC')), psync: cellText_(at(r, 'PSYNC'))
     });
   });
   return _contacts;
@@ -2857,8 +2868,8 @@ function readContacts_() {
 function findContact_(agentName, phone, email) {
   const a = norm_(agentName), mail = emailKey_(email);
   const mine = readContacts_().filter(c => norm_(c.agent) === a);
-  return (phone && mine.find(c => c.phone === phone)) ||
-         (mail && mine.find(c => emailKey_(c.email) === mail)) || null;
+  return (phone && mine.find(c => c.phone === phone || (c.xphones || []).indexOf(phone) !== -1)) ||
+         (mail && mine.find(c => emailKey_(c.email) === mail || (c.xemails || []).indexOf(mail) !== -1)) || null;
 }
 
 /** Οι επαφές ενός μεσίτη: CRM + εφαρμογή, ενωμένες. */
@@ -2876,10 +2887,19 @@ function agentIndex_(agentName) {
   };
   list.forEach(c => { byId[c.crmId] = c; put(c); });
 
+  // 2.17: και τα «Άλλα τηλέφωνα / email» (από συγχώνευση) μετράνε στην ταύτιση.
+  const morePh = a => (a.xphones || []).filter(p => p && p !== a.phone);
+  const moreEm = a => (a.xemails || []).filter(e => e && e !== emailKey_(a.email));
+  const extend = (m, a) => {
+    morePh(a).forEach(p => { if (m.phones.indexOf(p) === -1) m.phones.push(p); if (!byPhone[p]) byPhone[p] = m; });
+    moreEm(a).forEach(e => { if (m.emails.indexOf(e) === -1) m.emails.push(e); if (!byEmail[e]) byEmail[e] = m; });
+  };
   readContacts_().filter(a => norm_(a.agent) === key).forEach(a => {
-    const m = (a.crmId && byId[a.crmId]) || (a.phone && byPhone[a.phone]) || (a.email && byEmail[emailKey_(a.email)]);
+    const m = (a.crmId && byId[a.crmId]) || (a.phone && byPhone[a.phone]) || (a.email && byEmail[emailKey_(a.email)]) ||
+              morePh(a).map(p => byPhone[p]).filter(Boolean)[0] || moreEm(a).map(e => byEmail[e]).filter(Boolean)[0];
     if (m) {
       m.apps.push(a);
+      extend(m, a);
       // 2.7: ό,τι διόρθωσε ο μεσίτης στην εφαρμογή υπερισχύει του CRM (το CRM δεν αλλάζει).
       if (a.edited && a.crmId && a.crmId === m.crmId) {
         if (a.name) m.name = a.name;
@@ -2890,9 +2910,10 @@ function agentIndex_(agentName) {
       return;
     }
     const c = { id: a.id, crm: false, crmId: '', name: a.name, phones: a.phone ? [a.phone] : [],
-                emails: emailList_(a.email), apps: [a] };
+                emails: emailList_(a.email), apps: [a], src: a.src };
     list.push(c);
     put(c);
+    extend(c, a);
   });
 
   return (_cidx[key] = { list: list, byPhone: byPhone, byEmail: byEmail });
@@ -3037,7 +3058,7 @@ function contactPayload_(m) {
     id: m.id, crm: m.crm, name: m.name || a.name || '', phones: m.phones, emails: m.emails,
     role: m.role, tags: m.tags, job: m.job, source: m.source, street: m.street, area: m.area,
     added: m.added ? fmtDate_(m.added) : '', inactive: !!m.inactive, notes: a.notes,
-    first: stamp_(first), last: stamp_(last), edited: !!m.edited,
+    first: stamp_(first), last: stamp_(last), edited: !!m.edited, src: m.crm ? '' : (a.src || ''),
     codes: codesOf_(m).map(code => {
       const p = props[normCode_(code)];
       return { code: code, street: p ? p.street : '', status: p ? p.status : '' };

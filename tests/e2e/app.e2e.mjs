@@ -1103,3 +1103,79 @@ test('2.16: η φόρμα περιμένει τον πελάτη → «Περι�
   assert.deepEqual(a.errors, []);
   await a.ctx.close();
 });
+
+test('2.17: Επαφές κινητού — CSV Google → έλεγχος διπλών → εισαγωγή · ενδιαφερόμενοι · κουμπί στην επαφή', { skip }, async () => {
+  const contacts = [
+    { id: 'K1', crm: true, name: 'Μαρία Παπαδάκη', phones: ['6971234567'], emails: ['maria@ex.gr'] },
+    { id: 'C2', name: 'Γιώργος Λάμπρου', phones: ['6900000002'], codes: [{ code: 'A-12', street: 'Ερατοσθένους 5' }] }
+  ];
+  let imported = null;
+  const status = { mode: 'off', linked: false, helper: true, pendingDup: 0, pendingPhone: 0 };
+  const a = await openApp({ phoneContacts: true }, null, {}, {
+    contacts: () => contacts,
+    pcStatus: () => status,
+    pcImport: (d) => { imported = d; return { added: 1, merged: 1, later: 1, skipped: 0 }; }
+  });
+  await a.page.evaluate(() => goto('contacts'));
+  await a.page.waitForTimeout(500);
+  assert.equal(await a.page.locator('#pc-card').isHidden(), false, 'δεν φαίνεται η κάρτα');
+  await a.page.locator('#pc-card').click();
+  await a.page.waitForTimeout(300);
+  assert.match(await a.page.locator('#pc-body').innerText(), /Φέρε τις επαφές μου/);
+  await a.page.locator('[data-pc="import"]').click();
+  await a.page.locator('[data-dev="android"]').click();
+  const csv = 'First Name,Last Name,Labels,E-mail 1 - Value,Phone 1 - Value\n' +
+    'Maria,Papadaki,A-12 Ερατοσθένους 5 ::: * myContacts,,+30 697 123 4567\n' +     // ίδια με K1 → συγχώνευση
+    'Σοφία,Άλλη,Ερατοσθένους 5,,6900000002\n' +                                       // ίδιο τηλέφωνο με C2, άλλο όνομα → απόφαση
+    'Κώστας,Νέος,A-12,,6999999999\n' +                                                 // νέα
+    'Μαμά,,* myContacts,,6911111111\n';                                                // χωρίς ακίνητο → δεν τσεκάρεται
+  await a.page.locator('#pc-file').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await a.page.waitForSelector('#pc-go');
+  const txt = await a.page.locator('#pc-body').innerText();
+  assert.match(txt, /Βρέθηκαν 4 επαφές/);
+  assert.match(txt, /Υπάρχει ήδη · συγχώνευση/);
+  assert.match(txt, /Μάλλον ίδια · διάλεξε/);
+  assert.match(txt, /Νέα/);
+  assert.doesNotMatch(txt, /Μαμά/, 'η επαφή χωρίς ακίνητο φαίνεται στο «Με ακίνητο»');
+  assert.match(await a.page.locator('#pc-go').innerText(), /Πέρασε 3 επαφές/);
+  await a.page.locator('[data-act="separate"]').click();
+  await a.page.locator('#pc-go').click();
+  await a.page.waitForTimeout(500);
+  assert.equal(imported.src, 'Google');
+  assert.equal(imported.items.length, 3, 'πήγε και η επαφή χωρίς ακίνητο');
+  assert.deepEqual(imported.items.map((x) => x.action), ['merge', 'separate', 'auto']);
+  assert.equal(imported.items[0].target, 'K1');
+  assert.deepEqual(imported.items.map((x) => x.codes), [['A-12'], ['A-12'], ['A-12']]);
+  assert.deepEqual(a.errors, []);
+  assert.match(await a.page.locator('#pc-body').innerText(), /Νέες 1 · Συγχωνεύτηκαν 1 · Περιμένουν απόφαση 1/);
+  await a.page.locator('#pcbox [data-pop-close]').click();
+  await a.page.waitForTimeout(300);
+  // Στην επαφή: «Αποθήκευση στο κινητό»
+  await a.page.evaluate(() => openContact('C2'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#btn-ct-phone').isHidden(), false);
+  assert.match(await a.page.locator('#btn-ct-phone').innerText(), /Αποθήκευση στο κινητό/);
+  await a.page.evaluate(() => closeSheet('contact'));
+  // Στο ακίνητο: «Ενδιαφερόμενοι (1)»
+  await a.page.evaluate(() => openProp('A-12'));
+  await a.page.waitForTimeout(400);
+  assert.match(await a.page.locator('#pd-interest').innerText(), /Ενδιαφερόμενοι \(1\)/);
+  await a.page.locator('#pd-interest').click();
+  await a.page.waitForTimeout(300);
+  assert.match(await a.page.locator('#pc-body').innerText(), /Γιώργος Λάμπρου/);
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
+
+test('2.17: χωρίς flag phoneContacts: καμία κάρτα, κανένα κουμπί, κανένα αίτημα', { skip }, async () => {
+  const a = await openApp({}, null, {}, { contacts: () => [{ id: 'C2', name: 'Γ', phones: ['6900000002'], codes: [{ code: 'A-12' }] }] });
+  await a.page.evaluate(() => goto('contacts'));
+  await a.page.waitForTimeout(400);
+  assert.equal(await a.page.locator('#pc-card').isHidden(), true);
+  await a.page.evaluate(() => openProp('A-12'));
+  await a.page.waitForTimeout(300);
+  assert.equal(await a.page.locator('#pd-interest').isHidden(), true);
+  assert.ok(!a.sent.some((x) => /^pc/.test(x)), 'στάλθηκε αίτημα pc* χωρίς flag');
+  assert.deepEqual(a.errors, []);
+  await a.ctx.close();
+});
