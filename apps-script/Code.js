@@ -517,19 +517,40 @@ const PUBLIC_ACTIONS = {
  * code 'auth' = η συσκευή δεν είναι (πια) συνδεδεμένη → η σελίδα ζητά νέα σύνδεση.
  */
 function doPost(e) {
+  // 2.18 · Μέτρηση χρόνου ανά ενέργεια (Perf.js). Το όνομα μπαίνει μόνο αν είναι γνωστή ενέργεια.
+  const t0 = Date.now();
+  const meta = { action: 'unknown', ok: true };
+  try {
+    return doPostRun_(e, meta);
+  } finally {
+    perfRec_('a:' + meta.action, Date.now() - t0, meta.ok);
+  }
+}
+
+/** Γνωστή ενέργεια; (για το όνομα της μέτρησης, ποτέ ελεύθερο κείμενο από το κινητό) */
+function knownAction_(a) {
+  a = String(a || '');
+  return a === 'logout' || !!(PUBLIC_ACTIONS[a] || ACTIONS[a] || ADMIN_ACTIONS[a] || COACH_ACTIONS[a]);
+}
+
+function doPostRun_(e, meta) {
   let req;
   try {
     req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
   } catch (err) {
+    meta.ok = false;
     return json_({ ok: false, error: 'Μη έγκυρο αίτημα.' });
   }
+  if (knownAction_(req.action)) meta.action = req.action;
 
   try {
     if (PUBLIC_ACTIONS[req.action]) {
       return json_({ ok: true, data: PUBLIC_ACTIONS[req.action](req.data || {}) });
     }
 
+    const ts = Date.now();
     const sess = session_(req.t);
+    perfRec_('s:session', Date.now() - ts, true);   // baseline για το βήμα 2 (cache συνεδρίας)
     if (!sess) return json_({ ok: false, code: 'auth', error: 'Η συσκευή δεν είναι συνδεδεμένη.' });
 
     let fn = req.action === 'logout' ? actLogout_ : ACTIONS[req.action];
@@ -549,6 +570,7 @@ function doPost(e) {
   } catch (err) {
     // Τα μηνύματα της φόρμας πελάτη δεν περιέχουν ποτέ τιμές πεδίων (βλ. sfFail_).
     console.error(req.action + ': ' + err.message);
+    meta.ok = false;
     return json_({ ok: false, error: err.message, code: err.code || '' });
   }
 }
@@ -685,6 +707,17 @@ function safe_(v) {
   return typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
 }
 function safeRow_(arr) { return arr.map(safe_); }
+
+/**
+ * 2.18 · Γέφυρες προς το Perf.js. Αν το αρχείο λείπει (ή στα tests που φορτώνουν μόνο το Code.js),
+ * ο κώδικας τρέχει κανονικά χωρίς μέτρηση.
+ */
+function perf_(name, fn) {
+  return typeof perfRun_ === 'function' ? perfRun_(name, fn) : fn();
+}
+function perfRec_(name, ms, ok) {
+  if (typeof perfRecord_ === 'function') perfRecord_(name, ms, ok);
+}
 
 function log_(event, agentName, detail) {
   try {
@@ -1183,7 +1216,12 @@ function geocode_(q) {
 }
 
 /** Trigger κάθε ώρα. Ψάχνει μόνο νέα ακίνητα και όσα άλλαξαν διεύθυνση. */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το geocodePropsRun_. */
 function geocodeProps() {
+  return perf_('t:geocodeProps', () => geocodePropsRun_());
+}
+
+function geocodePropsRun_() {
   if (!CONFIG.MAP.ENABLED) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
@@ -1971,7 +2009,12 @@ function actSettings_(agent, d) {
 //  ΥΠΕΝΘΥΜΙΣΗ ΠΕΛΑΤΗ — trigger ανά 15 λεπτά
 // ═════════════════════════════════════════════════════════════
 
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το sendShowingRemindersRun_. */
 function sendShowingReminders() {
+  return perf_('t:sendShowingReminders', () => sendShowingRemindersRun_());
+}
+
+function sendShowingRemindersRun_() {
   // 2.17: ειδοποίηση το βράδυ «Ν νέοι πελάτες για το κινητό» (μία φορά την ημέρα, μόνο όσοι διάλεξαν «Με ένα πάτημα»)
   if (typeof pcEveningPush === 'function') {
     try { pcEveningPush(); } catch (e) { console.warn('Επαφές κινητού: ' + e.message); }
@@ -2583,11 +2626,16 @@ function scheduleDriveSync_() {
   ScriptApp.newTrigger('syncDriveFoldersOnce').timeBased().after(30 * 1000).create();
 }
 
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το syncDriveFoldersOnceRun_. */
 function syncDriveFoldersOnce() {
+  return perf_('t:syncDriveFoldersOnce', () => syncDriveFoldersOnceRun_());
+}
+
+function syncDriveFoldersOnceRun_() {
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === 'syncDriveFoldersOnce')
     .forEach(t => ScriptApp.deleteTrigger(t));
-  syncDriveFolders();
+  syncDriveFoldersRun_();   // 2.18: όχι μέσω του syncDriveFolders, για να μη μετρηθεί δύο φορές
 }
 
 /**
@@ -2595,9 +2643,16 @@ function syncDriveFoldersOnce() {
  * του. Ό,τι υπάρχει ήδη στο φύλλο «Έγγραφα» προσπερνιέται, οπότε μετά την
  * πρώτη φορά τελειώνει σε δευτερόλεπτα. Σταματά πριν το όριο των 6 λεπτών.
  */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το syncDriveFoldersRun_. */
 function syncDriveFolders(budgetMs) {
+  return perf_('t:syncDriveFolders', () => syncDriveFoldersRun_(budgetMs));
+}
+
+function syncDriveFoldersRun_(budgetMs) {
   const t0 = Date.now();
-  const budget = budgetMs || 270000;
+  // 2.18: όταν καλείται από trigger, το πρώτο όρισμα είναι αντικείμενο γεγονότος, όχι αριθμός.
+  // Πριν, το όριο δεν ίσχυε ποτέ στις προγραμματισμένες εκτελέσεις (σύγκριση με αντικείμενο = πάντα false).
+  const budget = Number(budgetMs) > 0 ? Number(budgetMs) : 270000;
   let made = 0, skipped = 0;
 
   _agents = null;
@@ -2636,7 +2691,12 @@ function missingDocs_(counts) {
  * η εφαρμογή ανοίγει τη λίστα τους. Χωρίς ενεργές ειδοποιήσεις → email.
  * Πριν μετρήσει, ξαναδιαβάζει το Drive: πιάνει και αρχεία που μπήκαν με το χέρι.
  */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το docsReminderRun_. */
 function docsReminder() {
+  return perf_('t:docsReminder', () => docsReminderRun_());
+}
+
+function docsReminderRun_() {
   _agents = null; _docs = null;
   const props = readProps_();
 
@@ -3187,7 +3247,12 @@ function actContactMail_(agent, d) {
 // ═════════════════════════════════════════════════════════════
 
 /** Trigger κάθε πρωί: πρώτα οι εντολές που λήγουν, μετά η σύνοψη της ημέρας. */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το morningBriefRun_. */
 function morningBrief() {
+  return perf_('t:morningBrief', () => morningBriefRun_());
+}
+
+function morningBriefRun_() {
   _agents = null;
   // 2.14.1: ένα σφάλμα στις εντολές δεν σταματά πια τα ταιριάσματα, τις μειώσεις και τη σύνοψη της ημέρας
   try { mandateReminder(); } catch (e) { console.warn('Λήξεις εντολών: ' + e.message); }
@@ -3265,7 +3330,12 @@ function mandateReminder() {
 }
 
 /** Trigger κάθε Δευτέρα: μόνο σε όσους δεν έστειλαν τη φόρμα της προηγούμενης εβδομάδας. */
+/** 2.18 · Trigger: μετρά τη διάρκεια (Perf.js) και τρέχει το formReminderRun_. */
 function formReminder() {
+  return perf_('t:formReminder', () => formReminderRun_());
+}
+
+function formReminderRun_() {
   if (!metricsSpreadsheet_()) return console.log('Η φόρμα δεν έχει ρυθμιστεί.');
   _agents = null;
 
@@ -3608,7 +3678,17 @@ function actPushTest_(agent) {
 // Κάθε κλήση που ειδοποιήθηκε (ή κρίθηκε ότι δεν χρειάζεται) γράφεται στο
 // φύλλο «Ειδοποιήσεις», ώστε να μη σταλεί ποτέ δεύτερη φορά.
 
+/**
+ * 2.18 · Trigger: μετρά τη διάρκεια (η διαδρομή «τίποτα νέο» μετριέται χωριστά ως :skip) και,
+ * μία φορά την ώρα, συγχωνεύει τις μετρήσεις στο ημερήσιο σύνολο (Perf.js).
+ */
 function checkNewLeads() {
+  const r = perf_('t:checkNewLeads', checkNewLeadsRun_);
+  if (typeof perfFlush_ === 'function') perfFlush_();
+  return r;
+}
+
+function checkNewLeadsRun_() {
   const cache = CacheService.getScriptCache();
   if (cache.get('checking')) return;                    // προηγούμενη εκτέλεση τρέχει ακόμα
   cache.put('checking', '1', 120);
@@ -3624,7 +3704,7 @@ function checkNewLeads() {
     }).join('|');
 
     const props = PropertiesService.getScriptProperties();
-    if (props.getProperty('LEADS_FP') === fp) return;
+    if (props.getProperty('LEADS_FP') === fp) return 'skip';
 
     const notified = readNotified_();
     const fresh = readLeads_().filter(l => !notified[l.id]);
