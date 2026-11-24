@@ -3115,7 +3115,7 @@ function contactPayload_(m) {
   const first = m.apps.reduce((x, r) => (ts_(r.first) && (!x || ts_(r.first) < ts_(x)) ? r.first : x), '');
   const last = m.apps.reduce((x, r) => (ts_(r.last) > ts_(x) ? r.last : x), '');
   const out = {
-    id: m.id, crm: m.crm, name: m.name || a.name || '', phones: m.phones, emails: m.emails,
+    id: m.id, crm: m.crm, name: String(m.name || a.name || ''), phones: m.phones, emails: m.emails,
     role: m.role, tags: m.tags, job: m.job, source: m.source, street: m.street, area: m.area,
     added: m.added ? fmtDate_(m.added) : '', inactive: !!m.inactive, notes: a.notes,
     first: stamp_(first), last: stamp_(last), edited: !!m.edited, src: m.crm ? '' : (a.src || ''),
@@ -3138,8 +3138,11 @@ function myContact_(agent, id) {
 }
 
 function actContacts_(agent) {
+  // 2.17.1: το contactPayload_ σβήνει τα κενά πεδία, άρα επαφή χωρίς όνομα (π.χ. από το κινητό) δεν έχει name.
+  // Χωρίς όνομα → στο τέλος. Όνομα-αριθμός (τηλέφωνο στη θέση του ονόματος) → ως κείμενο.
+  const nm = (c) => String(c.name == null ? '' : c.name).trim();
   return agentIndex_(agent.name).list.map(contactPayload_)
-    .sort((a, b) => a.name.localeCompare(b.name, 'el'));
+    .sort((a, b) => (!nm(a) - !nm(b)) || nm(a).localeCompare(nm(b), 'el'));
 }
 
 /**
