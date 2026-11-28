@@ -60,7 +60,7 @@ function dropClients_(d, leads, profiles, status, outcome) {
   const seen = {}, out = [];
   leads.forEach(l => {
     if (normCode_(l.code) !== d.key) return;
-    if (status(l.id) === STATUS.CLOSED || outcome(l.id) === 'Ενδιαφέρθηκε') return;
+    if (status(l.id) === STATUS.CLOSED || status(l.id) === STATUS.NOT_INTERESTED || outcome(l.id) === 'Ενδιαφέρθηκε') return;
     const key = l.phone || l.id;
     if (seen[key]) return;
     seen[key] = 1;

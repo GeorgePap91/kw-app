@@ -1038,6 +1038,7 @@
       <button class="subtab" role="tab" data-tab="leads"><span>Κλήσεις</span> <i class="pill" id="pd-leads-count"></i></button>
       <button class="subtab" role="tab" data-tab="mkt" id="tab-pd-mkt" hidden><span>Marketing</span></button>
       <button class="subtab" role="tab" data-tab="pnotes" id="tab-pd-pnotes" hidden><span>Σημειώσεις</span> <i class="pill" id="pd-pnotes-count"></i></button>   <!-- 2.13 -->
+      <button class="subtab" role="tab" data-tab="prog" id="tab-pd-prog"><span>Πορεία</span></button>   <!-- 2.19 -->
     </div>
 
     <div id="prop-panes">
@@ -1069,6 +1070,7 @@
       <div data-pane="facts" hidden>
         <dl class="facts" id="pd-facts"></dl>
       </div>
+      <div data-pane="prog" hidden><div id="pd-prog-body"></div></div>   <!-- 2.19 -->
       <div data-pane="pnotes" hidden>   <!-- 2.13 -->
         <label class="field">
           <span>Νέα σημείωση</span>
@@ -1427,6 +1429,7 @@
 <script src="close.js"></script>
 <script src="dayroute.js"></script>
 <script src="dash.js"></script>
+<script src="reports.js"></script>
 <script src="vendor/qrcode.js"></script>
 <script src="mkt.js"></script>
 <script src="phonecontacts.js"></script>

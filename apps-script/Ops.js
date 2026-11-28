@@ -37,7 +37,7 @@ function dayCloseCount_(leads, status, get, now) {
   let n = 0;
   leads.forEach(l => {
     const st = status(l.id);
-    if (st === STATUS.CLOSED) return;
+    if (st === STATUS.CLOSED || st === STATUS.NOT_INTERESTED) return;
     const at = ts_(get(l.id, ACOL.SHOW_AT));
     if (at && at <= now && now - at < OPS.CLOSE_DAYS * 86400000 && !String(get(l.id, ACOL.OUTCOME) || '')) n++;
     else if (st === STATUS.PENDING) n++;

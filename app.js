@@ -23,10 +23,10 @@ if (window.top !== window.self) {
 // ─────────────────────────────────────────────────────────────
 
 /** Έκδοση σελίδας. */
-var APP_VERSION = '2.17';
+var APP_VERSION = '2.19';
 
 /** Έκδοση server που περιμένει η σελίδα. */
-var API_VERSION = '1.27';
+var API_VERSION = '1.28';
 
 var API = (window.KW_CONFIG || {}).API_URL || '';
 var params = new URLSearchParams(location.search);
@@ -53,7 +53,8 @@ var ST = {
   ANSWERED:  'Απαντημένη',
   NO_ANSWER: 'Δεν απάντησε',
   SHOWING:   'Υπόδειξη',
-  CLOSED:    'Κλειστή'
+  CLOSED:    'Κλειστή',
+  NOT_INTERESTED: 'Δεν ενδιαφέρθηκε'   // 2.19
 };
 
 var STATUS_CLASS = {};
@@ -62,6 +63,7 @@ STATUS_CLASS[ST.ANSWERED]  = 'answered';
 STATUS_CLASS[ST.NO_ANSWER] = 'noanswer';
 STATUS_CLASS[ST.SHOWING]   = 'showing';
 STATUS_CLASS[ST.CLOSED]    = 'closed';
+STATUS_CLASS[ST.NOT_INTERESTED] = 'notint';
 
 var S = {
   boot: null, me: null, leads: [], props: [], lead: null,
@@ -169,7 +171,15 @@ function wireTabs(id, pane, onChange) {
 
 /** Δείχνει ένα από τα [data-pane] μέσα στο container. */
 function showPane(container, value) {
-  $(container).querySelectorAll('[data-pane]').forEach(function (p) { p.hidden = p.dataset.pane !== value; });
+  // 2.19: μόνο τα δικά του panes, όχι αυτά που ζουν μέσα σε άλλο pane (π.χ. «Για live» / «Απαραίτητα»
+  // μέσα στα Έγγραφα). Πριν, όταν άλλαζες tab ακινήτου, τα εσωτερικά έκρυβαν μαζί και οι λίστες
+  // εμφανίζονταν μόνο αφού πατούσες «Απαραίτητα».
+  var root = $(container);
+  root.querySelectorAll('[data-pane]').forEach(function (p) {
+    var outer = p.parentElement && p.parentElement.closest('[data-pane]');
+    if (outer && root.contains(outer)) return;
+    p.hidden = p.dataset.pane !== value;
+  });
 }
 
 // ── Φύλλα (κλήση, ακίνητο, ρυθμίσεις…) και «πίσω» του κινητού ──
@@ -739,6 +749,7 @@ function wire() {
     if (v === 'bill' && S.prop) loadDocs(S.prop, 'bill');
     if (v === 'mkt' && S.prop && window.kwMkt) window.kwMkt.show(S.prop);   // 2.10
     if (v === 'pnotes' && S.prop) loadPnotes(S.prop);                       // 2.13
+    if (v === 'prog' && S.prop) renderPropProgress(S.prop);                 // 2.19
   });
   // 2.13: «Για live» / «Απαραίτητα» μέσα στα Έγγραφα.
   wireTabs('tabs-docs', 'docs-panes', function (v) {
@@ -1166,6 +1177,7 @@ function statusLine(l) {
     return l.outcome ? 'Υπόδειξη · ' + l.outcome : 'Υπόδειξη';
   }
   if (l.status === ST.CLOSED) return 'Κλειστή' + (l.outcome ? ' · ' + l.outcome : '');
+  if (l.status === ST.NOT_INTERESTED) return 'Δεν ενδιαφέρθηκε' + (l.called ? ' · ' + lowerDay(niceDate(l.called)) : '');
   return (l.status || 'Απαντημένη') + (l.called ? ' · μίλησες ' + lowerDay(niceDate(l.called)) : '');
 }
 
@@ -2303,14 +2315,15 @@ function openProp(code) {
   // 2.13: Σημειώσεις σε κάθε ακίνητο που βλέπεις (δικό σου ή της ομάδας), πίσω από το flag propNotes.
   var pnOn = !!(S.flags && S.flags.propNotes);
   $('tab-pd-pnotes').hidden = !pnOn;
-  var nTabs = 2 + (p.mine ? 2 : 0) + (mkt ? 1 : 0) + (pnOn ? 1 : 0);
+  var nTabs = 3 + (p.mine ? 2 : 0) + (mkt ? 1 : 0) + (pnOn ? 1 : 0);   // 2.19: +1 «Πορεία»
   $('tabs-prop').classList.toggle('four', nTabs === 4);
   $('tabs-prop').classList.toggle('five', nTabs >= 5);
-  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts' || S.propPane === 'pnotes') &&
+  var pane = S.propPane && (p.mine || S.propPane === 'leads' || S.propPane === 'facts' || S.propPane === 'pnotes' || S.propPane === 'prog') &&
     S.propPane !== 'bill' && (S.propPane !== 'mkt' || mkt) && (S.propPane !== 'pnotes' || pnOn) ? S.propPane : 'facts';
   setTab('tabs-prop', pane);
   showPane('prop-panes', pane);
   if (pane === 'mkt') window.kwMkt.show(p);
+  renderPropProgress(p);             // 2.19: μετράει μόνο ό,τι ήδη έχει η εφαρμογή· καμία κλήση στον server
   $('pd-pnotes-count').textContent = '';
   $('pn-text').value = '';
   if (pnOn) loadPnotes(p);           // ένα μικρό αίτημα: ο αριθμός στο tab δείχνει ότι υπάρχουν σημειώσεις
@@ -2647,6 +2660,10 @@ function renderNext(l) {
     title = 'Κάλεσε ξανά';
     text = 'Δεν απάντησε' + (l.called ? ' ' + lowerDay(niceDate(l.called)) : '') + '.' + (l.followUp ? ' Follow-up ' + lowerDay(niceDate(l.followUp)) + '.' : '');
     btns = callBtn('Κλήση ξανά') + b('noanswer', 'Δεν απάντησε ξανά', '');
+  } else if (l.status === ST.NOT_INTERESTED) {
+    title = 'Δεν ενδιαφέρθηκε';
+    text = 'Ο πελάτης δεν ενδιαφέρθηκε για αυτό το ακίνητο. Αν ψάχνει κάτι άλλο, γράψε τι.';
+    btns = (S.flags && S.flags.demandForm ? b('demand', dmOf(l.id) ? 'Η ζήτηση' : 'Πάρε ζήτηση', 'form', true) : '') + b('task', 'Εργασία', 'tasks');
   } else if (l.status === ST.CLOSED) {
     title = 'Η κλήση έκλεισε';
     text = 'Αν ο πελάτης ξαναβγεί, άλλαξε την κατάσταση από κάτω ή φτιάξε εργασία.';
@@ -4084,6 +4101,32 @@ function reqDone(counts) {
 
 function docKey(set, code) { return set + ':' + code; }
 
+/**
+ * 2.19 · «Πορεία» ακινήτου: με μία ματιά τι συμβαίνει μέσα στο ακίνητο.
+ * Από τις κλήσεις που ήδη έχει η εφαρμογή (τρέχων + προηγούμενος μήνας).
+ */
+function renderPropProgress(p) {
+  var el = $('pd-prog-body');
+  if (!el || !window.kwRep) return;
+  var r = window.kwRep.propProgress(myLeadsFor(p.code), ST);
+  var tile = function (cls, n, label, sub) {
+    return '<div class="rp-tile ' + cls + '"><b>' + n + '</b><span>' + esc(label) + '</span>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>';
+  };
+  if (!r.calls) {
+    el.innerHTML = '<p class="card-note">Δεν υπάρχουν κλήσεις για αυτό το ακίνητο τους τελευταίους 2 μήνες, άρα δεν υπάρχει ακόμα πορεία να δείξουμε.</p>';
+    return;
+  }
+  el.innerHTML = '<div class="rp-grid">' +
+    tile('ok', r.interested, 'Ενδιαφέρθηκαν') +
+    tile('no', r.notInterested, 'Δεν ενδιαφέρθηκαν') +
+    tile('', r.showings, 'Υποδείξεις', r.showingsUpcoming ? r.showingsDone + ' έγιναν · ' + r.showingsUpcoming + ' έρχονται' : '') +
+    tile('', r.offers, 'Προσφορές', r.offersPending ? r.offersPending + ' σε αναμονή' : '') +
+    '</div>' +
+    '<p class="rp-sum">' + r.calls + (r.calls === 1 ? ' κλήση' : ' κλήσεις') + ' συνολικά' +
+    (r.waiting ? ' · ' + r.waiting + ' σε αναμονή (δεν απάντησαν ή δεν τους πήρες ακόμα)' : '') + '</p>' +
+    '<p class="note">Τελευταίοι 2 μήνες. «Ενδιαφέρθηκαν»: μίλησες μαζί τους και δεν είπαν «Δεν ενδιαφέρθηκε», ούτε στο τηλέφωνο ούτε μετά την υπόδειξη. «Προσφορές»: έντυπα που υπέγραψε ο πελάτης.</p>';
+}
+
 function loadDocs(p, set) {
   set = set || 'live';
   var cached = S.docs[docKey(set, p.code)] || null;
@@ -5144,6 +5187,7 @@ function aStatusLine(l) {
     return l.outcome ? 'Υπόδειξη · ' + l.outcome : 'Υπόδειξη';
   }
   if (l.status === ST.CLOSED) return 'Κλειστή' + (l.outcome ? ' · ' + l.outcome : '');
+  if (l.status === ST.NOT_INTERESTED) return 'Δεν ενδιαφέρθηκε' + (l.called ? ' · ' + lowerDay(niceDate(l.called)) : '');
   return (l.status || 'Απαντημένη') + (l.called ? ' · μίλησε ' + lowerDay(niceDate(l.called)) : '');
 }
 
@@ -6029,6 +6073,7 @@ function fmtPrice(v) {
 // ─────────────────────────────────────────────────────────────
 
 function loadMetrics(force) {
+  if (S.view === 'metrics') loadDemands(false, true);   // 2.19: για τον αριθμό «Ζητήσεις» στη «Ροή του μήνα» (cache 2')
   if (S.mxLoading || (S.mx && !force)) { if (S.mx) renderMetrics(); return; }
   S.mxLoading = true;
   if (!S.mx) $('mx-body').innerHTML = skel(5);
@@ -6104,6 +6149,39 @@ function mxTiles(v, pv) {
   ];
 }
 
+// 2.19 · «Ροή του μήνα»: από το ραντεβού στην αποκλειστική, και από την κλήση στη ζήτηση.
+function rpRow(label, n, sub, extra) {
+  return '<div class="rp-row"><span class="rp-label"><b>' + esc(label) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') +
+    '</span>' + (extra || '') + '<span class="rp-val">' + (n == null ? '—' : fmtNum(n)) + '</span></div>';
+}
+
+function rpPct(p, of) { return p == null ? '' : '<span class="rp-pct" title="' + esc(of) + '">' + p + '%</span>'; }
+
+/** Ιδιοκτήτες: 1ο ραντεβού → 2ο → αποκλειστικές. v = τιμές του μήνα (ή του έτους). */
+function rpOwnersHtml(v) {
+  var f = window.kwRep.ownerFunnel(v);
+  return '<div class="section">Ιδιοκτήτες · από το ραντεβού στην αποκλειστική</div><div class="rp-card">' +
+    rpRow('1ο ραντεβού', f.first, 'πωλητές και εκμισθωτές') +
+    rpRow('2ο ραντεβού', f.second, f.first ? 'από τα ' + f.first + ' πρώτα' : 'παρουσίαση αποκλειστικότητας', rpPct(f.secondPct, 'των πρώτων ραντεβού')) +
+    rpRow('Αποκλειστικές', f.excl, f.first ? 'από τα ' + f.first + ' πρώτα' : 'πώληση και εκμίσθωση', rpPct(f.exclPct, 'των πρώτων ραντεβού')) +
+    '</div>';
+}
+
+/** Κλήσεις του μήνα. Μόνο για τους 2 μήνες που έχει η εφαρμογή (τρέχων, προηγούμενος). */
+function rpCallsHtml(ym) {
+  if (window.kwRep.callMonths().indexOf(ym) === -1) {
+    return '<div class="section">Κλήσεις</div><p class="card-note">Οι κλήσεις φαίνονται μόνο για τον τρέχοντα και τον προηγούμενο μήνα.</p>';
+  }
+  var dem = S.flags && S.flags.demandForm ? (S.dmList ? S.dmList.items : null) : undefined;
+  var r = window.kwRep.monthCalls(S.leads, ym, dem || null, ST);
+  var dmN = dem === undefined ? null : r.demands;
+  return '<div class="section">Κλήσεις του μήνα</div><div class="rp-card">' +
+    rpRow('Κλήσεις', r.calls, 'που πήραμε') +
+    rpRow('Ενδιαφέρθηκαν', r.interested, r.calls ? r.notInterested + ' δεν ενδιαφέρθηκαν · ' + r.waiting + ' σε αναμονή' : '', rpPct(window.kwRep.pct(r.interested, r.calls), 'των κλήσεων')) +
+    rpRow('Ζητήσεις', dmN, dem === undefined ? 'δεν είναι ενεργές' : dem === null ? 'φορτώνουν…' : 'που πήραμε από πελάτες') +
+    '</div>';
+}
+
 function isLiveYm(ym) {
   var now = new Date();
   return ym === now.getFullYear() + '-' + (now.getMonth() < 9 ? '0' : '') + (now.getMonth() + 1);
@@ -6157,6 +6235,8 @@ function renderMetrics() {
     return '<div class="mx-tile"><b>' + fmtNum(t.v) + '</b><span>' + t.label + '</span>' + deltaHtml(t.v, t.p, live) + '</div>';
   }).join('') + '</div>';
 
+  html += rpOwnersHtml(m.values) + rpCallsHtml(m.ym);   // 2.19
+
   d.groups.forEach(function (g) {
     html += '<div class="section">' + esc(g.label) + '</div>';
     d.metrics.filter(function (x) { return x.group === g.key; }).forEach(function (x) {
@@ -6198,6 +6278,9 @@ function renderMetricsYear(d, body) {
 
   var html = '<div class="mx-status"><span>' + active + (active === 1 ? ' μήνας' : ' μήνες') +
     ' με υποβολές</span></div>';
+  var yv = {};
+  d.metrics.forEach(function (x) { yv[x.key] = total(x.key); });
+  html += rpOwnersHtml(yv);   // 2.19
 
   d.groups.forEach(function (g) {
     html += '<div class="section">' + esc(g.label) + '</div>';
@@ -6900,6 +6983,7 @@ function loadDemands(force, quiet) {
     S.dmListAt = Date.now();
     demandBadge();
     if (S.view === 'demands') renderDemands();
+    else if (S.view === 'metrics' && S.mx) renderMetrics();   // 2.19: η «Ροή του μήνα» δείχνει τις ζητήσεις
   }).catch(function (e) {
     if (quiet) return;
     if (!S.dmList) $('dm-list').innerHTML = '<div class="empty"><b>Δεν φορτώθηκαν</b>' + esc(e.message) + '</div>';
@@ -7135,7 +7219,7 @@ var PIPE = [
 ];
 
 function pipeStage(l) {
-  if (l.status === ST.CLOSED) return 'closed';
+  if (l.status === ST.CLOSED || l.status === ST.NOT_INTERESTED) return 'closed';
   if (l.offer === 'Στάλθηκε' || l.offer === 'Υπογράφηκε') return 'deal';
   if (l.status === ST.SHOWING) return 'show';
   return 'new';
@@ -7155,7 +7239,7 @@ function setCallsMode(m) {
 
 function pipeTone(l) {
   return l.status === ST.PENDING ? 'pending' : l.status === ST.NO_ANSWER ? 'noanswer'
-    : l.status === ST.CLOSED ? 'answered' : pipeStage(l) === 'deal' ? 'closed' : 'showing';
+    : l.status === ST.CLOSED || l.status === ST.NOT_INTERESTED ? 'answered' : pipeStage(l) === 'deal' ? 'closed' : 'showing';
 }
 
 function pipeCard(l) {
@@ -7247,6 +7331,7 @@ function nextHint(l) {
     return 'Επόμενη υπόδειξη ή έντυπο προσφοράς';
   }
   if (l.status === ST.CLOSED) return l.outcome || 'Κλειστή';
+  if (l.status === ST.NOT_INTERESTED) return 'Δεν ενδιαφέρθηκε · πάρε ζήτηση ή άσε το';
   return 'Κλείσε υπόδειξη';
 }
 
@@ -7291,7 +7376,7 @@ function alertItems() {
     add({ id: 'fu:' + l.id + ':' + l.followUp, kind: 'calls', icon: 'refresh', tone: 'warn', title: 'Follow-up · ' + (l.name || 'Χωρίς όνομα'),
       sub: 'Ξανά ' + lowerDay(niceDate(l.followUp)) + (l.code ? ' · Κωδ. ' + l.code : ''), go: function () { openLead(l.id); } });
   });
-  S.leads.filter(function (l) { return l.offer === 'Υπογράφηκε' && l.status !== ST.CLOSED; }).forEach(function (l) {
+  S.leads.filter(function (l) { return l.offer === 'Υπογράφηκε' && l.status !== ST.CLOSED && l.status !== ST.NOT_INTERESTED; }).forEach(function (l) {
     add({ id: 'of:' + l.id, kind: 'calls', icon: 'receipt', tone: 'blue', title: 'Υπογράφηκε προσφορά · ' + (l.name || 'Χωρίς όνομα'),
       sub: (l.code ? 'Κωδ. ' + l.code + ' · ' : '') + 'Άνοιξε το PDF μέσα στην κλήση', go: function () { openLead(l.id); } });
   });
