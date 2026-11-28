@@ -21,7 +21,7 @@
  */
 
 /** Έκδοση backend. Πρέπει να ταιριάζει με το APP_VERSION του app.js. */
-const VERSION = '1.27';
+const VERSION = '1.28';
 
 /**
  * Ρυθμίσεις που διαφέρουν ανά περιβάλλον (DEV / PROD) ή είναι ιδιωτικές.
@@ -369,9 +369,10 @@ const STATUS = {
   ANSWERED:  'Απαντημένη',
   NO_ANSWER: 'Δεν απάντησε',
   SHOWING:   'Υπόδειξη',
-  CLOSED:    'Κλειστή'
+  CLOSED:    'Κλειστή',
+  NOT_INTERESTED: 'Δεν ενδιαφέρθηκε'    // 2.19: ο πελάτης δεν ενδιαφέρθηκε ήδη από το τηλέφωνο
 };
-const STATUS_LIST = [STATUS.PENDING, STATUS.ANSWERED, STATUS.NO_ANSWER, STATUS.SHOWING, STATUS.CLOSED];
+const STATUS_LIST = [STATUS.PENDING, STATUS.ANSWERED, STATUS.NO_ANSWER, STATUS.SHOWING, STATUS.CLOSED, STATUS.NOT_INTERESTED];
 
 /**
  * Προεπιλεγμένα μηνύματα SMS. Ο κάθε μεσίτης τα αλλάζει από το ⚙.
