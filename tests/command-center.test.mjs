@@ -56,8 +56,9 @@ function fakeSheet(name, grid) {
   return { writes, sheet: { getName: () => name, getRange: range } };
 }
 
-test('onEdit: επικόλληση 2 γραμμών μαζί με την κεφαλίδα, μία εγγραφή ανά κανόνα', () => {
+test('onEdit: επικόλληση 2 γραμμών μαζί με slicers και κεφαλίδα, μία εγγραφή ανά κανόνα', () => {
   const grid = [
+    ['', '', '', '', '', true, ''],
     ['Εβδομάδα', 'Ρόλος', 'Ποιος', 'Στόχος', 'Project', 'Έγινε', 'Ολοκληρώθηκε'],
     ['2026-W48', '', '', 'α', '', true, ''],
     ['2026-W48', '', '', 'β', '', false, '2026-11-20']
@@ -65,12 +66,12 @@ test('onEdit: επικόλληση 2 γραμμών μαζί με την κεφ�
   const { writes, sheet } = fakeSheet('Στόχοι', grid);
   const e = {
     source: { getSpreadsheetTimeZone: () => 'Europe/Athens' },
-    range: { getSheet: () => sheet, getRow: () => 1, getColumn: () => 6, getNumRows: () => 3, getNumColumns: () => 1 }
+    range: { getSheet: () => sheet, getRow: () => 1, getColumn: () => 6, getNumRows: () => 4, getNumColumns: () => 1 }
   };
   run('onEdit')(e);
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].row, 2);
-  assert.deepEqual(grid.map((r) => r[6]), ['Ολοκληρώθηκε', T, '']);
+  assert.equal(writes[0].row, 3);
+  assert.deepEqual(grid.map((r) => r[6]), ['', 'Ολοκληρώθηκε', T, '']);
 });
 
 test('onEdit: αλλαγή σε στήλη χωρίς κανόνα δεν διαβάζει τίποτα', () => {

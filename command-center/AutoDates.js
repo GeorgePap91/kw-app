@@ -1,5 +1,5 @@
 /**
- * KWAC Command Center · Αυτόματες ημερομηνίες · v1.0 (27/11/2026)
+ * KWAC Command Center · Αυτόματες ημερομηνίες · v1.1 (28/11/2026)
  *
  * Μπαίνει ΜΟΝΟ στο Apps Script του workbook «KWAC Command Center»
  * (Επεκτάσεις → Apps Script). ΔΕΝ ανήκει στο apps-script/ της KW App.
@@ -16,7 +16,11 @@
  * αγγίζει μόνο τις γραμμές που άλλαξαν (μία ανάγνωση + μία εγγραφή ανά κανόνα).
  * Δεν τρέχει για αλλαγές που κάνει άλλο script ή το API: εκεί η ημερομηνία
  * γράφεται από όποιον κάνει την αλλαγή.
+ *
+ * v1.1: γραμμή 1 = slicers, γραμμή 2 = κεφαλίδα, τα δεδομένα από τη γραμμή 3.
  */
+
+const AUTO_DATE_FIRST_ROW = 3;
 
 const AUTO_DATE_RULES = [
   { sheet: 'Στόχοι', watchCol: 6,  dateCol: 7,  when: 'checked',     onFalse: 'clear' },
@@ -65,7 +69,7 @@ function onEdit(e) {
   const rules = autoDateRulesFor_(sh.getName(), range.getColumn(), range.getNumColumns());
   if (!rules.length) return;
 
-  const start = Math.max(range.getRow(), 2);           // η γραμμή 1 είναι κεφαλίδα
+  const start = Math.max(range.getRow(), AUTO_DATE_FIRST_ROW); // γραμμές 1–2: slicers, κεφαλίδα
   const end = range.getRow() + range.getNumRows() - 1;
   if (end < start) return;
   const n = end - start + 1;
@@ -82,5 +86,5 @@ function onEdit(e) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { AUTO_DATE_RULES, autoDateMatches_, autoDateCompute_, autoDateRulesFor_ };
+  module.exports = { AUTO_DATE_FIRST_ROW, AUTO_DATE_RULES, autoDateMatches_, autoDateCompute_, autoDateRulesFor_ };
 }
